@@ -14648,6 +14648,7 @@ return Quests
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
@@ -14783,12 +14784,23 @@ function Shop:Init(controllers)
 		select("Products")
 	end })
 
-	for i, entry in sorted(Config.GamePasses) do
-		card(passPage, i, entry.Data, true, entry.Key)
+	-- in Studio everything shows (purchases are simulated); in a live game only
+	-- the items whose ids are set up on the Creator Dashboard
+	local showAll = RunService:IsStudio() and Config.Monetization.SimulateUnconfiguredInStudio
+	local function fill(page, map, isPass: boolean)
+		local shown = 0
+		for _, entry in sorted(map) do
+			if showAll or (entry.Data.Id or 0) ~= 0 then
+				shown += 1
+				card(page, shown, entry.Data, isPass, entry.Key)
+			end
+		end
+		if shown == 0 then
+			UIKit.Label({ Text = "Coming soon! 🛠️", Size = UDim2.new(1, 0, 0, 40), Font = Theme.BodyFont, TextColor3 = Theme.SubText, ZIndex = 7, Parent = page })
+		end
 	end
-	for i, entry in sorted(Config.Products) do
-		card(productPage, i, entry.Data, false, entry.Key)
-	end
+	fill(passPage, Config.GamePasses, true)
+	fill(productPage, Config.Products, false)
 	select("Passes")
 end
 

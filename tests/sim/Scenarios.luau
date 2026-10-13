@@ -2483,4 +2483,113 @@ add({
 	end,
 })
 
+---------------------------------------------------------------------------
+-- Soak: an 8-hour server with bots coming and going, random disasters and
+-- minigames. Nothing may error, leak instances or corrupt data.
+---------------------------------------------------------------------------
+add({
+	Name = "soak",
+	Slow = true,
+	MaxSeconds = 9 * 3600,
+	AllowedWarnings = { "DataStores unavailable", "Could not load data", "Took over a session lock" },
+	Run = function(T, place)
+		T.SetDt(1)
+		local game, me = T.Boot(place)
+		local ws = game:GetService("Workspace")
+		local DataService = T.Service("DataService")
+		local TycoonService = T.Service("TycoonService")
+		local bots = {}
+		local nextId = 20000
+		local function join()
+			nextId += 1
+			local bot = T.AddPlayer("Bot" .. nextId, { UserId = 20000 + (nextId % 6) })
+			table.insert(bots, bot)
+		end
+		for _ = 1, 4 do
+			join()
+		end
+		T.Wait(30)
+		local baseline = #ws:GetDescendants()
+		local samples = {}
+		local start = T.Engine.Now
+		local hour = 0
+		while T.Engine.Now - start < 8 * 3600 do
+			T.Wait(10)
+			for i = #bots, 1, -1 do
+				local bot = bots[i]
+				if bot.Parent then
+					TycoonService:CollectVault(bot)
+					T.Engine.FireServerAs(bot, T.Remote("BuyAll"))
+					if math.random() < 0.05 then
+						T.Engine.FireServerAs(bot, T.Remote("MinigameJoin"))
+					end
+					if math.random() < 0.004 then
+						T.Engine.RemovePlayer(bot) -- leaves...
+						table.remove(bots, i)
+						join() -- ...someone (maybe them again) joins
+					end
+				else
+					table.remove(bots, i)
+				end
+			end
+			TycoonService:CollectVault(me)
+			T.Client(function()
+				T.Remote("BuyAll"):FireServer()
+			end)
+			local h = math.floor((T.Engine.Now - start) / 3600)
+			if h > hour then
+				hour = h
+				local count = #ws:GetDescendants()
+				table.insert(samples, count)
+				print(("    hour %d: %d instances in workspace, %d players"):format(h, count, #game:GetService("Players"):GetPlayers()))
+			end
+		end
+		-- the world doesn't keep growing (towers are bounded, effects are cleaned up)
+		local first, last = samples[2] or samples[1], samples[#samples]
+		T.Check(last < first * 1.35 + 2000, ("no instance leak (%d -> %d)"):format(first, last))
+		for _, p in game:GetService("Players"):GetPlayers() do
+			local data = DataService:Get(p)
+			T.Check(data ~= nil and finite(data.Cash) and finite(data.Vault) and finite(data.TotalEarned), p.Name .. " data valid")
+		end
+		T.Check(#T.Engine.Kicks == 0, "nobody was kicked")
+		T.Check(me.PlayerGui:FindFirstChild("MegaTycoonUI") ~= nil, "the local client survived 8 hours")
+	end,
+})
+
+add({
+	Name = "shop_live_ui",
+	Run = function(T, place)
+		T.Engine.Studio = false
+		local game, me = T.Boot(place, {
+			Setup = function(T2)
+				-- server and client each have their own copy of Config
+				T2.Shared("Config", "server").GamePasses.VIP.Id = 111
+				T2.Shared("Config", "client").GamePasses.VIP.Id = 111
+			end,
+		})
+		T.Wait(6)
+		T.Client(function()
+			T.Controller("UI"):Open("Shop")
+		end)
+		T.Wait(0.5)
+		local passes, products
+		for _, d in me.PlayerGui:GetDescendants() do
+			if d:IsA("ScrollingFrame") and d.Name == "Passes" then
+				passes = d
+			elseif d:IsA("ScrollingFrame") and d.Name == "Products" then
+				products = d
+			end
+		end
+		local cards = 0
+		for _, child in passes:GetChildren() do
+			if child:IsA("Frame") then
+				cards += 1
+				T.Check(child.Name == "VIP", "only configured passes are listed (" .. child.Name .. ")")
+			end
+		end
+		T.Check(cards == 1, "one configured pass shown (" .. cards .. ")")
+		T.Check(T.FindText(products, "Coming soon") ~= nil, "no products configured: 'coming soon'")
+	end,
+})
+
 return Scenarios

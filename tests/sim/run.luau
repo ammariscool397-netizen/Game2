@@ -1,7 +1,8 @@
 --[[
 	Runs the Mega Tycoon simulation tests.
 	  lune run tests/sim/run.luau [place.rbxlx] [scenario] [--verbose]
-	Without a scenario name, every scenario runs in its own process.
+	Without a scenario name, every scenario runs in its own process
+	(slow ones like the 8-hour soak only with SIM_SLOW=1).
 ]]
 local process = require("@lune/process")
 local stdio = require("@lune/stdio")
@@ -26,8 +27,12 @@ if not only then
 	-- run each scenario in a fresh process so they can't affect each other
 	local failed = 0
 	local names = {}
+	local includeSlow = process.env.SIM_SLOW == "1"
 	for _, scenario in Scenarios do
-		table.insert(names, scenario.Name)
+		-- slow scenarios (e.g. the 8-hour soak) only run when asked for
+		if not scenario.Slow or includeSlow then
+			table.insert(names, scenario.Name)
+		end
 	end
 	for _, name in names do
 		-- this file's own path (Lune names chunks [string "path/without/ext"])
