@@ -45,12 +45,42 @@ function Animator:IsLowGraphics(): boolean
 	return lowGraphics
 end
 
+-- low graphics: no animations and no particles (also ones created later).
+-- Only emitters we switched off are switched back on.
+local quieted = setmetatable({}, { __mode = "k" })
+local descendantConn: RBXScriptConnection?
+local function quiet(d: Instance)
+	if lowGraphics and d:IsA("ParticleEmitter") and d.Enabled then
+		d.Enabled = false
+		quieted[d] = true
+	end
+end
+
 function Animator:SetLowGraphics(enabled: boolean)
+	if enabled == lowGraphics then
+		return
+	end
 	lowGraphics = enabled
-	for _, d in workspace:GetDescendants() do
-		if d:IsA("ParticleEmitter") then
-			d.Enabled = not enabled
+	if enabled then
+		for _, d in workspace:GetDescendants() do
+			quiet(d)
 		end
+		descendantConn = workspace.DescendantAdded:Connect(function(d)
+			if d:IsA("ParticleEmitter") then
+				task.defer(quiet, d)
+			end
+		end)
+	else
+		if descendantConn then
+			descendantConn:Disconnect()
+			descendantConn = nil
+		end
+		for d in quieted do
+			if d.Parent then
+				(d :: ParticleEmitter).Enabled = true
+			end
+		end
+		table.clear(quieted)
 	end
 end
 
@@ -105,6 +135,11 @@ function Animator:Init(controllers)
 end
 
 function Animator:Start()
+	-- the saved setting
+	self:SetLowGraphics(player:GetAttribute("LowGraphics") == true)
+	player:GetAttributeChangedSignal("LowGraphics"):Connect(function()
+		self:SetLowGraphics(player:GetAttribute("LowGraphics") == true)
+	end)
 	RunService.RenderStepped:Connect(function()
 		local t = os.clock()
 		local cam = workspace.CurrentCamera

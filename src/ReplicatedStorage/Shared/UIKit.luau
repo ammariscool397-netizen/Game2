@@ -304,8 +304,12 @@ function UIKit.TextBox(props: { [string]: any })
 	return box
 end
 
--- Pop a panel open / closed with a bouncy tween
+-- Pop a panel open / closed with a bouncy tween. The token makes sure a
+-- close animation that finishes after a quick re-open can't hide the panel.
+local popTokens: { [GuiObject]: number } = setmetatable({}, { __mode = "k" }) :: any
+
 function UIKit.Open(frame: GuiObject)
+	popTokens[frame] = (popTokens[frame] or 0) + 1
 	local scale = frame:FindFirstChild("PopScale") :: UIScale?
 	frame.Visible = true
 	if scale then
@@ -316,12 +320,14 @@ function UIKit.Open(frame: GuiObject)
 end
 
 function UIKit.Close(frame: GuiObject)
+	popTokens[frame] = (popTokens[frame] or 0) + 1
+	local token = popTokens[frame]
 	local scale = frame:FindFirstChild("PopScale") :: UIScale?
 	if scale then
 		local tween = TweenService:Create(scale, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Scale = 0.6 })
 		tween:Play()
 		tween.Completed:Once(function()
-			if scale.Scale <= 0.61 then
+			if popTokens[frame] == token then
 				frame.Visible = false
 			end
 		end)

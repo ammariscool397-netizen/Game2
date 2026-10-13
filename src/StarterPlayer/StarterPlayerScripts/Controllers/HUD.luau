@@ -255,7 +255,9 @@ function HUD:Refresh()
 	local rebirths = player:GetAttribute("WalletRebirths") or player:GetAttribute("Rebirths") or 0
 	local rounded = math.floor(mult * 100 + 0.5) / 100
 	incomeLabel.Text = "+" .. Util.Money(player:GetAttribute("Income") or 0) .. "/s"
-	infoLabel.Text = string.format("x%s cash  •  Rebirth %d%s", rounded >= 1000 and Util.Abbreviate(rounded) or tostring(rounded), rebirths, player:GetAttribute("DuoHost") and "  •  👥 Duo" or "")
+	local extras = (player:GetAttribute("DuoHost") and "  •  👥 Duo" or "")
+		.. ((player:GetAttribute("Pass_AutoBuild") and player:GetAttribute("AutoBuild") ~= false) and "  •  🤖 Auto" or "")
+	infoLabel.Text = string.format("x%s cash  •  Rebirth %d%s", rounded >= 1000 and Util.Abbreviate(rounded) or tostring(rounded), rebirths, extras)
 	local hasAuto = player:GetAttribute("Pass_AutoCollect")
 	local vault = player:GetAttribute("Vault") or 0
 	vaultLabel.Text = (not hasAuto and vault > 0) and ("🏦 Vault: " .. Util.Money(vault) .. " (step on a vault pad!)") or ""

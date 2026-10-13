@@ -16,7 +16,7 @@
 local Config = {}
 
 Config.GameName = "MEGA TYCOON"
-Config.Version = "2.0.0"
+Config.Version = "2.1.0"
 
 ---------------------------------------------------------------------------
 -- Data / economy
@@ -187,6 +187,21 @@ Config.GamePasses = {
 		Color = Color3.fromRGB(255, 90, 160),
 		Order = 5,
 	},
+	AutoBuild = {
+		Id = 0,
+		Name = "Auto Builder",
+		Description = "Your tower buys its best affordable upgrade by itself. Turn it on/off in Settings.",
+		PriceHint = 349,
+		Icon = "🤖",
+		Color = Color3.fromRGB(0, 210, 190),
+		Order = 6,
+	},
+}
+
+-- Auto Builder: how often it buys (seconds) and how many upgrades per go
+Config.AutoBuild = {
+	Interval = 2,
+	PerTick = 1,
 }
 
 -- Cash products pay "Minutes" of your current income (never less than MinCash)
@@ -401,6 +416,38 @@ Config.Daily = {
 	StreakResetAfter = 48 * 60 * 60,
 	Rewards = { 1_000, 2_500, 5_000, 10_000, 20_000, 40_000, 100_000 },
 	IncomeMinutes = { 2, 3, 5, 8, 12, 18, 30 },
+}
+
+---------------------------------------------------------------------------
+-- Quests: everyone has 3 at a time; claim one and a new one appears.
+-- Rewards = the bigger of RewardSeconds of your income or MinCash x (1 + rebirths).
+-- Text uses %d / %s for the target.
+---------------------------------------------------------------------------
+Config.Quests = {
+	Enabled = true,
+	Active = 3,
+	Types = {
+		Buy = { Text = "Buy %d upgrades", Targets = { 5, 8, 12 }, RewardSeconds = 90, MinCash = 400 },
+		Earn = { Text = "Earn %s from your tower", IncomeSeconds = { 120, 240, 400 }, MinTarget = 500, RewardSeconds = 120, MinCash = 500 },
+		Collect = { Text = "Collect your vault %d times", Targets = { 3, 5 }, RewardSeconds = 60, MinCash = 300 },
+		Floor = { Text = "Unlock %s", RewardSeconds = 240, MinCash = 2000, BoostSeconds = 300 },
+		Secret = { Text = "Find a hidden secret", RewardSeconds = 180, MinCash = 2500, BoostSeconds = 300 },
+		Obby = { Text = "Finish the obby", RewardSeconds = 150, MinCash = 2000 },
+		Minigame = { Text = "Play a minigame", RewardSeconds = 120, MinCash = 1500 },
+		Survive = { Text = "Survive a disaster", RewardSeconds = 150, MinCash = 1500 },
+	},
+}
+
+---------------------------------------------------------------------------
+-- Playtime gifts: stay in the server to unlock them (resets every session).
+-- Each pays the bigger of IncomeMinutes of income or MinCash x (1 + rebirths).
+---------------------------------------------------------------------------
+Config.Gifts = {
+	Enabled = true,
+	Minutes = { 5, 10, 20, 30, 45, 60 }, -- minutes after joining
+	IncomeMinutes = { 1, 2, 3, 5, 8, 12 },
+	MinCash = { 500, 1_000, 2_000, 4_000, 8_000, 15_000 },
+	FinalBoostSeconds = 10 * 60, -- the last gift also gives a 2x boost
 }
 
 ---------------------------------------------------------------------------

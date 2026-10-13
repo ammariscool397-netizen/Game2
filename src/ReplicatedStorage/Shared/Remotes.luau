@@ -26,6 +26,8 @@ local EVENTS = {
 	"DuoRespond", -- client -> server  (hostUserId, accept)
 	"DuoLeave", -- client -> server  (kick partner if host / leave if partner)
 	"DuoInvited", -- server -> client  { HostName, HostUserId, Timeout }
+	"QuestUpdate", -- server -> client  (quests, claimedCount)
+	"GiftUpdate", -- server -> client  { Index, ReadyIn, Total }
 }
 
 local FUNCTIONS = {
@@ -35,6 +37,8 @@ local FUNCTIONS = {
 	"AdminData", -- (what) -> data
 	"BuyItem", -- (itemId) -> ok, message
 	"GetTycoonState", -- () -> state
+	"ClaimQuest", -- (slot) -> ok, message
+	"ClaimGift", -- () -> ok, message
 }
 
 local folder: Folder

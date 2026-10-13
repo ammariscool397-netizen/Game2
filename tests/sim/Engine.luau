@@ -278,6 +278,14 @@ function Signal:Connect(fn)
 	assert(type(fn) == "function", "Attempt to connect failed: Passed value is not a function")
 	local conn = setmetatable({ Connected = true, Fn = fn, Ctx = Engine.Context, Signal = self }, Connection)
 	table.insert(self.Connections, conn)
+	-- remote events that arrived with nobody listening are delivered now (Roblox queues them)
+	local queued = self.Queued
+	if queued and #queued > 0 then
+		self.Queued = {}
+		for _, args in queued do
+			spawnIn(conn.Ctx, conn.Fn, table.unpack(args, 1, args.n))
+		end
+	end
 	return conn
 end
 
@@ -311,6 +319,14 @@ function Signal:Fire(...)
 		for i = 1, #list // 2 do
 			list[i], list[#list - i + 1] = list[#list - i + 1], list[i]
 		end
+	end
+	if self.Queued and #list == 0 and #self.Waiting == 0 then
+		if #self.Queued >= 256 then
+			record("warning", Engine.Context, "Remote event invocation queue exhausted for " .. self.Name .. "; did you forget to implement OnClientEvent?")
+		else
+			table.insert(self.Queued, args)
+		end
+		return
 	end
 	for _, conn in list do
 		if conn.Connected then
@@ -584,8 +600,13 @@ local EVENTS = {
 }
 for className, names in EVENTS do
 	for _, name in names do
+		local queues = className == "RemoteEvent"
 		prop(className, name, function(proxy)
-			return signalFor(proxy, name)
+			local sig = signalFor(proxy, name)
+			if queues and not sig.Queued then
+				sig.Queued = {}
+			end
+			return sig
 		end)
 	end
 end
@@ -616,13 +637,21 @@ end
 -- Instance basics
 ---------------------------------------------------------------------------
 local function fireAncestry(child, newParent)
-	-- ChildAdded / DescendantAdded only if someone listens (cheap)
+	-- ChildAdded / DescendantAdded only if someone listens (cheap). Like
+	-- Roblox, DescendantAdded fires for the child AND everything inside it.
 	if newParent then
 		fireIfExists(newParent, "ChildAdded", child)
 		local ancestor = newParent
+		local subtree
 		while ancestor do
 			if hasSignal(ancestor, "DescendantAdded") then
+				if not subtree then
+					subtree = unwrap(child):GetDescendants()
+				end
 				fireIfExists(ancestor, "DescendantAdded", child)
+				for _, d in subtree do
+					fireIfExists(ancestor, "DescendantAdded", d)
+				end
 			end
 			ancestor = ancestor.Parent
 		end
@@ -1241,6 +1270,15 @@ local function assertPlayer(value, label)
 	end
 end
 
+-- a remote's event signal (queues events while nobody listens, like Roblox)
+local function remoteSignal(remote, name: string)
+	local sig = signalFor(remote, name)
+	if not sig.Queued then
+		sig.Queued = {}
+	end
+	return sig
+end
+
 -- everything the server sent to each player (for checks)
 Engine.Outbox = {} :: { [string]: { { Remote: string, Args: any } } }
 local function postToOutbox(player, remoteName: string, args)
@@ -1297,7 +1335,7 @@ local function fireServerAs(remote, player, ...)
 	Engine.Stats.FireServer += 1
 	local args = packCopy(...)
 	checkRemoteArgs("FireServer(" .. remote.Name .. ")", args)
-	signalFor(remote, "OnServerEvent"):Fire(player, table.unpack(args, 1, args.n))
+	remoteSignal(remote, "OnServerEvent"):Fire(player, table.unpack(args, 1, args.n))
 end
 
 local function invokeServerAs(remote, player, ...)
@@ -1352,7 +1390,7 @@ method("RemoteEvent", "FireClient", function(self, player, ...)
 	checkRemoteArgs("FireClient(" .. self.Name .. ")", args)
 	postToOutbox(player, self.Name, args)
 	if player == Engine.LocalPlayer then
-		signalFor(self, "OnClientEvent"):Fire(table.unpack(args, 1, args.n))
+		remoteSignal(self, "OnClientEvent"):Fire(table.unpack(args, 1, args.n))
 	end
 end)
 method("RemoteEvent", "FireAllClients", function(self, ...)
@@ -1363,7 +1401,7 @@ method("RemoteEvent", "FireAllClients", function(self, ...)
 	for _, player in playerList() do
 		postToOutbox(player, self.Name, args)
 		if player == Engine.LocalPlayer then
-			signalFor(self, "OnClientEvent"):Fire(table.unpack(args, 1, args.n))
+			remoteSignal(self, "OnClientEvent"):Fire(table.unpack(args, 1, args.n))
 		end
 	end
 end)
@@ -1726,11 +1764,15 @@ local CFrameLib = setmetatable({ lookAt = lookAt }, { __index = CFrame })
 Engine.CFrame = CFrameLib
 
 local InstanceLib = {}
+local clientCreated = setmetatable({}, { __mode = "k" })
 function InstanceLib.new(className: string, parent)
 	assert(type(className) == "string", "Instance.new expects a class name")
 	local native = RInstance.new(className)
 	Engine.Stats.Instances += 1
 	local proxy = wrap(native)
+	if Engine.Context == "client" then
+		clientCreated[proxy] = true
+	end
 	if className == "Humanoid" then
 		native.MaxHealth = 100
 		native.WalkSpeed = 16
@@ -2028,6 +2070,67 @@ function Engine.RemovePlayer(player)
 	if player == Engine.LocalPlayer then
 		Engine.LocalPlayer = nil
 	end
+end
+
+-- The local player's client shuts down (they left): every client connection,
+-- thread, render binding, module and client-made instance goes away, like
+-- closing the Roblox app. A new local player can then start a fresh client.
+function Engine.ResetClient()
+	local function dropClientConnections(sig)
+		for _, conn in table.clone(sig.Connections) do
+			if conn.Ctx == "client" then
+				conn:Disconnect()
+			end
+		end
+		local keep = {}
+		for _, thread in sig.Waiting do
+			if threadCtx[thread] ~= "client" then
+				table.insert(keep, thread)
+			end
+		end
+		sig.Waiting = keep
+	end
+	for _, bucket in instanceSignals do
+		for _, sig in bucket do
+			dropClientConnections(sig)
+		end
+	end
+	for _, sig in tagAdded do
+		dropClientConnections(sig)
+	end
+	for _, sig in tagRemoved do
+		dropClientConnections(sig)
+	end
+	local function serverOnly(list)
+		local keep = {}
+		for _, entry in list do
+			local thread = entry.Thread
+			if threadCtx[thread] == "client" then
+				cancelled[thread] = true
+			else
+				table.insert(keep, entry)
+			end
+		end
+		return keep
+	end
+	sleeping = serverOnly(sleeping)
+	deferred = serverOnly(deferred)
+	waiters = serverOnly(waiters)
+	for name, binding in renderBindings do
+		if binding.Ctx == "client" then
+			renderBindings[name] = nil
+		end
+	end
+	for proxy in clientCreated do
+		local native = natives[proxy]
+		local parent = native and native.Parent
+		if parent and not clientCreated[wrap(parent)] then
+			simDestroy(proxy)
+		end
+	end
+	table.clear(clientCreated)
+	moduleCache.client = {}
+	Engine.LocalPlayer = nil
 end
 
 ---------------------------------------------------------------------------

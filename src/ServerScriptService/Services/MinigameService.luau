@@ -620,6 +620,9 @@ function MinigameService:RunGame(key: string)
 	for _, r in results do
 		local player = r.Player
 		if player.Parent then
+			if S.QuestService then
+				S.QuestService:Progress(player, "Minigame", 1)
+			end
 			local data = S.DataService:Get(player)
 			if data and r.Reward > 0 then
 				S.DataService:AddCash(player, r.Reward, false)

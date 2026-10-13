@@ -515,9 +515,20 @@ function DisasterService:_run(kind: string, by: string?)
 	active = kind
 	stopRequested = false
 	workspace:SetAttribute("Disaster", kind)
+	-- who's out there (survivors = same character, still alive at the end)
+	local present = {}
+	for _, info in mainMapPlayers() do
+		present[info.Player] = info.Player.Character
+	end
 	local ok, err = pcall(handlers[kind], by)
 	if not ok then
 		warn("[Disasters] " .. kind .. " failed: " .. tostring(err))
+	end
+	for player, character in present do
+		local humanoid = getHumanoid(player)
+		if player.Parent and player.Character == character and humanoid and humanoid.Health > 0 and S.QuestService then
+			S.QuestService:Progress(player, "Survive", 1)
+		end
 	end
 	broadcast({ Phase = "End", Kind = kind })
 	workspace:SetAttribute("Disaster", nil)

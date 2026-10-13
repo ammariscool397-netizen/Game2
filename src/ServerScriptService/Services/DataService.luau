@@ -46,7 +46,8 @@ local TEMPLATE = {
 	PlayTime = 0,
 	LastOnline = 0,
 	LastIncome = 0,
-	Settings = { MusicVolume = Config.Music.DefaultVolume, SFX = true, LowGraphics = false },
+	Quests = { List = {}, Claimed = 0 },
+	Settings = { MusicVolume = Config.Music.DefaultVolume, SFX = true, LowGraphics = false, Guide = true, AutoBuild = true },
 }
 
 local profiles: { [Player]: any } = {}
@@ -434,6 +435,9 @@ function DataService:Sync(player: Player)
 	player:SetAttribute("DailyStreak", data.DailyStreak)
 	player:SetAttribute("MusicVolume", data.Settings.MusicVolume)
 	player:SetAttribute("SFX", data.Settings.SFX)
+	player:SetAttribute("LowGraphics", data.Settings.LowGraphics)
+	player:SetAttribute("Guide", data.Settings.Guide)
+	player:SetAttribute("AutoBuild", data.Settings.AutoBuild)
 	local found = {}
 	for id in data.Secrets do
 		table.insert(found, id)

@@ -200,8 +200,8 @@ end
 
 ---------------------------------------------------------------------------
 local function buildSettings()
-	local _, content = C.UI:MakePanel("Settings", "⚙️ SETTINGS", Color3.fromRGB(130, 140, 160), 520, 420)
-	UIKit.List(content, 12)
+	local _, content = C.UI:MakePanel("Settings", "⚙️ SETTINGS", Color3.fromRGB(130, 140, 160), 520, 520)
+	UIKit.List(content, 10)
 
 	local function row(order: number, text: string)
 		local frame = UIKit.new("Frame", { Size = UDim2.new(1, -20, 0, 52), BackgroundColor3 = Theme.PanelLight, LayoutOrder = order, ZIndex = 7, Parent = content })
@@ -251,17 +251,63 @@ local function buildSettings()
 		end
 	end
 
-	local setSfx = toggle(2, "🔊 Sound Effects", true, function(on)
+	-- toggles start from the saved settings (player attributes from the server)
+	local setSfx = toggle(2, "🔊 Sound Effects", player:GetAttribute("SFX") ~= false, function(on)
 		UIKit.SFXEnabled = on
 		Remotes.SaveSettings:FireServer({ SFX = on })
 	end)
 	toggle(3, "🎶 Music Widget", true, function(on)
 		C.Music:SetWidgetVisible(on)
 	end)
-	toggle(4, "🥔 Low Graphics", false, function(on)
+	local setLow = toggle(4, "🥔 Low Graphics", player:GetAttribute("LowGraphics") == true, function(on)
 		C.Animator:SetLowGraphics(on)
 		Remotes.SaveSettings:FireServer({ LowGraphics = on })
 	end)
+	player:GetAttributeChangedSignal("LowGraphics"):Connect(function()
+		setLow(player:GetAttribute("LowGraphics") == true)
+	end)
+	local setGuide = toggle(5, "🧭 Guide Arrow", player:GetAttribute("Guide") ~= false, function(on)
+		player:SetAttribute("Guide", on) -- instant locally; the server saves it
+		Remotes.SaveSettings:FireServer({ Guide = on })
+	end)
+	player:GetAttributeChangedSignal("Guide"):Connect(function()
+		setGuide(player:GetAttribute("Guide") ~= false)
+	end)
+
+	-- Auto Builder (game pass): ON/OFF when owned, otherwise a shortcut to the shop
+	local autoRow = row(6, "🤖 Auto Builder")
+	local autoButton
+	local function refreshAuto()
+		if player:GetAttribute("Pass_AutoBuild") then
+			local on = player:GetAttribute("AutoBuild") ~= false
+			autoButton.Text = on and "ON" or "OFF"
+			autoButton.BackgroundColor3 = on and Theme.Green or Theme.Red
+		else
+			autoButton.Text = "GET"
+			autoButton.BackgroundColor3 = Theme.Accent
+		end
+	end
+	autoButton = UIKit.Button({
+		Text = "GET",
+		Color = Theme.Accent,
+		Size = UDim2.fromOffset(90, 36),
+		Position = UDim2.new(1, -104, 0, 8),
+		ZIndex = 8,
+		Parent = autoRow,
+		Callback = function()
+			if not player:GetAttribute("Pass_AutoBuild") then
+				C.UI:Open("Shop")
+				return
+			end
+			local on = player:GetAttribute("AutoBuild") == false
+			player:SetAttribute("AutoBuild", on)
+			Remotes.SaveSettings:FireServer({ AutoBuild = on })
+			refreshAuto()
+		end,
+	})
+	player:GetAttributeChangedSignal("Pass_AutoBuild"):Connect(refreshAuto)
+	player:GetAttributeChangedSignal("AutoBuild"):Connect(refreshAuto)
+	refreshAuto()
 
 	UIKit.Label({ Text = Config.GameName .. " v" .. Config.Version, Size = UDim2.new(1, 0, 0, 20), Font = Theme.BodyFont, TextColor3 = Theme.SubText, LayoutOrder = 9, ZIndex = 7, Parent = content })
 

@@ -903,6 +903,18 @@ add({
 			T.Check(button.Text:find("OWNED") ~= nil, "card for " .. key .. " shows OWNED")
 		end
 		T.Check(data.Passes.DoubleCash, "simulated passes are saved")
+		-- the Auto Builder spends cash by itself; check it, then switch it off
+		local owned = count(data.Purchased)
+		T.Service("DataService"):AddCash(me, 1e5, false)
+		T.Wait(5)
+		T.Check(count(data.Purchased) > owned, "Auto Builder buys upgrades by itself")
+		T.Client(function()
+			T.Remote("SaveSettings"):FireServer({ AutoBuild = false })
+		end)
+		T.Wait(0.5)
+		owned = count(data.Purchased)
+		T.Wait(5)
+		T.Check(count(data.Purchased) == owned, "Auto Builder can be switched off")
 		local mult = me:GetAttribute("Multiplier")
 		T.Check(math.abs(mult - 3) < 1e-9, "2x Cash * VIP 1.5x = 3x (" .. tostring(mult) .. ")")
 		T.Check(T.Humanoid(me).WalkSpeed == 32, "Super Speed doubles walk speed")
@@ -1284,13 +1296,16 @@ local function playMinigame(T, key: string)
 		T.Wait(0.5)
 	end
 	T.Check(me:GetAttribute("InMinigame") == nil, "round ended")
-	T.Check(data.Cash > cash, key .. " paid a reward")
-	local results = nil
-	for _, args in T.Sent(me, "MinigameState") do
-		if args[1].Phase == "Results" then
-			results = args[1]
+	-- (everyone can be out a moment before the server posts the results)
+	local results = T.WaitFor(function()
+		for _, args in T.Sent(me, "MinigameState") do
+			if args[1].Phase == "Results" then
+				return args[1]
+			end
 		end
-	end
+		return nil
+	end, 10, "minigame results")
+	T.Check(data.Cash > cash, key .. " paid a reward")
 	T.Check(results ~= nil and #results.Results == 2, "results list both players")
 	-- (if a meteor got us we respawn at home a few seconds later)
 	T.WaitFor(function()
@@ -1817,6 +1832,329 @@ add({
 		print(("    nuke wrecked %d items on 8 towers in %.1fs real time"):format(wrecked, os.clock() - stepClock))
 		T.Check(wrecked == 0, "maxed towers own the Nuke Shield (no damage)")
 		T.Check(os.clock() - clock < 120, ("whole scenario runs fast (%.1fs)"):format(os.clock() - clock))
+	end,
+})
+
+---------------------------------------------------------------------------
+-- Settings are saved and come back when you rejoin (client restarts)
+---------------------------------------------------------------------------
+add({
+	Name = "settings_rejoin",
+	Run = function(T, place)
+		local game, me = T.Boot(place, { Name = "Fan", UserId = 4242 })
+		T.Wait(6)
+		local UI = T.Controller("UI")
+		T.Client(function()
+			UI:Open("Settings")
+		end)
+		T.Wait(0.6)
+		-- find the toggle rows
+		local function toggleFor(label: string)
+			for _, d in me.PlayerGui:GetDescendants() do
+				if d:IsA("TextLabel") and d.Text:find(label, 1, true) and T.IsShown(d) then
+					return d.Parent:FindFirstChildWhichIsA("TextButton")
+				end
+			end
+			return nil
+		end
+		local low = toggleFor("Low Graphics")
+		local sfx = toggleFor("Sound Effects")
+		T.Check(low ~= nil and low.Text == "OFF", "low graphics starts OFF")
+		T.Check(sfx ~= nil and sfx.Text == "ON", "sound effects start ON")
+		T.Client(function()
+			T.Engine.Click(low)
+			T.Engine.Click(sfx)
+		end)
+		T.Wait(0.5)
+		T.Check(T.Controller("Animator"):IsLowGraphics(), "low graphics applied")
+		local data = T.Service("DataService"):Get(me)
+		T.Check(data.Settings.LowGraphics == true and data.Settings.SFX == false, "settings saved on the server")
+		-- particles made later are quiet too
+		T.Wait(1)
+		local emitter = T.Client(function()
+			local part = T.Engine.Instance.new("Part")
+			part.Parent = game:GetService("Workspace")
+			local e = T.Engine.Instance.new("ParticleEmitter")
+			e.Parent = part
+			return e
+		end)
+		T.Wait(0.3)
+		T.Check(emitter and emitter.Enabled == false, "new particle emitters are disabled in low graphics")
+
+		-- quick close + reopen must leave the panel open
+		T.Client(function()
+			UI:Close()
+			UI:Open("Settings")
+		end)
+		T.Wait(0.6)
+		T.Check(UI.Current == "Settings" and T.IsShown(UI.Panels.Settings.Frame), "panel stays open after a quick close/reopen")
+
+		-- rejoin: the settings come back
+		T.LeaveClient()
+		T.Wait(2)
+		me = T.StartClient("Fan", { UserId = 4242 })
+		T.Wait(8)
+		T.Check(me:GetAttribute("LowGraphics") == true, "LowGraphics restored from the save")
+		T.Check(T.Controller("Animator"):IsLowGraphics(), "client starts in low graphics")
+		UI = T.Controller("UI")
+		T.Client(function()
+			UI:Open("Settings")
+		end)
+		T.Wait(0.6)
+		low = toggleFor("Low Graphics")
+		sfx = toggleFor("Sound Effects")
+		T.Check(low ~= nil and low.Text == "ON", "toggle shows the saved low graphics")
+		T.Check(sfx ~= nil and sfx.Text == "OFF", "toggle shows the saved sound setting")
+		T.Check(#me.PlayerGui:GetChildren() >= 2, "the new client built its UI")
+	end,
+})
+
+---------------------------------------------------------------------------
+-- Quests
+---------------------------------------------------------------------------
+add({
+	Name = "quests",
+	Run = function(T, place)
+		local game, me = T.Boot(place, { Name = "Quester", UserId = 6001 })
+		T.Wait(6)
+		local QuestService = T.Service("QuestService")
+		local DataService = T.Service("DataService")
+		local TycoonService = T.Service("TycoonService")
+		local data = DataService:Get(me)
+		local Quests = T.Controller("Quests")
+		T.Check(#data.Quests.List == 3, "new players get 3 quests (" .. #data.Quests.List .. ")")
+		T.Check(#Quests.List == 3, "client tracker shows 3 quests")
+		local types = {}
+		for _, q in data.Quests.List do
+			T.Check(not types[q.Type], "no duplicate quest types")
+			types[q.Type] = true
+		end
+		-- buy a dropper so income quests are possible, then set known quests
+		T.Client(function()
+			return T.Remote("BuyItem"):InvokeServer(cheapestAvailable(T, data).Id)
+		end)
+		data.Quests.List = {
+			{ Type = "Buy", Target = 3, Progress = 0 },
+			{ Type = "Collect", Target = 2, Progress = 0 },
+			{ Type = "Earn", Target = 30, Progress = 0 },
+		}
+		QuestService:Refresh(me)
+		T.Wait(1.5)
+		T.Check(#Quests.List == 3 and Quests.List[1].Type == "Buy", "client got the quest list")
+		-- claiming early fails
+		local early = T.Client(function()
+			return T.Remote("ClaimQuest"):InvokeServer(1)
+		end)
+		T.Check(early == false, "can't claim an unfinished quest")
+		-- do the quests
+		DataService:AddCash(me, 1e4, false)
+		for _ = 1, 3 do
+			T.Client(function()
+				return T.Remote("BuyItem"):InvokeServer(cheapestAvailable(T, data).Id)
+			end)
+		end
+		T.Check(data.Quests.List[1].Progress == 3, "Buy quest counts purchases")
+		T.Check(T.Noticed(me, "Quest complete"), "quest complete toast")
+		T.Wait(1.5)
+		T.Check(Quests:ReadyCount() >= 1, "tracker shows a quest ready")
+		local claimButton = T.WaitFor(function()
+			return T.FindButton(me.PlayerGui, "^CLAIM$")
+		end, 3, "CLAIM button")
+		local cash = data.Cash
+		if claimButton then
+			T.Client(function()
+				T.Engine.Click(claimButton)
+			end)
+			T.Wait(1)
+		end
+		T.Check(data.Cash > cash, "claiming pays the reward")
+		T.Check(data.Quests.Claimed == 1, "claimed quests are counted")
+		T.Check(#data.Quests.List == 3, "a new quest replaces the claimed one")
+		-- vault collect + earn
+		for _, d in TycoonService:GetPlot(me).Built.F1_1:GetDescendants() do
+			if d.Name == "VaultPad" then
+				T.Wait(3)
+				T.Engine.Touch(d, me)
+				T.Wait(1.5)
+				T.Engine.Touch(d, me)
+			end
+		end
+		local collect, earn
+		for _, q in data.Quests.List do
+			if q.Type == "Collect" then
+				collect = q
+			elseif q.Type == "Earn" then
+				earn = q
+			end
+		end
+		T.Check(collect and collect.Progress == 2, "Collect quest counts vault collections")
+		T.WaitFor(function()
+			return earn.Progress >= earn.Target
+		end, 30, "Earn quest from tower income")
+		-- every other kind of quest progresses from the real game event
+		data.Quests.List = {
+			{ Type = "Floor", Target = 2, Progress = 1 },
+			{ Type = "Survive", Target = 1, Progress = 0 },
+			{ Type = "Secret", Target = 1, Progress = 0 },
+		}
+		QuestService:Refresh(me)
+		DataService:AddCash(me, 1e9, false)
+		T.Client(function()
+			T.Remote("BuyAll"):FireServer()
+		end)
+		T.Wait(1)
+		T.Check(data.Quests.List[1].Progress >= 2, "Floor quest completes when floor 2 is unlocked")
+		T.Admin(me, ";meteors")
+		T.Wait(3)
+		T.Admin(me, ";stopdisaster")
+		T.WaitFor(function()
+			return game:GetService("Workspace"):GetAttribute("Disaster") == nil
+		end, 10, "storm stop")
+		T.Wait(1)
+		T.Check(data.Quests.List[2].Progress == 1 or T.Humanoid(me).Health <= 0, "Survive quest after a disaster")
+		T.Server(function()
+			T.Service("SecretService"):Find(me, "Board", true)
+		end)
+		T.Check(data.Quests.List[3].Progress == 1, "Secret quest")
+		data.Quests.List = {
+			{ Type = "Obby", Target = 1, Progress = 0 },
+			{ Type = "Minigame", Target = 1, Progress = 0 },
+			{ Type = "Buy", Target = 1, Progress = 0 },
+		}
+		QuestService:Refresh(me)
+		T.Server(function()
+			T.Service("ObbyService"):_finish(me)
+		end)
+		T.Check(data.Quests.List[1].Progress == 1, "Obby quest")
+		-- claim everything that's done
+		local claimed = data.Quests.Claimed
+		T.Client(function()
+			T.Remote("ClaimQuest"):InvokeServer(1)
+		end)
+		T.Check(data.Quests.Claimed == claimed + 1, "claim by slot")
+		-- quests are saved and come back after rejoining
+		local before = {}
+		for i, q in data.Quests.List do
+			before[i] = q.Type .. ":" .. q.Target
+		end
+		T.LeaveClient()
+		T.Wait(1)
+		me = T.StartClient("Quester", { UserId = 6001 })
+		T.Wait(8)
+		data = DataService:Get(me)
+		local same = #data.Quests.List == #before
+		for i, q in data.Quests.List do
+			same = same and before[i] == q.Type .. ":" .. q.Target
+		end
+		T.Check(same, "quests saved across sessions")
+		T.Check(data.Quests.Claimed == claimed + 1, "claimed count saved")
+		T.Check(#T.Controller("Quests").List == #data.Quests.List, "rejoined client shows the quests")
+		-- a rebirth replaces floor quests that no longer fit
+		data.Quests.List = { { Type = "Floor", Target = 5, Progress = 3 } }
+		T.Server(function()
+			TycoonService:Rebirth(me, true)
+		end)
+		T.Wait(1)
+		for _, q in data.Quests.List do
+			T.Check(q.Type ~= "Floor" or q.Target == 2, "floor quest re-targeted after rebirth")
+		end
+		T.Check(#data.Quests.List == 3, "still 3 quests after rebirth")
+	end,
+})
+
+---------------------------------------------------------------------------
+-- Playtime gifts
+---------------------------------------------------------------------------
+add({
+	Name = "gifts",
+	MaxSeconds = 2 * 3600,
+	Run = function(T, place)
+		local game, me = T.Boot(place)
+		T.Wait(6)
+		local Config = T.Shared("Config")
+		local data = T.Service("DataService"):Get(me)
+		local Gifts = T.Controller("Gifts")
+		local button = me.PlayerGui:FindFirstChild("GiftButton", true)
+		T.Check(button ~= nil and T.IsShown(button), "gift button on screen")
+		T.Check(button and button.Text:find("in") ~= nil, "shows a countdown: " .. (button and button.Text or "?"))
+		local okEarly = T.Client(function()
+			return T.Remote("ClaimGift"):InvokeServer()
+		end)
+		T.Check(okEarly == false, "gift can't be opened early")
+		T.SetDt(0.5)
+		local total = #Config.Gifts.Minutes
+		for index = 1, total do
+			T.WaitFor(function()
+				return Gifts:IsReady()
+			end, 20 * 60, "gift " .. index)
+			T.Wait(1.5)
+			T.Check(button.Text:find("OPEN") ~= nil, "gift " .. index .. " button says OPEN")
+			local cash = data.Cash
+			T.Client(function()
+				T.Engine.Click(button)
+			end)
+			T.Wait(0.5)
+			T.Check(data.Cash > cash, "gift " .. index .. " paid cash")
+		end
+		T.Check(data.BoostEnd > 0, "last gift gives a boost")
+		T.Wait(1.5)
+		T.Check(not T.IsShown(button), "gift button hides after the last gift")
+		local okMore = T.Client(function()
+			return T.Remote("ClaimGift"):InvokeServer()
+		end)
+		T.Check(okMore == false, "no more gifts this session")
+		T.Check(T.Engine.Now < 70 * 60 + 60, "all gifts within ~an hour")
+	end,
+})
+
+---------------------------------------------------------------------------
+-- Guide beam
+---------------------------------------------------------------------------
+add({
+	Name = "guide",
+	Run = function(T, place)
+		local game, me = T.Boot(place)
+		T.Wait(6)
+		local Guide = T.Controller("Guide")
+		local DataService = T.Service("DataService")
+		local TycoonItems = T.Shared("TycoonItems")
+		local data = DataService:Get(me)
+		local first = cheapestAvailable(T, data)
+		T.Wait(1)
+		T.Check(Guide.Target and Guide.Target.Kind == "Buy" and Guide.Target.Id == first.Id, "guide points at the first affordable button (" .. tostring(Guide.Target and Guide.Target.Id) .. ")")
+		local anchor = game:GetService("Workspace"):FindFirstChild("GuideTarget")
+		local beam = anchor and anchor:FindFirstChildOfClass("Beam")
+		T.Check(beam and beam.Enabled and beam.Attachment0 and beam.Attachment0.Parent == T.Root(me), "beam goes from the player to the button")
+		-- buy it by walking onto the pad
+		local plot = T.Service("TycoonService"):GetPlot(me)
+		T.Engine.Touch(plot.ButtonObjs[first.Id].Pad, me)
+		T.Wait(1)
+		T.Check(data.Purchased[first.Id], "bought the guided button")
+		-- broke: nothing to point at, until the vault would pay for the next one
+		DataService:SetCash(me, 0)
+		T.Wait(1)
+		T.Check(Guide.Target == nil or Guide.Target.Kind == "Vault", "no button target when broke")
+		local next = cheapestAvailable(T, data)
+		T.WaitFor(function()
+			return data.Vault >= next.Cost
+		end, 120, "vault to fill")
+		T.Wait(1)
+		T.Check(Guide.Target and Guide.Target.Kind == "Vault", "guide points at the vault when collecting lets you buy")
+		-- the setting turns it off
+		T.Client(function()
+			T.Remote("SaveSettings"):FireServer({ Guide = false })
+		end)
+		T.Service("DataService"):Sync(me)
+		T.Wait(1)
+		T.Check(Guide.Target == nil and not beam.Enabled, "guide can be turned off")
+		T.Client(function()
+			T.Remote("SaveSettings"):FireServer({ Guide = true })
+		end)
+		T.Service("DataService"):Sync(me)
+		-- far from home: hidden
+		T.MoveTo(me, CFrame.new(0, 5, 0))
+		T.Wait(1)
+		T.Check(Guide.Target == nil, "guide hidden away from your tower")
 	end,
 })
 

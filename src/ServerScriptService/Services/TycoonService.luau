@@ -65,6 +65,12 @@ local function sendUpdate(plot, payload)
 	end
 end
 
+local function quest(player: Player, kind: string, amount: number?)
+	if S.QuestService then
+		S.QuestService:Progress(player, kind, amount)
+	end
+end
+
 local function canKnockOut(item): boolean
 	if not KNOCKOUT_KINDS[item.Kind] then
 		return false
@@ -209,6 +215,22 @@ function TycoonService:_tick(plot, now: number)
 	if #due > 0 then
 		self:_recompute(plot)
 	end
+	-- Auto Builder pass: buys the cheapest affordable upgrade every few seconds
+	local data = S.DataService:Get(owner)
+	if data and data.Settings.AutoBuild ~= false and S.DataService:TeamHasPass(owner, "AutoBuild") then
+		plot.AutoBuildTimer = (plot.AutoBuildTimer or 0) + 1
+		if plot.AutoBuildTimer >= Config.AutoBuild.Interval and #plot.Queue == 0 then
+			plot.AutoBuildTimer = 0
+			local bought = self:_buyCheapest(owner, plot, data, Config.AutoBuild.PerTick)
+			if #bought > 0 then
+				self:_refreshButtons(plot)
+				self:_recompute(plot)
+				local last = TycoonItems.ById[bought[#bought]]
+				Remotes.VFX:FireAllClients("BuildIn", { Model = plot.Built[last.Id], Position = plot.ItemPos[last.Id], Color = last.Theme and last.Theme.Accent or plot.Color })
+			end
+		end
+	end
+
 	local mult = S.DataService:GetMultiplier(owner)
 	local amount = plot.Income * mult
 	if amount > 0 then
@@ -220,6 +242,9 @@ function TycoonService:_tick(plot, now: number)
 	end
 	for _, member in members(plot) do
 		member:SetAttribute("Income", amount)
+		if amount > 0 then
+			quest(member, "Earn", amount)
+		end
 	end
 end
 
@@ -494,6 +519,9 @@ function TycoonService:AddPartner(host: Player, partner: Player): boolean
 	S.DataService:Sync(host)
 	self:_recompute(plot)
 	sendUpdate(plot, { Type = "Reset" })
+	if S.QuestService then
+		S.QuestService:Refresh(partner) -- tower quests now follow the host's tower
+	end
 	if partner.Character then
 		partner.Character:PivotTo(plot.SpawnCFrame * CFrame.new(4, 0, 0))
 	end
@@ -525,6 +553,9 @@ function TycoonService:RemovePartner(plot, reassign: boolean)
 			if data then
 				self:_assign(partner, data)
 			end
+		end
+		if S.QuestService then
+			S.QuestService:Refresh(partner)
 		end
 	end
 end
@@ -745,6 +776,7 @@ end
 function TycoonService:CollectVault(player: Player)
 	local amount = S.DataService:CollectVault(player)
 	if amount > 0 then
+		quest(player, "Collect", 1)
 		Remotes.VFX:FireClient(player, "CashBurst", { Amount = amount })
 		Remotes.Notify:FireClient(player, { Text = "Collected " .. Util.Money(amount) .. "!", Type = "success" })
 	end
@@ -792,7 +824,31 @@ function TycoonService:TryPurchase(player: Player, itemId: string, silent: boole
 		end
 	end
 	sendUpdate(plot, { Type = "Bought", Id = itemId })
+	quest(player, "Buy", 1)
+	if (item.Kind == "Unlock" or itemId == "Roof_1") and S.QuestService then
+		S.QuestService:FloorUnlocked(plot)
+	end
 	return true, "Purchased " .. item.Name .. "!"
+end
+
+-- buys up to `max` of the cheapest affordable upgrades (quietly); returns their ids
+function TycoonService:_buyCheapest(player: Player, plot, data, max: number, floor: number?): { string }
+	local bought = {}
+	for _ = 1, max do
+		local best
+		for _, item in TycoonItems.List do
+			if item.Kind ~= "Secret" and (floor == nil or item.Floor == floor) and item.Cost <= data.Cash and TycoonItems.IsAvailable(item, data.Purchased) then
+				if not best or item.Cost < best.Cost then
+					best = item
+				end
+			end
+		end
+		if not best or not self:TryPurchase(player, best.Id, true) then
+			break
+		end
+		table.insert(bought, best.Id)
+	end
+	return bought
 end
 
 -- Buy every affordable upgrade (cheapest first). floor = only that floor
@@ -805,27 +861,9 @@ function TycoonService:BuyAll(player: Player, floor: number?)
 	if not data then
 		return
 	end
-	local count = 0
-	local spent = 0
-	for _ = 1, 80 do
-		local best
-		for _, item in TycoonItems.List do
-			if item.Kind ~= "Secret" and (floor == nil or item.Floor == floor) and TycoonItems.IsAvailable(item, data.Purchased) and item.Cost <= data.Cash then
-				if not best or item.Cost < best.Cost then
-					best = item
-				end
-			end
-		end
-		if not best then
-			break
-		end
-		local ok = self:TryPurchase(player, best.Id, true)
-		if not ok then
-			break
-		end
-		count += 1
-		spent += best.Cost
-	end
+	local spent = data.Cash
+	local count = #self:_buyCheapest(player, plot, data, 80, floor)
+	spent -= data.Cash
 	if count > 0 then
 		self:_refreshButtons(plot)
 		self:_recompute(plot)
@@ -852,6 +890,9 @@ function TycoonService:UnlockAll(player: Player, upToFloor: number?)
 		end
 	end
 	self:Rebuild(plot.Owner)
+	if S.QuestService then
+		S.QuestService:FloorUnlocked(plot)
+	end
 end
 
 -- Rebuild the whole tower from data (after reset / rebirth)
@@ -887,6 +928,9 @@ function TycoonService:Rebirth(player: Player, free: boolean?)
 	data.Purchased = { F1_1 = true }
 	S.DataService:Sync(player)
 	self:Rebuild(player)
+	if S.QuestService then
+		S.QuestService:Refresh(player)
+	end
 
 	Remotes.VFX:FireClient(player, "Rebirth", { Rebirths = data.Rebirths })
 	if plot then

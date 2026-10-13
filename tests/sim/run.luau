@@ -30,7 +30,9 @@ if not only then
 		table.insert(names, scenario.Name)
 	end
 	for _, name in names do
-		local runArgs = { "run", "tests/sim/run.luau", "--", placePath, name }
+		-- this file's own path (Lune names chunks [string "path/without/ext"])
+		local self = debug.info(1, "s"):match('^%[string "(.-)"%]$') or "tests/sim/run"
+		local runArgs = { "run", self .. ".luau", "--", placePath, name }
 		if verbose then
 			table.insert(runArgs, "--verbose")
 		end
@@ -47,6 +49,9 @@ local Harness = require("./Harness")
 local Engine = Harness.Engine
 Engine.Verbose = verbose
 Engine.SignalOrder = process.env.SIM_SIGNAL_ORDER or "forward"
+-- reproducible runs: the game's math.random shares this generator
+local seed = tonumber(process.env.SIM_SEED) or 20261013
+math.randomseed(seed)
 
 local scenario
 for _, s in Scenarios do
@@ -57,7 +62,7 @@ end
 assert(scenario, "unknown scenario " .. tostring(only))
 
 Engine.Prepare(placePath)
-print("▶ " .. scenario.Name)
+print("▶ " .. scenario.Name .. (seed ~= 20261013 and (" (seed " .. seed .. ")") or ""))
 local startClock = os.clock()
 local finished = false
 local thread = coroutine.create(function()

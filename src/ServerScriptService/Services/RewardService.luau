@@ -34,8 +34,10 @@ function RewardService:Init(services)
 		if type(settings.SFX) == "boolean" then
 			data.Settings.SFX = settings.SFX
 		end
-		if type(settings.LowGraphics) == "boolean" then
-			data.Settings.LowGraphics = settings.LowGraphics
+		for _, key in { "LowGraphics", "Guide", "AutoBuild" } do
+			if type(settings[key]) == "boolean" then
+				data.Settings[key] = settings[key]
+			end
 		end
 	end)
 	Players.PlayerRemoving:Connect(function(player)

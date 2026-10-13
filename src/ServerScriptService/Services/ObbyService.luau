@@ -280,6 +280,9 @@ function ObbyService:_finish(player: Player)
 	local elapsed = startTimes[player] and (os.clock() - startTimes[player]) or nil
 	startTimes[player] = nil
 	data.ObbyCompletions += 1
+	if S.QuestService then
+		S.QuestService:Progress(player, "Obby", 1)
+	end
 	Remotes.VFX:FireClient(player, "Confetti", {})
 	Remotes.VFX:FireClient(player, "WinSound", {})
 	local now = os.time()

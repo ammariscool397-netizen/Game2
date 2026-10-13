@@ -430,7 +430,7 @@ end
 local Config = {}
 
 Config.GameName = "MEGA TYCOON"
-Config.Version = "2.0.0"
+Config.Version = "2.1.0"
 
 ---------------------------------------------------------------------------
 -- Data / economy
@@ -601,6 +601,21 @@ Config.GamePasses = {
 		Color = Color3.fromRGB(255, 90, 160),
 		Order = 5,
 	},
+	AutoBuild = {
+		Id = 0,
+		Name = "Auto Builder",
+		Description = "Your tower buys its best affordable upgrade by itself. Turn it on/off in Settings.",
+		PriceHint = 349,
+		Icon = "🤖",
+		Color = Color3.fromRGB(0, 210, 190),
+		Order = 6,
+	},
+}
+
+-- Auto Builder: how often it buys (seconds) and how many upgrades per go
+Config.AutoBuild = {
+	Interval = 2,
+	PerTick = 1,
 }
 
 -- Cash products pay "Minutes" of your current income (never less than MinCash)
@@ -818,6 +833,38 @@ Config.Daily = {
 }
 
 ---------------------------------------------------------------------------
+-- Quests: everyone has 3 at a time; claim one and a new one appears.
+-- Rewards = the bigger of RewardSeconds of your income or MinCash x (1 + rebirths).
+-- Text uses %d / %s for the target.
+---------------------------------------------------------------------------
+Config.Quests = {
+	Enabled = true,
+	Active = 3,
+	Types = {
+		Buy = { Text = "Buy %d upgrades", Targets = { 5, 8, 12 }, RewardSeconds = 90, MinCash = 400 },
+		Earn = { Text = "Earn %s from your tower", IncomeSeconds = { 120, 240, 400 }, MinTarget = 500, RewardSeconds = 120, MinCash = 500 },
+		Collect = { Text = "Collect your vault %d times", Targets = { 3, 5 }, RewardSeconds = 60, MinCash = 300 },
+		Floor = { Text = "Unlock %s", RewardSeconds = 240, MinCash = 2000, BoostSeconds = 300 },
+		Secret = { Text = "Find a hidden secret", RewardSeconds = 180, MinCash = 2500, BoostSeconds = 300 },
+		Obby = { Text = "Finish the obby", RewardSeconds = 150, MinCash = 2000 },
+		Minigame = { Text = "Play a minigame", RewardSeconds = 120, MinCash = 1500 },
+		Survive = { Text = "Survive a disaster", RewardSeconds = 150, MinCash = 1500 },
+	},
+}
+
+---------------------------------------------------------------------------
+-- Playtime gifts: stay in the server to unlock them (resets every session).
+-- Each pays the bigger of IncomeMinutes of income or MinCash x (1 + rebirths).
+---------------------------------------------------------------------------
+Config.Gifts = {
+	Enabled = true,
+	Minutes = { 5, 10, 20, 30, 45, 60 }, -- minutes after joining
+	IncomeMinutes = { 1, 2, 3, 5, 8, 12 },
+	MinCash = { 500, 1_000, 2_000, 4_000, 8_000, 15_000 },
+	FinalBoostSeconds = 10 * 60, -- the last gift also gives a 2x boost
+}
+
+---------------------------------------------------------------------------
 -- Codes (case-insensitive). Remove a code or set Expired = true to disable.
 ---------------------------------------------------------------------------
 Config.Codes = {
@@ -890,6 +937,8 @@ local EVENTS = {
 	"DuoRespond", -- client -> server  (hostUserId, accept)
 	"DuoLeave", -- client -> server  (kick partner if host / leave if partner)
 	"DuoInvited", -- server -> client  { HostName, HostUserId, Timeout }
+	"QuestUpdate", -- server -> client  (quests, claimedCount)
+	"GiftUpdate", -- server -> client  { Index, ReadyIn, Total }
 }
 
 local FUNCTIONS = {
@@ -899,6 +948,8 @@ local FUNCTIONS = {
 	"AdminData", -- (what) -> data
 	"BuyItem", -- (itemId) -> ok, message
 	"GetTycoonState", -- () -> state
+	"ClaimQuest", -- (slot) -> ok, message
+	"ClaimGift", -- () -> ok, message
 }
 
 local folder: Folder
@@ -1836,8 +1887,12 @@ function UIKit.TextBox(props: { [string]: any })
 	return box
 end
 
--- Pop a panel open / closed with a bouncy tween
+-- Pop a panel open / closed with a bouncy tween. The token makes sure a
+-- close animation that finishes after a quick re-open can't hide the panel.
+local popTokens: { [GuiObject]: number } = setmetatable({}, { __mode = "k" }) :: any
+
 function UIKit.Open(frame: GuiObject)
+	popTokens[frame] = (popTokens[frame] or 0) + 1
 	local scale = frame:FindFirstChild("PopScale") :: UIScale?
 	frame.Visible = true
 	if scale then
@@ -1848,12 +1903,14 @@ function UIKit.Open(frame: GuiObject)
 end
 
 function UIKit.Close(frame: GuiObject)
+	popTokens[frame] = (popTokens[frame] or 0) + 1
+	local token = popTokens[frame]
 	local scale = frame:FindFirstChild("PopScale") :: UIScale?
 	if scale then
 		local tween = TweenService:Create(scale, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Scale = 0.6 })
 		tween:Play()
 		tween.Completed:Once(function()
-			if scale.Scale <= 0.61 then
+			if popTokens[frame] == token then
 				frame.Visible = false
 			end
 		end)
@@ -2062,6 +2119,8 @@ local ORDER = {
 	"ObbyService",
 	"SecretService",
 	"DuoService",
+	"QuestService",
+	"GiftService",
 	"DisasterService",
 	"AdminService",
 	"MinigameService",
@@ -3486,7 +3545,8 @@ local TEMPLATE = {
 	PlayTime = 0,
 	LastOnline = 0,
 	LastIncome = 0,
-	Settings = { MusicVolume = Config.Music.DefaultVolume, SFX = true, LowGraphics = false },
+	Quests = { List = {}, Claimed = 0 },
+	Settings = { MusicVolume = Config.Music.DefaultVolume, SFX = true, LowGraphics = false, Guide = true, AutoBuild = true },
 }
 
 local profiles: { [Player]: any } = {}
@@ -3874,6 +3934,9 @@ function DataService:Sync(player: Player)
 	player:SetAttribute("DailyStreak", data.DailyStreak)
 	player:SetAttribute("MusicVolume", data.Settings.MusicVolume)
 	player:SetAttribute("SFX", data.Settings.SFX)
+	player:SetAttribute("LowGraphics", data.Settings.LowGraphics)
+	player:SetAttribute("Guide", data.Settings.Guide)
+	player:SetAttribute("AutoBuild", data.Settings.AutoBuild)
 	local found = {}
 	for id in data.Secrets do
 		table.insert(found, id)
@@ -4535,9 +4598,20 @@ function DisasterService:_run(kind: string, by: string?)
 	active = kind
 	stopRequested = false
 	workspace:SetAttribute("Disaster", kind)
+	-- who's out there (survivors = same character, still alive at the end)
+	local present = {}
+	for _, info in mainMapPlayers() do
+		present[info.Player] = info.Player.Character
+	end
 	local ok, err = pcall(handlers[kind], by)
 	if not ok then
 		warn("[Disasters] " .. kind .. " failed: " .. tostring(err))
+	end
+	for player, character in present do
+		local humanoid = getHumanoid(player)
+		if player.Parent and player.Character == character and humanoid and humanoid.Health > 0 and S.QuestService then
+			S.QuestService:Progress(player, "Survive", 1)
+		end
 	end
 	broadcast({ Phase = "End", Kind = kind })
 	workspace:SetAttribute("Disaster", nil)
@@ -4760,6 +4834,103 @@ return DuoService
       </Item>
       <Item class="ModuleScript" referent="19">
         <Properties>
+          <string name="Name">GiftService</string>
+          <string name="Source"><![CDATA[--[[
+	GiftService - playtime gifts (see Config.Gifts). The longer you stay in
+	the server, the more gifts unlock; each pays minutes of your income and
+	the last one also gives a 2x boost. Counts per session (not saved).
+]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local Remotes = require(Shared.Remotes)
+
+local GC = Config.Gifts
+
+local GiftService = {}
+local S
+
+local sessions: { [Player]: { Start: number, Index: number } } = {}
+
+function GiftService:GetState(player: Player)
+	local session = sessions[player]
+	if not session then
+		return nil
+	end
+	local total = #GC.Minutes
+	if session.Index > total then
+		return { Index = session.Index, Total = total, ReadyIn = -1 }
+	end
+	local readyAt = session.Start + GC.Minutes[session.Index] * 60
+	return { Index = session.Index, Total = total, ReadyIn = math.max(0, readyAt - os.time()) }
+end
+
+function GiftService:_send(player: Player)
+	local state = self:GetState(player)
+	if state and player.Parent then
+		Remotes.GiftUpdate:FireClient(player, state)
+	end
+end
+
+function GiftService:GetReward(player: Player, index: number): number
+	local wallet = S.DataService:GetWallet(player)
+	local rebirths = wallet and wallet.Rebirths or 0
+	return math.floor(math.max(GC.MinCash[index] * (1 + rebirths), S.TycoonService:GetIncome(player) * GC.IncomeMinutes[index] * 60))
+end
+
+function GiftService:Claim(player: Player): (boolean, string)
+	local session = sessions[player]
+	if not session or not S.DataService:IsLoaded(player) then
+		return false, "Data still loading..."
+	end
+	local index = session.Index
+	if index > #GC.Minutes then
+		return false, "You opened every gift this session!"
+	end
+	local readyAt = session.Start + GC.Minutes[index] * 60
+	if os.time() < readyAt then
+		return false, "Your next gift opens in " .. Util.FormatTime(readyAt - os.time())
+	end
+	session.Index += 1
+	local cash = self:GetReward(player, index)
+	S.DataService:AddCash(player, cash, false)
+	local text = "🎁 Gift " .. index .. "/" .. #GC.Minutes .. ": +" .. Util.Money(cash)
+	if index == #GC.Minutes and GC.FinalBoostSeconds then
+		S.DataService:AddBoost(player, GC.FinalBoostSeconds)
+		text ..= " & 2x Boost!"
+	end
+	Remotes.VFX:FireClient(player, "CashBurst", { Amount = cash })
+	Remotes.VFX:FireClient(player, "Confetti", {})
+	self:_send(player)
+	return true, text
+end
+
+function GiftService:Init(services)
+	S = services
+	if not GC.Enabled then
+		return
+	end
+	Remotes.ClaimGift.OnServerInvoke = function(player)
+		return self:Claim(player)
+	end
+	S.DataService.PlayerLoaded:Connect(function(player)
+		sessions[player] = { Start = os.time(), Index = 1 }
+		self:_send(player)
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		sessions[player] = nil
+	end)
+end
+
+return GiftService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="20">
+        <Properties>
           <string name="Name">LeaderboardService</string>
           <string name="Source"><![CDATA[--[[
 	LeaderboardService - global "Top Earners" board in the lobby
@@ -4883,7 +5054,7 @@ return LeaderboardService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="20">
+      <Item class="ModuleScript" referent="21">
         <Properties>
           <string name="Name">MinigameService</string>
           <string name="Source"><![CDATA[--[[
@@ -5508,6 +5679,9 @@ function MinigameService:RunGame(key: string)
 	for _, r in results do
 		local player = r.Player
 		if player.Parent then
+			if S.QuestService then
+				S.QuestService:Progress(player, "Minigame", 1)
+			end
 			local data = S.DataService:Get(player)
 			if data and r.Reward > 0 then
 				S.DataService:AddCash(player, r.Reward, false)
@@ -5556,7 +5730,7 @@ return MinigameService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="21">
+      <Item class="ModuleScript" referent="22">
         <Properties>
           <string name="Name">MonetizationService</string>
           <string name="Source"><![CDATA[--[[
@@ -5874,7 +6048,7 @@ return MonetizationService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="22">
+      <Item class="ModuleScript" referent="23">
         <Properties>
           <string name="Name">ObbyService</string>
           <string name="Source"><![CDATA[--[[
@@ -6159,6 +6333,9 @@ function ObbyService:_finish(player: Player)
 	local elapsed = startTimes[player] and (os.clock() - startTimes[player]) or nil
 	startTimes[player] = nil
 	data.ObbyCompletions += 1
+	if S.QuestService then
+		S.QuestService:Progress(player, "Obby", 1)
+	end
 	Remotes.VFX:FireClient(player, "Confetti", {})
 	Remotes.VFX:FireClient(player, "WinSound", {})
 	local now = os.time()
@@ -6199,7 +6376,320 @@ return ObbyService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="23">
+      <Item class="ModuleScript" referent="24">
+        <Properties>
+          <string name="Name">QuestService</string>
+          <string name="Source"><![CDATA[--[[
+	QuestService - every player has 3 quests (see Config.Quests). Other
+	services report what players do (QuestService:Progress / :Reach); when a
+	quest is complete the player claims it from the quest tracker and a new
+	one takes its place. Quests are saved with the player's data.
+
+	Rewards are paid when claimed, so they scale with the income you have
+	then: the bigger of RewardSeconds of income or MinCash x (1 + rebirths).
+]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local Remotes = require(Shared.Remotes)
+local TycoonItems = require(Shared.TycoonItems)
+
+local QC = Config.Quests
+
+local QuestService = {}
+local S
+
+local dirty: { [Player]: boolean } = {}
+
+local function count(map): number
+	local n = 0
+	for _ in map do
+		n += 1
+	end
+	return n
+end
+
+-- lowest floor (2..roof) the tower hasn't unlocked yet
+local function nextFloor(towerData): number?
+	for floor = 2, Config.Tycoon.Floors do
+		if not towerData.Purchased[TycoonItems.FloorUnlockId(floor)] then
+			return floor
+		end
+	end
+	if not towerData.Purchased.Roof_1 then
+		return Config.Tycoon.Floors + 1
+	end
+	return nil
+end
+
+local function highestFloor(towerData): number
+	local highest = 1
+	for floor = 2, Config.Tycoon.Floors do
+		if towerData.Purchased[TycoonItems.FloorUnlockId(floor)] then
+			highest = floor
+		end
+	end
+	if towerData.Purchased.Roof_1 then
+		highest = Config.Tycoon.Floors + 1
+	end
+	return highest
+end
+
+local function floorName(floor: number): string
+	return floor > Config.Tycoon.Floors and "the roof" or ("floor " .. floor)
+end
+
+function QuestService:_towerData(player: Player)
+	return S.DataService:GetWallet(player) or S.DataService:Get(player)
+end
+
+-- can this kind of quest be done right now?
+function QuestService:_available(kind: string, player: Player, data): boolean
+	local tower = self:_towerData(player)
+	if kind == "Floor" then
+		return tower ~= nil and nextFloor(tower) ~= nil
+	elseif kind == "Secret" then
+		return count(data.Secrets) < #Config.Secrets
+	elseif kind == "Minigame" then
+		return Config.Minigames.Enabled
+	elseif kind == "Survive" then
+		return Config.Disasters.Enabled
+	elseif kind == "Buy" then
+		return tower ~= nil and count(tower.Purchased) < TycoonItems.BuyableCount
+	elseif kind == "Earn" then
+		return S.TycoonService:GetIncome(player) > 0
+	end
+	return QC.Types[kind] ~= nil
+end
+
+function QuestService:_new(player: Player, data, taken: { [string]: boolean })
+	local kinds = {}
+	for kind in QC.Types do
+		if not taken[kind] and self:_available(kind, player, data) then
+			table.insert(kinds, kind)
+		end
+	end
+	if #kinds == 0 then
+		return nil
+	end
+	table.sort(kinds) -- stable order, then a random pick
+	local kind = kinds[math.random(1, #kinds)]
+	local def = QC.Types[kind]
+	local quest = { Type = kind, Progress = 0, Target = 1 }
+	if def.Targets then
+		quest.Target = def.Targets[math.random(1, #def.Targets)]
+	elseif kind == "Earn" then
+		local seconds = def.IncomeSeconds[math.random(1, #def.IncomeSeconds)]
+		quest.Target = math.max(def.MinTarget, Util.Number(math.floor(S.TycoonService:GetIncome(player) * seconds)) or 0)
+	elseif kind == "Floor" then
+		local tower = self:_towerData(player)
+		quest.Target = nextFloor(tower) or Config.Tycoon.Floors + 1
+		quest.Progress = highestFloor(tower)
+	end
+	return quest
+end
+
+-- top up to QC.Active quests (and drop ones that can't be done any more)
+function QuestService:_fill(player: Player)
+	local data = S.DataService:Get(player)
+	if not data then
+		return
+	end
+	local list = data.Quests.List
+	local tower = self:_towerData(player)
+	for i = #list, 1, -1 do
+		local quest = list[i]
+		local def = QC.Types[quest.Type]
+		local done = def and quest.Progress >= quest.Target
+		local stale = quest.Type == "Floor" and tower and nextFloor(tower) ~= quest.Target -- e.g. after a rebirth
+		if not def or (not done and (stale or not self:_available(quest.Type, player, data))) then
+			table.remove(list, i)
+		end
+	end
+	local taken = {}
+	for _, quest in list do
+		taken[quest.Type] = true
+	end
+	while #list < QC.Active do
+		local quest = self:_new(player, data, taken)
+		if not quest then
+			break
+		end
+		taken[quest.Type] = true
+		table.insert(list, quest)
+	end
+	dirty[player] = true
+end
+
+function QuestService:_reward(player: Player, quest)
+	local def = QC.Types[quest.Type]
+	local wallet = self:_towerData(player)
+	local rebirths = wallet and wallet.Rebirths or 0
+	local cash = math.max(def.MinCash * (1 + rebirths), S.TycoonService:GetIncome(player) * def.RewardSeconds)
+	return math.floor(cash), def.BoostSeconds
+end
+
+function QuestService:_text(quest): string
+	local def = QC.Types[quest.Type]
+	if quest.Type == "Earn" then
+		return string.format(def.Text, Util.Money(quest.Target))
+	elseif quest.Type == "Floor" then
+		return string.format(def.Text, floorName(quest.Target))
+	end
+	return (string.format(def.Text, quest.Target))
+end
+
+-- what the client shows
+function QuestService:GetQuests(player: Player)
+	local data = S.DataService:Get(player)
+	if not data then
+		return {}
+	end
+	local out = {}
+	for i, quest in data.Quests.List do
+		local cash, boost = self:_reward(player, quest)
+		local progress, target = quest.Progress, quest.Target
+		if quest.Type == "Floor" then
+			-- show "floor 3 of 4" style progress as done / not done
+			progress, target = (quest.Progress >= quest.Target) and 1 or 0, 1
+		end
+		out[i] = {
+			Slot = i,
+			Type = quest.Type,
+			Text = self:_text(quest),
+			Progress = math.min(progress, target),
+			Target = target,
+			Done = quest.Progress >= quest.Target,
+			Reward = cash,
+			Boost = boost,
+		}
+	end
+	return out
+end
+
+function QuestService:_send(player: Player)
+	dirty[player] = nil
+	if player.Parent then
+		Remotes.QuestUpdate:FireClient(player, self:GetQuests(player), (S.DataService:Get(player) or { Quests = { Claimed = 0 } }).Quests.Claimed)
+	end
+end
+
+-- something happened: add `amount` to every active quest of that kind
+function QuestService:Progress(player: Player, kind: string, amount: number?)
+	local data = S.DataService:Get(player)
+	if not data or not QC.Enabled then
+		return
+	end
+	amount = Util.Number(amount) or 1
+	for _, quest in data.Quests.List do
+		if quest.Type == kind and quest.Progress < quest.Target then
+			quest.Progress = math.min(quest.Target, quest.Progress + amount)
+			dirty[player] = true
+			if quest.Progress >= quest.Target then
+				Remotes.Notify:FireClient(player, { Text = "📜 Quest complete: " .. self:_text(quest) .. "! Claim your reward.", Type = "success" })
+				Remotes.VFX:FireClient(player, "PurchaseSound", {})
+			end
+		end
+	end
+end
+
+-- progress that's a level, not a count (highest floor reached)
+function QuestService:Reach(player: Player, kind: string, value: number)
+	local data = S.DataService:Get(player)
+	if not data then
+		return
+	end
+	for _, quest in data.Quests.List do
+		if quest.Type == kind and value > quest.Progress then
+			self:Progress(player, kind, math.min(value, quest.Target) - quest.Progress)
+		end
+	end
+end
+
+-- a floor was unlocked in `plot`: counts for everyone building it
+function QuestService:FloorUnlocked(plot)
+	local tower = plot.Owner and S.DataService:Get(plot.Owner)
+	if not tower then
+		return
+	end
+	local highest = highestFloor(tower)
+	for _, member in { plot.Owner, plot.Partner } do
+		if member then
+			self:Reach(member, "Floor", highest)
+		end
+	end
+end
+
+-- re-check the quests (after a rebirth, a duo change...)
+function QuestService:Refresh(player: Player)
+	self:_fill(player)
+	self:_send(player)
+end
+
+function QuestService:Claim(player: Player, slot: any): (boolean, string)
+	local data = S.DataService:Get(player)
+	if not data then
+		return false, "Data still loading..."
+	end
+	slot = Util.Number(slot)
+	local quest = slot and data.Quests.List[slot]
+	if not quest then
+		return false, "That quest doesn't exist."
+	end
+	if quest.Progress < quest.Target then
+		return false, "Finish the quest first!"
+	end
+	local cash, boost = self:_reward(player, quest)
+	table.remove(data.Quests.List, slot)
+	data.Quests.Claimed += 1
+	S.DataService:AddCash(player, cash, false)
+	local text = "+" .. Util.Money(cash)
+	if boost then
+		S.DataService:AddBoost(player, boost)
+		text ..= " & 2x Boost for " .. Util.FormatTime(boost)
+	end
+	Remotes.VFX:FireClient(player, "CashBurst", { Amount = cash })
+	Remotes.VFX:FireClient(player, "Confetti", {})
+	self:_fill(player)
+	self:_send(player)
+	return true, "Quest reward: " .. text .. "!"
+end
+
+function QuestService:Init(services)
+	S = services
+	Remotes.ClaimQuest.OnServerInvoke = function(player, slot)
+		return self:Claim(player, slot)
+	end
+	S.DataService.PlayerLoaded:Connect(function(player)
+		task.defer(function()
+			-- (the tower is assigned on load too; quests depend on it)
+			self:_fill(player)
+			self:_send(player)
+		end)
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		dirty[player] = nil
+	end)
+end
+
+function QuestService:Start()
+	-- batch updates (income progress changes every second)
+	while true do
+		task.wait(1)
+		for player in dirty do
+			Util.Try("Quests", self._send, self, player)
+		end
+	end
+end
+
+return QuestService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="25">
         <Properties>
           <string name="Name">RewardService</string>
           <string name="Source"><![CDATA[--[[
@@ -6238,8 +6728,10 @@ function RewardService:Init(services)
 		if type(settings.SFX) == "boolean" then
 			data.Settings.SFX = settings.SFX
 		end
-		if type(settings.LowGraphics) == "boolean" then
-			data.Settings.LowGraphics = settings.LowGraphics
+		for _, key in { "LowGraphics", "Guide", "AutoBuild" } do
+			if type(settings[key]) == "boolean" then
+				data.Settings[key] = settings[key]
+			end
 		end
 	end)
 	Players.PlayerRemoving:Connect(function(player)
@@ -6324,7 +6816,7 @@ return RewardService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="24">
+      <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">SecretService</string>
           <string name="Source"><![CDATA[--[[
@@ -6438,6 +6930,9 @@ function SecretService:Find(player: Player, secretId: string, silent: boolean?):
 	S.DataService:AddCash(player, cash, false)
 	S.DataService:Sync(player)
 	S.TycoonService:OnSecretFound(player, secretId)
+	if S.QuestService then
+		S.QuestService:Progress(player, "Secret", 1)
+	end
 	if secret.BadgeId and secret.BadgeId ~= 0 then
 		task.spawn(pcall, BadgeService.AwardBadge, BadgeService, player.UserId, secret.BadgeId)
 	end
@@ -6475,7 +6970,7 @@ return SecretService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="25">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">TycoonBuilder</string>
           <string name="Source"><![CDATA[--[[
@@ -7301,7 +7796,7 @@ return TycoonBuilder
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">TycoonService</string>
           <string name="Source"><![CDATA[--[[
@@ -7368,6 +7863,12 @@ end
 local function sendUpdate(plot, payload)
 	for _, member in members(plot) do
 		Remotes.TycoonUpdate:FireClient(member, payload)
+	end
+end
+
+local function quest(player: Player, kind: string, amount: number?)
+	if S.QuestService then
+		S.QuestService:Progress(player, kind, amount)
 	end
 end
 
@@ -7515,6 +8016,22 @@ function TycoonService:_tick(plot, now: number)
 	if #due > 0 then
 		self:_recompute(plot)
 	end
+	-- Auto Builder pass: buys the cheapest affordable upgrade every few seconds
+	local data = S.DataService:Get(owner)
+	if data and data.Settings.AutoBuild ~= false and S.DataService:TeamHasPass(owner, "AutoBuild") then
+		plot.AutoBuildTimer = (plot.AutoBuildTimer or 0) + 1
+		if plot.AutoBuildTimer >= Config.AutoBuild.Interval and #plot.Queue == 0 then
+			plot.AutoBuildTimer = 0
+			local bought = self:_buyCheapest(owner, plot, data, Config.AutoBuild.PerTick)
+			if #bought > 0 then
+				self:_refreshButtons(plot)
+				self:_recompute(plot)
+				local last = TycoonItems.ById[bought[#bought]]
+				Remotes.VFX:FireAllClients("BuildIn", { Model = plot.Built[last.Id], Position = plot.ItemPos[last.Id], Color = last.Theme and last.Theme.Accent or plot.Color })
+			end
+		end
+	end
+
 	local mult = S.DataService:GetMultiplier(owner)
 	local amount = plot.Income * mult
 	if amount > 0 then
@@ -7526,6 +8043,9 @@ function TycoonService:_tick(plot, now: number)
 	end
 	for _, member in members(plot) do
 		member:SetAttribute("Income", amount)
+		if amount > 0 then
+			quest(member, "Earn", amount)
+		end
 	end
 end
 
@@ -7800,6 +8320,9 @@ function TycoonService:AddPartner(host: Player, partner: Player): boolean
 	S.DataService:Sync(host)
 	self:_recompute(plot)
 	sendUpdate(plot, { Type = "Reset" })
+	if S.QuestService then
+		S.QuestService:Refresh(partner) -- tower quests now follow the host's tower
+	end
 	if partner.Character then
 		partner.Character:PivotTo(plot.SpawnCFrame * CFrame.new(4, 0, 0))
 	end
@@ -7831,6 +8354,9 @@ function TycoonService:RemovePartner(plot, reassign: boolean)
 			if data then
 				self:_assign(partner, data)
 			end
+		end
+		if S.QuestService then
+			S.QuestService:Refresh(partner)
 		end
 	end
 end
@@ -8051,6 +8577,7 @@ end
 function TycoonService:CollectVault(player: Player)
 	local amount = S.DataService:CollectVault(player)
 	if amount > 0 then
+		quest(player, "Collect", 1)
 		Remotes.VFX:FireClient(player, "CashBurst", { Amount = amount })
 		Remotes.Notify:FireClient(player, { Text = "Collected " .. Util.Money(amount) .. "!", Type = "success" })
 	end
@@ -8098,7 +8625,31 @@ function TycoonService:TryPurchase(player: Player, itemId: string, silent: boole
 		end
 	end
 	sendUpdate(plot, { Type = "Bought", Id = itemId })
+	quest(player, "Buy", 1)
+	if (item.Kind == "Unlock" or itemId == "Roof_1") and S.QuestService then
+		S.QuestService:FloorUnlocked(plot)
+	end
 	return true, "Purchased " .. item.Name .. "!"
+end
+
+-- buys up to `max` of the cheapest affordable upgrades (quietly); returns their ids
+function TycoonService:_buyCheapest(player: Player, plot, data, max: number, floor: number?): { string }
+	local bought = {}
+	for _ = 1, max do
+		local best
+		for _, item in TycoonItems.List do
+			if item.Kind ~= "Secret" and (floor == nil or item.Floor == floor) and item.Cost <= data.Cash and TycoonItems.IsAvailable(item, data.Purchased) then
+				if not best or item.Cost < best.Cost then
+					best = item
+				end
+			end
+		end
+		if not best or not self:TryPurchase(player, best.Id, true) then
+			break
+		end
+		table.insert(bought, best.Id)
+	end
+	return bought
 end
 
 -- Buy every affordable upgrade (cheapest first). floor = only that floor
@@ -8111,27 +8662,9 @@ function TycoonService:BuyAll(player: Player, floor: number?)
 	if not data then
 		return
 	end
-	local count = 0
-	local spent = 0
-	for _ = 1, 80 do
-		local best
-		for _, item in TycoonItems.List do
-			if item.Kind ~= "Secret" and (floor == nil or item.Floor == floor) and TycoonItems.IsAvailable(item, data.Purchased) and item.Cost <= data.Cash then
-				if not best or item.Cost < best.Cost then
-					best = item
-				end
-			end
-		end
-		if not best then
-			break
-		end
-		local ok = self:TryPurchase(player, best.Id, true)
-		if not ok then
-			break
-		end
-		count += 1
-		spent += best.Cost
-	end
+	local spent = data.Cash
+	local count = #self:_buyCheapest(player, plot, data, 80, floor)
+	spent -= data.Cash
 	if count > 0 then
 		self:_refreshButtons(plot)
 		self:_recompute(plot)
@@ -8158,6 +8691,9 @@ function TycoonService:UnlockAll(player: Player, upToFloor: number?)
 		end
 	end
 	self:Rebuild(plot.Owner)
+	if S.QuestService then
+		S.QuestService:FloorUnlocked(plot)
+	end
 end
 
 -- Rebuild the whole tower from data (after reset / rebirth)
@@ -8193,6 +8729,9 @@ function TycoonService:Rebirth(player: Player, free: boolean?)
 	data.Purchased = { F1_1 = true }
 	S.DataService:Sync(player)
 	self:Rebuild(player)
+	if S.QuestService then
+		S.QuestService:Refresh(player)
+	end
 
 	Remotes.VFX:FireClient(player, "Rebirth", { Rebirths = data.Rebirths })
 	if plot then
@@ -8474,7 +9013,7 @@ return TycoonService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">WorldBuilder</string>
           <string name="Source"><![CDATA[--[[
@@ -9254,22 +9793,22 @@ return WorldBuilder
       </Item>
     </Item>
   </Item>
-  <Item class="SoundService" referent="28">
+  <Item class="SoundService" referent="30">
     <Properties>
       <string name="Name">SoundService</string>
     </Properties>
   </Item>
-  <Item class="StarterPlayer" referent="29">
+  <Item class="StarterPlayer" referent="31">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <float name="CharacterJumpPower">50</float>
       <float name="CharacterWalkSpeed">16</float>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="30">
+    <Item class="StarterPlayerScripts" referent="32">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="31">
+      <Item class="LocalScript" referent="33">
         <Properties>
           <string name="Name">Client</string>
           <string name="Source"><![CDATA[--[[
@@ -9290,6 +9829,9 @@ local ORDER = {
 	"Panels",
 	"Duo",
 	"Disasters",
+	"Quests",
+	"Gifts",
+	"Guide",
 	"DropVisuals",
 	"Admin",
 	"Minigame",
@@ -9333,11 +9875,11 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="32">
+      <Item class="Folder" referent="34">
         <Properties>
           <string name="Name">Controllers</string>
         </Properties>
-        <Item class="ModuleScript" referent="33">
+        <Item class="ModuleScript" referent="35">
           <Properties>
             <string name="Name">Admin</string>
             <string name="Source"><![CDATA[--[[
@@ -9855,7 +10397,7 @@ return Admin
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="34">
+        <Item class="ModuleScript" referent="36">
           <Properties>
             <string name="Name">Animator</string>
             <string name="Source"><![CDATA[--[[
@@ -9905,12 +10447,42 @@ function Animator:IsLowGraphics(): boolean
 	return lowGraphics
 end
 
+-- low graphics: no animations and no particles (also ones created later).
+-- Only emitters we switched off are switched back on.
+local quieted = setmetatable({}, { __mode = "k" })
+local descendantConn: RBXScriptConnection?
+local function quiet(d: Instance)
+	if lowGraphics and d:IsA("ParticleEmitter") and d.Enabled then
+		d.Enabled = false
+		quieted[d] = true
+	end
+end
+
 function Animator:SetLowGraphics(enabled: boolean)
+	if enabled == lowGraphics then
+		return
+	end
 	lowGraphics = enabled
-	for _, d in workspace:GetDescendants() do
-		if d:IsA("ParticleEmitter") then
-			d.Enabled = not enabled
+	if enabled then
+		for _, d in workspace:GetDescendants() do
+			quiet(d)
 		end
+		descendantConn = workspace.DescendantAdded:Connect(function(d)
+			if d:IsA("ParticleEmitter") then
+				task.defer(quiet, d)
+			end
+		end)
+	else
+		if descendantConn then
+			descendantConn:Disconnect()
+			descendantConn = nil
+		end
+		for d in quieted do
+			if d.Parent then
+				(d :: ParticleEmitter).Enabled = true
+			end
+		end
+		table.clear(quieted)
 	end
 end
 
@@ -9965,6 +10537,11 @@ function Animator:Init(controllers)
 end
 
 function Animator:Start()
+	-- the saved setting
+	self:SetLowGraphics(player:GetAttribute("LowGraphics") == true)
+	player:GetAttributeChangedSignal("LowGraphics"):Connect(function()
+		self:SetLowGraphics(player:GetAttribute("LowGraphics") == true)
+	end)
 	RunService.RenderStepped:Connect(function()
 		local t = os.clock()
 		local cam = workspace.CurrentCamera
@@ -10028,7 +10605,7 @@ return Animator
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="35">
+        <Item class="ModuleScript" referent="37">
           <Properties>
             <string name="Name">Build</string>
             <string name="Source"><![CDATA[--[[
@@ -10478,7 +11055,7 @@ return Build
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="36">
+        <Item class="ModuleScript" referent="38">
           <Properties>
             <string name="Name">ChatTags</string>
             <string name="Source"><![CDATA[--[[ ChatTags - [Owner] / [Admin] / [VIP] / rebirth tags in the chat ]]
@@ -10538,7 +11115,7 @@ return ChatTags
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="37">
+        <Item class="ModuleScript" referent="39">
           <Properties>
             <string name="Name">Disasters</string>
             <string name="Source"><![CDATA[--[[
@@ -11420,7 +11997,7 @@ return Disasters
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="38">
+        <Item class="ModuleScript" referent="40">
           <Properties>
             <string name="Name">DropVisuals</string>
             <string name="Source"><![CDATA[--[[
@@ -11695,7 +12272,7 @@ return DropVisuals
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="39">
+        <Item class="ModuleScript" referent="41">
           <Properties>
             <string name="Name">Duo</string>
             <string name="Source"><![CDATA[--[[ Duo (client) - invite players to build one tower together + invite popups ]]
@@ -11894,7 +12471,287 @@ return Duo
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="40">
+        <Item class="ModuleScript" referent="42">
+          <Properties>
+            <string name="Name">Gifts</string>
+            <string name="Source"><![CDATA[--[[ Gifts (client) - the playtime gift button (bottom right) ]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Util = require(Shared.Util)
+local UIKit = require(Shared.UIKit)
+local Remotes = require(Shared.Remotes)
+
+local player = Players.LocalPlayer
+local Theme = UIKit.Theme
+
+local Gifts = {}
+Gifts.State = nil :: { Index: number, Total: number, ReadyAt: number }?
+local C
+
+local button: TextButton
+local busy = false
+
+local function refresh()
+	local state = Gifts.State
+	if not state or state.Index > state.Total then
+		button.Visible = false
+		return
+	end
+	button.Visible = not player:GetAttribute("InMinigame")
+	local left = state.ReadyAt - os.clock()
+	if left <= 0 then
+		button.Text = "🎁 OPEN GIFT " .. state.Index .. "/" .. state.Total .. "!"
+		button.BackgroundColor3 = Theme.Green
+	else
+		button.Text = "🎁 Gift " .. state.Index .. "/" .. state.Total .. " in " .. Util.Clock(left)
+		button.BackgroundColor3 = Theme.PanelLight
+	end
+end
+
+function Gifts:IsReady(): boolean
+	return self.State ~= nil and self.State.Index <= self.State.Total and self.State.ReadyAt - os.clock() <= 0
+end
+
+function Gifts:Init(controllers)
+	C = controllers
+	button = UIKit.Button({
+		Name = "GiftButton",
+		Text = "🎁",
+		Color = Theme.PanelLight,
+		Size = UDim2.fromOffset(240, 50),
+		Position = UDim2.new(1, -12, 1, -14),
+		AnchorPoint = Vector2.new(1, 1),
+		Parent = C.UI.Gui,
+		Callback = function()
+			if busy or not self:IsReady() then
+				return
+			end
+			busy = true
+			local ok, message = Remotes.ClaimGift:InvokeServer()
+			busy = false
+			C.Notifications:Toast(tostring(message), ok and "success" or "error")
+		end,
+	})
+	button.Visible = false
+	local scale = button:FindFirstChildOfClass("UIScale") :: UIScale
+	Remotes.GiftUpdate.OnClientEvent:Connect(function(state)
+		if type(state) ~= "table" then
+			return
+		end
+		local wasReady = self:IsReady()
+		self.State = { Index = state.Index, Total = state.Total, ReadyAt = os.clock() + math.max(0, state.ReadyIn or 0) }
+		refresh()
+		if not wasReady and self:IsReady() and scale then
+			scale.Scale = 1.2
+			TweenService:Create(scale, TweenInfo.new(0.4, Enum.EasingStyle.Back), { Scale = 1 }):Play()
+		end
+	end)
+end
+
+function Gifts:Start()
+	local announced = 0
+	while true do
+		task.wait(1)
+		Util.Try("Gifts", refresh)
+		-- tell the player once when a gift unlocks
+		local state = self.State
+		if state and self:IsReady() and announced < state.Index then
+			announced = state.Index
+			C.Notifications:Toast("🎁 A playtime gift is ready! Open it in the bottom-right corner.", "success")
+			UIKit.PlaySound("Notify", 0.6, 1.3)
+		end
+	end
+end
+
+return Gifts
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="43">
+          <Properties>
+            <string name="Name">Guide</string>
+            <string name="Source"><![CDATA[--[[
+	Guide (client) - a glowing beam from you to your next goal in your tower:
+	the cheapest button you can afford (on your floor first), or a vault pad
+	when collecting would let you buy something. Only near your own tower;
+	hidden during nukes and minigames. Turn it off in Settings.
+]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local UIKit = require(Shared.UIKit)
+local TycoonItems = require(Shared.TycoonItems)
+
+local player = Players.LocalPlayer
+local Theme = UIKit.Theme
+
+local Guide = {}
+Guide.Target = nil :: { Kind: string, Id: string?, Position: Vector3 }?
+
+local RANGE = 150 -- studs from your tower's centre
+local fromAttachment: Attachment?
+local anchor: BasePart
+local beam: Beam
+local labelGui: BillboardGui
+local label: TextLabel
+
+local function root(): BasePart?
+	local character = player.Character
+	return character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+end
+
+local function plotModel(): Instance?
+	local index = player:GetAttribute("Plot")
+	local tycoons = workspace:FindFirstChild("Tycoons")
+	return index and tycoons and tycoons:FindFirstChild("Plot" .. tostring(index))
+end
+
+-- where should the player go next?
+local function findTarget(from: BasePart)
+	local plot = plotModel()
+	local center = player:GetAttribute("PlotCenter")
+	if not plot or typeof(center) ~= "Vector3" then
+		return nil
+	end
+	local offset = from.Position - center
+	if Vector3.new(offset.X, 0, offset.Z).Magnitude > RANGE then
+		return nil
+	end
+	local cash = player:GetAttribute("Cash") or 0
+	local buttons = plot:FindFirstChild("Buttons")
+	local best, bestScore, cheapest = nil, math.huge, nil
+	for _, model in buttons and buttons:GetChildren() or {} do
+		local item = TycoonItems.ById[model.Name]
+		local pad = model:FindFirstChild("Pad") :: BasePart?
+		if item and pad then
+			if not cheapest or item.Cost < cheapest.Cost then
+				cheapest = item
+			end
+			if item.Cost <= cash then
+				-- strongly prefer buttons on the floor you're standing on
+				local sameFloor = math.abs(pad.Position.Y - from.Position.Y) < Config.Tycoon.FloorHeight / 2
+				local score = item.Cost * (sameFloor and 1 or 1000)
+				if score < bestScore then
+					best, bestScore = { Kind = "Buy", Id = item.Id, Position = pad.Position, Text = "⬇ BUY: " .. item.Name }, score
+				end
+			end
+		end
+	end
+	if best then
+		return best
+	end
+	-- nothing affordable: the vault would make it affordable?
+	local vault = player:GetAttribute("Vault") or 0
+	if cheapest and vault > 0 and cash + vault >= cheapest.Cost and not player:GetAttribute("Pass_AutoCollect") then
+		local items = plot:FindFirstChild("Items")
+		local nearest, nearestD = nil, math.huge
+		for floor = 1, Config.Tycoon.Floors do
+			local unlock = items and items:FindFirstChild(TycoonItems.FloorUnlockId(floor))
+			local pad = unlock and unlock:FindFirstChild("VaultPad", true) :: BasePart?
+			if pad then
+				local d = (pad.Position - from.Position).Magnitude
+				if d < nearestD then
+					nearest, nearestD = pad, d
+				end
+			end
+		end
+		if nearest then
+			return { Kind = "Vault", Position = nearest.Position, Text = "💰 COLLECT " .. Util.Money(vault) }
+		end
+	end
+	return nil
+end
+
+local function hide()
+	Guide.Target = nil
+	beam.Enabled = false
+	labelGui.Enabled = false
+end
+
+local function update()
+	local r = root()
+	local enabled = player:GetAttribute("Guide") ~= false
+	if not r or not enabled or player:GetAttribute("InMinigame") or workspace:GetAttribute("Disaster") == "Nuke" then
+		hide()
+		return
+	end
+	local target = findTarget(r)
+	if not target then
+		hide()
+		return
+	end
+	if not fromAttachment or fromAttachment.Parent ~= r then
+		local attachment = Instance.new("Attachment")
+		attachment.Name = "GuideFrom"
+		attachment.Parent = r
+		beam.Attachment0 = attachment
+		fromAttachment = attachment
+	end
+	Guide.Target = target
+	anchor.CFrame = CFrame.new(target.Position + Vector3.new(0, 1, 0))
+	local color = target.Kind == "Vault" and Theme.Accent or Theme.Green
+	beam.Color = ColorSequence.new(color)
+	beam.Enabled = true
+	label.Text = target.Text
+	label.TextColor3 = color
+	labelGui.Enabled = true
+end
+
+function Guide:Init()
+	anchor = Instance.new("Part")
+	anchor.Name = "GuideTarget"
+	anchor.Anchored = true
+	anchor.CanCollide = false
+	anchor.CanQuery = false
+	anchor.CanTouch = false
+	anchor.Transparency = 1
+	anchor.Size = Vector3.one
+	anchor.Parent = workspace
+	local toAttachment = Instance.new("Attachment")
+	toAttachment.Parent = anchor
+	beam = Instance.new("Beam")
+	beam.Attachment1 = toAttachment
+	beam.Width0 = 0.6
+	beam.Width1 = 0.6
+	beam.FaceCamera = true
+	beam.LightEmission = 1
+	beam.Segments = 16
+	beam.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	beam.TextureMode = Enum.TextureMode.Wrap
+	beam.TextureLength = 3
+	beam.TextureSpeed = 2
+	beam.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.6), NumberSequenceKeypoint.new(0.2, 0.15), NumberSequenceKeypoint.new(1, 0.1) })
+	beam.Enabled = false
+	beam.Parent = anchor
+	labelGui = Instance.new("BillboardGui")
+	labelGui.Name = "GuideLabel"
+	labelGui.Size = UDim2.fromOffset(240, 40)
+	labelGui.StudsOffset = Vector3.new(0, 4.5, 0)
+	labelGui.AlwaysOnTop = true
+	labelGui.MaxDistance = 120
+	labelGui.Enabled = false
+	labelGui.Parent = anchor
+	label = UIKit.Label({ Text = "", Size = UDim2.fromScale(1, 1), Parent = labelGui })
+end
+
+function Guide:Start()
+	while true do
+		task.wait(0.25)
+		Util.Try("Guide", update)
+	end
+end
+
+return Guide
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="44">
           <Properties>
             <string name="Name">HUD</string>
             <string name="Source"><![CDATA[--[[ HUD - cash counter, income, multiplier/boost info, floor indicator,
@@ -12154,7 +13011,9 @@ function HUD:Refresh()
 	local rebirths = player:GetAttribute("WalletRebirths") or player:GetAttribute("Rebirths") or 0
 	local rounded = math.floor(mult * 100 + 0.5) / 100
 	incomeLabel.Text = "+" .. Util.Money(player:GetAttribute("Income") or 0) .. "/s"
-	infoLabel.Text = string.format("x%s cash  •  Rebirth %d%s", rounded >= 1000 and Util.Abbreviate(rounded) or tostring(rounded), rebirths, player:GetAttribute("DuoHost") and "  •  👥 Duo" or "")
+	local extras = (player:GetAttribute("DuoHost") and "  •  👥 Duo" or "")
+		.. ((player:GetAttribute("Pass_AutoBuild") and player:GetAttribute("AutoBuild") ~= false) and "  •  🤖 Auto" or "")
+	infoLabel.Text = string.format("x%s cash  •  Rebirth %d%s", rounded >= 1000 and Util.Abbreviate(rounded) or tostring(rounded), rebirths, extras)
 	local hasAuto = player:GetAttribute("Pass_AutoCollect")
 	local vault = player:GetAttribute("Vault") or 0
 	vaultLabel.Text = (not hasAuto and vault > 0) and ("🏦 Vault: " .. Util.Money(vault) .. " (step on a vault pad!)") or ""
@@ -12216,7 +13075,7 @@ return HUD
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="41">
+        <Item class="ModuleScript" referent="45">
           <Properties>
             <string name="Name">Minigame</string>
             <string name="Source"><![CDATA[--[[ Minigame (client) - join popup, countdown, in-game HUD and results ]]
@@ -12451,7 +13310,7 @@ return Minigame
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="42">
+        <Item class="ModuleScript" referent="46">
           <Properties>
             <string name="Name">Music</string>
             <string name="Source"><![CDATA[--[[
@@ -12666,7 +13525,7 @@ return Music
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="43">
+        <Item class="ModuleScript" referent="47">
           <Properties>
             <string name="Name">Notifications</string>
             <string name="Source"><![CDATA[--[[ Notifications - toast messages (top right) + big announcement banners ]]
@@ -12825,7 +13684,7 @@ return Notifications
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="44">
+        <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">Panels</string>
             <string name="Source"><![CDATA[--[[ Panels - Rebirth, Daily Rewards, Codes and Settings menus ]]
@@ -13030,8 +13889,8 @@ end
 
 ---------------------------------------------------------------------------
 local function buildSettings()
-	local _, content = C.UI:MakePanel("Settings", "⚙️ SETTINGS", Color3.fromRGB(130, 140, 160), 520, 420)
-	UIKit.List(content, 12)
+	local _, content = C.UI:MakePanel("Settings", "⚙️ SETTINGS", Color3.fromRGB(130, 140, 160), 520, 520)
+	UIKit.List(content, 10)
 
 	local function row(order: number, text: string)
 		local frame = UIKit.new("Frame", { Size = UDim2.new(1, -20, 0, 52), BackgroundColor3 = Theme.PanelLight, LayoutOrder = order, ZIndex = 7, Parent = content })
@@ -13081,17 +13940,63 @@ local function buildSettings()
 		end
 	end
 
-	local setSfx = toggle(2, "🔊 Sound Effects", true, function(on)
+	-- toggles start from the saved settings (player attributes from the server)
+	local setSfx = toggle(2, "🔊 Sound Effects", player:GetAttribute("SFX") ~= false, function(on)
 		UIKit.SFXEnabled = on
 		Remotes.SaveSettings:FireServer({ SFX = on })
 	end)
 	toggle(3, "🎶 Music Widget", true, function(on)
 		C.Music:SetWidgetVisible(on)
 	end)
-	toggle(4, "🥔 Low Graphics", false, function(on)
+	local setLow = toggle(4, "🥔 Low Graphics", player:GetAttribute("LowGraphics") == true, function(on)
 		C.Animator:SetLowGraphics(on)
 		Remotes.SaveSettings:FireServer({ LowGraphics = on })
 	end)
+	player:GetAttributeChangedSignal("LowGraphics"):Connect(function()
+		setLow(player:GetAttribute("LowGraphics") == true)
+	end)
+	local setGuide = toggle(5, "🧭 Guide Arrow", player:GetAttribute("Guide") ~= false, function(on)
+		player:SetAttribute("Guide", on) -- instant locally; the server saves it
+		Remotes.SaveSettings:FireServer({ Guide = on })
+	end)
+	player:GetAttributeChangedSignal("Guide"):Connect(function()
+		setGuide(player:GetAttribute("Guide") ~= false)
+	end)
+
+	-- Auto Builder (game pass): ON/OFF when owned, otherwise a shortcut to the shop
+	local autoRow = row(6, "🤖 Auto Builder")
+	local autoButton
+	local function refreshAuto()
+		if player:GetAttribute("Pass_AutoBuild") then
+			local on = player:GetAttribute("AutoBuild") ~= false
+			autoButton.Text = on and "ON" or "OFF"
+			autoButton.BackgroundColor3 = on and Theme.Green or Theme.Red
+		else
+			autoButton.Text = "GET"
+			autoButton.BackgroundColor3 = Theme.Accent
+		end
+	end
+	autoButton = UIKit.Button({
+		Text = "GET",
+		Color = Theme.Accent,
+		Size = UDim2.fromOffset(90, 36),
+		Position = UDim2.new(1, -104, 0, 8),
+		ZIndex = 8,
+		Parent = autoRow,
+		Callback = function()
+			if not player:GetAttribute("Pass_AutoBuild") then
+				C.UI:Open("Shop")
+				return
+			end
+			local on = player:GetAttribute("AutoBuild") == false
+			player:SetAttribute("AutoBuild", on)
+			Remotes.SaveSettings:FireServer({ AutoBuild = on })
+			refreshAuto()
+		end,
+	})
+	player:GetAttributeChangedSignal("Pass_AutoBuild"):Connect(refreshAuto)
+	player:GetAttributeChangedSignal("AutoBuild"):Connect(refreshAuto)
+	refreshAuto()
 
 	UIKit.Label({ Text = Config.GameName .. " v" .. Config.Version, Size = UDim2.new(1, 0, 0, 20), Font = Theme.BodyFont, TextColor3 = Theme.SubText, LayoutOrder = 9, ZIndex = 7, Parent = content })
 
@@ -13176,7 +14081,175 @@ return Panels
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="45">
+        <Item class="ModuleScript" referent="49">
+          <Properties>
+            <string name="Name">Quests</string>
+            <string name="Source"><![CDATA[--[[ Quests (client) - the quest tracker in the bottom-right corner ]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Util = require(Shared.Util)
+local UIKit = require(Shared.UIKit)
+local Remotes = require(Shared.Remotes)
+
+local player = Players.LocalPlayer
+local Theme = UIKit.Theme
+
+local Quests = {}
+Quests.List = {}
+Quests.Claimed = 0
+local C
+
+local ICONS = {
+	Buy = "🏗️", Earn = "💵", Collect = "🏦", Floor = "🏢", Secret = "🕵️",
+	Obby = "🏃", Minigame = "🎮", Survive = "🛡️",
+}
+local ROW_HEIGHT = 58
+
+local tracker: Frame
+local title: TextLabel
+local rowsFrame: Frame
+local collapsed = false
+
+local function claim(slot: number, button: TextButton)
+	button.Text = "..."
+	local ok, message = Remotes.ClaimQuest:InvokeServer(slot)
+	C.Notifications:Toast(tostring(message), ok and "success" or "error")
+end
+
+local function render()
+	for _, child in rowsFrame:GetChildren() do
+		if child:IsA("Frame") then
+			child:Destroy()
+		end
+	end
+	local ready = 0
+	for i, quest in Quests.List do
+		if quest.Done then
+			ready += 1
+		end
+		local row = UIKit.new("Frame", {
+			Name = "Quest" .. i,
+			Size = UDim2.new(1, 0, 0, ROW_HEIGHT),
+			BackgroundColor3 = quest.Done and Color3.fromRGB(40, 70, 45) or Theme.Panel,
+			BackgroundTransparency = 0.1,
+			LayoutOrder = i,
+			Parent = rowsFrame,
+		})
+		UIKit.Corner(row, 10)
+		UIKit.Stroke(row, quest.Done and Theme.Green or Color3.new(0, 0, 0), 2, 0.2)
+		UIKit.Label({ Text = ICONS[quest.Type] or "📜", Size = UDim2.fromOffset(30, 30), Position = UDim2.fromOffset(6, 6), Parent = row })
+		UIKit.new("TextLabel", {
+			Text = quest.Text,
+			Size = UDim2.new(1, quest.Done and -132 or -48, 0, 22),
+			Position = UDim2.fromOffset(40, 5),
+			BackgroundTransparency = 1,
+			TextScaled = true,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Font = Theme.BodyFont,
+			TextColor3 = Theme.Text,
+			Parent = row,
+		})
+		local rewardText = "🎁 " .. Util.Money(quest.Reward) .. (quest.Boost and " + 2x" or "")
+		if quest.Done then
+			UIKit.Button({
+				Name = "Claim",
+				Text = "CLAIM",
+				Color = Theme.Green,
+				Size = UDim2.fromOffset(84, 40),
+				Position = UDim2.new(1, -90, 0, 9),
+				Parent = row,
+				Callback = function()
+					claim(quest.Slot, row:FindFirstChild("Claim") :: TextButton)
+				end,
+			})
+			UIKit.Label({ Text = rewardText, Size = UDim2.new(1, -132, 0, 18), Position = UDim2.fromOffset(40, 32), Font = Theme.BodyFont, TextColor3 = Color3.fromRGB(150, 255, 160), TextXAlignment = Enum.TextXAlignment.Left, Stroke = false, Parent = row })
+		else
+			local back = UIKit.new("Frame", { Size = UDim2.new(1, -150, 0, 14), Position = UDim2.fromOffset(40, 34), BackgroundColor3 = Theme.Background, Parent = row })
+			UIKit.Corner(back, 7)
+			local alpha = quest.Target > 0 and math.clamp(quest.Progress / quest.Target, 0, 1) or 0
+			local fill = UIKit.new("Frame", { Size = UDim2.fromScale(alpha, 1), BackgroundColor3 = Theme.Accent, Parent = back })
+			UIKit.Corner(fill, 7)
+			local progressText = quest.Target > 1 and (Util.Abbreviate(quest.Progress) .. "/" .. Util.Abbreviate(quest.Target)) or ""
+			UIKit.Label({ Text = progressText, Size = UDim2.new(1, 0, 1, 0), Font = Theme.BodyFont, Stroke = false, Parent = back })
+			UIKit.Label({ Text = rewardText, Size = UDim2.fromOffset(104, 18), Position = UDim2.new(1, -108, 0, 32), Font = Theme.BodyFont, TextColor3 = Color3.fromRGB(150, 255, 160), TextXAlignment = Enum.TextXAlignment.Right, Stroke = false, Parent = row })
+		end
+	end
+	title.Text = (collapsed and "▸ " or "▾ ") .. "📜 QUESTS" .. (ready > 0 and ("  (" .. ready .. " ready!)") or "")
+	rowsFrame.Visible = not collapsed
+	local height = 30 + (collapsed and 0 or (#Quests.List * (ROW_HEIGHT + 6)))
+	TweenService:Create(tracker, TweenInfo.new(0.2), { Size = UDim2.fromOffset(300, height) }):Play()
+	if C.HUD and C.HUD.SetBadge then
+		C.HUD:SetBadge("Quests", ready > 0, tostring(ready))
+	end
+end
+
+function Quests:ReadyCount(): number
+	local n = 0
+	for _, quest in self.List do
+		if quest.Done then
+			n += 1
+		end
+	end
+	return n
+end
+
+function Quests:Init(controllers)
+	C = controllers
+	local gui = C.UI.Gui
+	tracker = UIKit.new("Frame", {
+		Name = "QuestTracker",
+		Size = UDim2.fromOffset(300, 30),
+		Position = UDim2.new(1, -12, 1, -76),
+		AnchorPoint = Vector2.new(1, 1),
+		BackgroundTransparency = 1,
+		Parent = gui,
+	})
+	local scale = UIKit.new("UIScale", { Parent = tracker })
+	local function rescale()
+		local vp = workspace.CurrentCamera.ViewportSize
+		scale.Scale = math.clamp(vp.Y / 860, 0.6, 1.1)
+	end
+	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
+	rescale()
+
+	local header = UIKit.new("TextButton", {
+		Name = "Header",
+		Size = UDim2.new(1, 0, 0, 26),
+		BackgroundTransparency = 1,
+		Text = "",
+		Parent = tracker,
+	})
+	title = UIKit.Label({ Text = "📜 QUESTS", Size = UDim2.new(1, 0, 1, 0), TextXAlignment = Enum.TextXAlignment.Right, Parent = header })
+	header.Activated:Connect(function()
+		collapsed = not collapsed
+		UIKit.PlaySound("Click", 0.4)
+		render()
+	end)
+	rowsFrame = UIKit.new("Frame", { Name = "Rows", Size = UDim2.new(1, 0, 1, -30), Position = UDim2.fromOffset(0, 30), BackgroundTransparency = 1, Parent = tracker })
+	UIKit.List(rowsFrame, 6)
+
+	Remotes.QuestUpdate.OnClientEvent:Connect(function(list, claimed)
+		if type(list) == "table" then
+			self.List = list
+			self.Claimed = tonumber(claimed) or self.Claimed
+			render()
+		end
+	end)
+	-- out of the way during minigames
+	player:GetAttributeChangedSignal("InMinigame"):Connect(function()
+		tracker.Visible = not player:GetAttribute("InMinigame")
+	end)
+	render()
+end
+
+return Quests
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">Shop</string>
             <string name="Source"><![CDATA[--[[ Shop - Robux panel with Game Passes and Developer Products ]]
@@ -13331,7 +14404,7 @@ return Shop
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="46">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">UI</string>
             <string name="Source"><![CDATA[--[[ UI - owns the main ScreenGui and the "one panel at a time" manager ]]
@@ -13470,7 +14543,7 @@ return UI
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">VFX</string>
             <string name="Source"><![CDATA[--[[
@@ -14016,13 +15089,13 @@ return VFX
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="48">
+  <Item class="TextChatService" referent="53">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="49">
+  <Item class="Workspace" referent="54">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="Gravity">196.2</float>

@@ -122,16 +122,31 @@ function Harness.Boot(placePath: string, opts)
 	Harness.Wait(1)
 	local player
 	if opts.Client ~= false then
-		player = Engine.AddPlayer(opts.Name or "Tester", { Local = true })
-		Harness.Wait(0.2)
-		local loading = game:GetService("ReplicatedFirst"):FindFirstChild("LoadingScreen")
-		if loading then
-			Engine.RunScript(loading, "client")
-		end
-		local client = game:GetService("StarterPlayer"):FindFirstChild("StarterPlayerScripts"):FindFirstChild("Client")
-		Engine.RunScript(client, "client")
+		player = Harness.StartClient(opts.Name or "Tester", { UserId = opts.UserId })
 	end
 	return game, player
+end
+
+-- a player joins on the local client: runs the loading screen + client scripts
+function Harness.StartClient(name: string, opts)
+	opts = opts or {}
+	local player = Engine.AddPlayer(name, { Local = true, UserId = opts.UserId })
+	Harness.Wait(0.2)
+	local loading = game:GetService("ReplicatedFirst"):FindFirstChild("LoadingScreen")
+	if loading then
+		Engine.RunScript(loading, "client")
+	end
+	local client = game:GetService("StarterPlayer"):FindFirstChild("StarterPlayerScripts"):FindFirstChild("Client")
+	Engine.RunScript(client, "client")
+	return player
+end
+
+-- the local player leaves (their whole client shuts down)
+function Harness.LeaveClient()
+	local player = Engine.LocalPlayer
+	assert(player, "no local player")
+	Engine.RemovePlayer(player)
+	Engine.ResetClient()
 end
 
 function Harness.AddPlayer(name: string, opts)

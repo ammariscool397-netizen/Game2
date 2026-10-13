@@ -109,6 +109,9 @@ function SecretService:Find(player: Player, secretId: string, silent: boolean?):
 	S.DataService:AddCash(player, cash, false)
 	S.DataService:Sync(player)
 	S.TycoonService:OnSecretFound(player, secretId)
+	if S.QuestService then
+		S.QuestService:Progress(player, "Secret", 1)
+	end
 	if secret.BadgeId and secret.BadgeId ~= 0 then
 		task.spawn(pcall, BadgeService.AwardBadge, BadgeService, player.UserId, secret.BadgeId)
 	end
