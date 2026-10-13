@@ -112,11 +112,11 @@ function TycoonService:Init(services)
 	S.DataService.PlayerLoaded:Connect(function(player, data)
 		self:_assign(player, data)
 	end)
+	-- offline earnings use the player's OWN tower (also while they're a duo
+	-- partner). Computed from data, so it works no matter whether the tower
+	-- was already cleared when the leave-save runs.
 	S.DataService.BeforeSave:Connect(function(player, data)
-		local plot = playerPlot[player]
-		if plot and plot.Owner == player then
-			data.LastIncome = plot.Income * S.DataService:GetMultiplier(player)
-		end
+		data.LastIncome = self:GetOfflineIncome(player)
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		self:_onLeave(player)
@@ -237,6 +237,18 @@ function TycoonService:GetIncome(player: Player): number
 		return 0
 	end
 	return plot.Income * S.DataService:GetMultiplier(plot.Owner)
+end
+
+-- income per second used for offline earnings: the player's full tower
+-- (wrecked items repair while they're away) with permanent multipliers only
+function TycoonService:GetOfflineIncome(player: Player): number
+	local data = S.DataService:Get(player)
+	if not data then
+		return 0
+	end
+	local fast = S.MonetizationService ~= nil and S.MonetizationService:HasPass(player, "FastDroppers")
+	local income = TycoonItems.ComputeIncome(data.Purchased, nil, data.Secrets, fast)
+	return income * S.DataService:GetMultiplier(player, true)
 end
 
 function TycoonService:IsFloorUnlocked(plot, floor: number): boolean

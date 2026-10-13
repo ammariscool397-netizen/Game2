@@ -1872,19 +1872,56 @@ return UIKit
           <string name="Source"><![CDATA[--[[ Small helpers shared by server and client ]]
 local Util = {}
 
-local SUFFIXES = { "", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc" }
+local SUFFIXES = {
+	"", "K", "M", "B", "T", "Qa", "Qi", "Sx", "Sp", "Oc", "No", "Dc",
+	"Ud", "Dd", "Td", "Qad", "Qid", "Sxd", "Spd", "Ocd", "Nod", "Vg",
+}
+
+-- true for real numbers (not NaN, not +/-inf)
+function Util.IsFinite(n: any): boolean
+	return type(n) == "number" and n == n and n ~= math.huge and n ~= -math.huge
+end
+
+-- tonumber() that only accepts finite numbers (Luau's tonumber parses "nan" and "inf")
+function Util.Number(value: any): number?
+	local n = tonumber(value)
+	if n == nil or not Util.IsFinite(n) then
+		return nil
+	end
+	return n
+end
 
 -- 1234567 -> "1.23M"
 function Util.Abbreviate(n: number): string
 	n = tonumber(n) or 0
+	if n ~= n then
+		return "0"
+	elseif n == math.huge then
+		return "∞"
+	elseif n == -math.huge then
+		return "-∞"
+	end
 	local negative = n < 0
 	n = math.abs(n)
 	if n < 1000 then
 		local s = tostring(math.floor(n))
 		return negative and "-" .. s or s
 	end
-	local index = math.min(math.floor(math.log10(n) / 3), #SUFFIXES - 1)
+	if n >= 1000 ^ #SUFFIXES then
+		-- past the last suffix
+		local text = string.format("%.2e", n)
+		return negative and "-" .. text or text
+	end
+	local index = math.clamp(math.floor(math.log10(n) / 3), 0, #SUFFIXES - 1)
 	local value = n / (1000 ^ index)
+	-- log10 can land just below an integer (999.99...): fix the suffix
+	if value >= 1000 and index < #SUFFIXES - 1 then
+		index += 1
+		value /= 1000
+	elseif value < 1 and index > 0 then
+		index -= 1
+		value *= 1000
+	end
 	local text
 	if value >= 100 then
 		text = string.format("%d", math.floor(value))
@@ -1906,14 +1943,18 @@ end
 
 -- 1234567 -> "1,234,567"
 function Util.Commas(n: number): string
-	local s = tostring(math.floor(tonumber(n) or 0))
+	n = tonumber(n) or 0
+	if not Util.IsFinite(n) or math.abs(n) >= 1e15 then
+		return Util.Abbreviate(n)
+	end
+	local s = tostring(math.floor(n))
 	local formatted = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
 	return (formatted:gsub("^,", ""):gsub("^%-,", "-"))
 end
 
 -- 3725 -> "1h 2m 5s"
 function Util.FormatTime(seconds: number): string
-	seconds = math.max(0, math.floor(seconds))
+	seconds = math.max(0, math.floor(Util.Number(seconds) or 0))
 	local h = seconds // 3600
 	local m = (seconds % 3600) // 60
 	local s = seconds % 60
@@ -1926,7 +1967,7 @@ function Util.FormatTime(seconds: number): string
 end
 
 function Util.Clock(seconds: number): string
-	seconds = math.max(0, math.floor(seconds))
+	seconds = math.max(0, math.floor(Util.Number(seconds) or 0))
 	return string.format("%d:%02d", seconds // 60, seconds % 60)
 end
 
@@ -1941,16 +1982,38 @@ function Util.DeepCopy<T>(t: T): T
 	return copy :: any
 end
 
--- Fill in keys missing from `data` with values from `template`
+-- Fill in keys missing from `data` with values from `template`. Values of
+-- the wrong type (corrupted saves) and NaN / inf numbers are replaced too.
 function Util.Reconcile(data: { [any]: any }, template: { [any]: any })
 	for k, v in template do
-		if data[k] == nil then
+		local current = data[k]
+		if current == nil or type(current) ~= type(v) or (type(v) == "number" and not Util.IsFinite(current)) then
 			data[k] = Util.DeepCopy(v)
-		elseif type(v) == "table" and type(data[k]) == "table" then
-			Util.Reconcile(data[k], v)
+		elseif type(v) == "table" then
+			Util.Reconcile(current, v)
 		end
 	end
 	return data
+end
+
+-- Replace NaN / inf numbers anywhere in `t` (so a save can never fail on them).
+-- Returns how many values were fixed.
+function Util.Sanitize(t: { [any]: any }, template: { [any]: any }?, depth: number?): number
+	local fixed = 0
+	if (depth or 0) > 20 then
+		return 0
+	end
+	for k, v in t do
+		if type(v) == "number" and not Util.IsFinite(v) then
+			local default = template and template[k]
+			t[k] = type(default) == "number" and default or 0
+			fixed += 1
+		elseif type(v) == "table" then
+			local sub = template and type(template[k]) == "table" and template[k] or nil
+			fixed += Util.Sanitize(v, sub, (depth or 0) + 1)
+		end
+	end
+	return fixed
 end
 
 return Util
@@ -2128,7 +2191,7 @@ local function parseAmount(text: string?): number?
 	end
 	text = text:lower():gsub(",", "")
 	local number, suffix = text:match("^(%-?[%d%.]+)(%a*)$")
-	number = tonumber(number)
+	number = Util.Number(number)
 	if not number then
 		return nil
 	end
@@ -2136,7 +2199,7 @@ local function parseAmount(text: string?): number?
 	if not mult then
 		return nil
 	end
-	return number * mult
+	return Util.Number(number * mult)
 end
 
 local function getCharacterParts(player: Player)
@@ -2232,7 +2295,9 @@ local function eachTarget(executor: Player, selector: string?, harmful: boolean,
 	local myRank = AdminService:GetRank(executor)
 	local affected = {}
 	for _, target in targets do
-		if harmful and target ~= executor and AdminService:GetRank(target) >= myRank then
+		-- staff can't be harmed by equal/lower ranks (the Owner can do anything,
+		-- which also lets Studio play-testers - all Owners - test on each other)
+		if harmful and target ~= executor and myRank < 4 and AdminService:GetRank(target) >= myRank then
 			continue
 		end
 		local ok, err = pcall(fn, target)
@@ -2364,11 +2429,11 @@ local function buildCommands()
 		end,
 	})
 	charCommand("speed", { "ws", "walkspeed" }, 1, "Set walk speed: ;speed me 50", false, function(_, _, humanoid, _, args)
-		humanoid.WalkSpeed = math.clamp(tonumber(args[2]) or 16, 0, 500)
+		humanoid.WalkSpeed = math.clamp(Util.Number(args[2]) or 16, 0, 500)
 	end)
 	charCommand("jump", { "jp", "jumppower" }, 1, "Set jump power: ;jump me 100", false, function(_, _, humanoid, _, args)
 		humanoid.UseJumpPower = true
-		humanoid.JumpPower = math.clamp(tonumber(args[2]) or 50, 0, 1000)
+		humanoid.JumpPower = math.clamp(Util.Number(args[2]) or 50, 0, 1000)
 	end)
 	charCommand("heal", {}, 1, "Fully heal players", false, function(_, _, humanoid)
 		humanoid.Health = humanoid.MaxHealth
@@ -2620,11 +2685,11 @@ local function buildCommands()
 		Args = "<player> <amount>",
 		Desc = "Add rebirths (without resetting the tycoon)",
 		Run = function(executor, args)
-			local amount = math.floor(tonumber(args[2]) or 1)
+			local amount = math.clamp(math.floor(Util.Number(args[2]) or 1), -1000, 1000)
 			local affected = eachTarget(executor, args[1], false, function(target)
 				local data = S.DataService:Get(target)
 				if data then
-					data.Rebirths = math.max(0, data.Rebirths + amount)
+					data.Rebirths = math.clamp(data.Rebirths + amount, 0, 10000)
 					S.DataService:Sync(target)
 				end
 			end)
@@ -2695,8 +2760,8 @@ local function buildCommands()
 		Args = "<minutes> [multiplier]",
 		Desc = "Server-wide cash multiplier event",
 		Run = function(executor, args)
-			local minutes = math.clamp(tonumber(args[1]) or 10, 1, 600)
-			local mult = math.clamp(tonumber(args[2]) or 2, 1, 100)
+			local minutes = math.clamp(Util.Number(args[1]) or 10, 1, 600)
+			local mult = math.clamp(Util.Number(args[2]) or 2, 1, 100)
 			workspace:SetAttribute("EventMultiplier", mult)
 			workspace:SetAttribute("EventEnds", os.time() + minutes * 60)
 			for _, p in Players:GetPlayers() do
@@ -2718,7 +2783,7 @@ local function buildCommands()
 		Args = "<soundId>",
 		Desc = "Play a song for everyone",
 		Run = function(_, args)
-			local id = tonumber(args[1])
+			local id = Util.Number(args[1])
 			if not id then
 				return "Invalid sound id"
 			end
@@ -2757,7 +2822,7 @@ local function buildCommands()
 		Args = "<0-24>",
 		Desc = "Set the time of day",
 		Run = function(_, args)
-			local t = tonumber(args[1])
+			local t = Util.Number(args[1])
 			if not t then
 				return "Invalid time"
 			end
@@ -2817,7 +2882,7 @@ local function buildCommands()
 		Args = "<player> [percent]",
 		Desc = "Wreck part of a tower (test the repair system)",
 		Run = function(executor, args)
-			local percent = math.clamp(tonumber(args[2]) or 25, 1, 100)
+			local percent = math.clamp(Util.Number(args[2]) or 25, 1, 100)
 			local total = 0
 			local affected = eachTarget(executor, args[1], true, function(target)
 				local plot = S.TycoonService:GetPlot(target)
@@ -2839,7 +2904,7 @@ local function buildCommands()
 			if not plot then
 				return "You have no tower"
 			end
-			S.TycoonService:TeleportToFloor(executor, plot.Index, tonumber(args[1]) or 1)
+			S.TycoonService:TeleportToFloor(executor, plot.Index, Util.Number(args[1]) or 1)
 			return "Teleported"
 		end,
 	})
@@ -2850,7 +2915,7 @@ local function buildCommands()
 		Args = "<player> <floor>",
 		Desc = "Instantly build a tower up to a floor",
 		Run = function(executor, args)
-			local floor = math.clamp(math.floor(tonumber(args[2]) or 1), 1, Config.Tycoon.Floors + 1)
+			local floor = math.clamp(math.floor(Util.Number(args[2]) or 1), 1, Config.Tycoon.Floors + 1)
 			local affected = eachTarget(executor, args[1], false, function(target)
 				S.TycoonService:UnlockAll(target, floor)
 			end)
@@ -2920,7 +2985,8 @@ local function buildCommands()
 				return "User not found"
 			end
 			for _, target in targets do
-				if target ~= executor and AdminService:GetRank(target) < AdminService:GetRank(executor) then
+				local myRank = AdminService:GetRank(executor)
+				if target ~= executor and (myRank >= 4 or AdminService:GetRank(target) < myRank) then
 					AdminService:Ban(target.UserId, reason, executor.Name)
 					target:Kick("You are banned: " .. reason)
 					table.insert(banned, target)
@@ -3032,7 +3098,7 @@ local function buildCommands()
 		Args = "<player> <1-3>",
 		Desc = "Give a player an admin rank (this server)",
 		Run = function(executor, args)
-			local rank = math.clamp(math.floor(tonumber(args[2]) or 2), 0, 3)
+			local rank = math.clamp(math.floor(Util.Number(args[2]) or 2), 0, 3)
 			local affected = eachTarget(executor, args[1], false, function(target)
 				if target ~= executor then
 					tempRanks[target.UserId] = rank
@@ -3574,6 +3640,10 @@ function DataService:_onJoin(player: Player)
 		data = Util.DeepCopy(TEMPLATE)
 	else
 		Util.Reconcile(data, TEMPLATE)
+		local fixed = Util.Sanitize(data, TEMPLATE)
+		if fixed > 0 then
+			warn("[DataService] Repaired " .. fixed .. " invalid numbers in " .. player.Name .. "'s data")
+		end
 	end
 	-- drop purchases of items that no longer exist (old versions)
 	for id in data.Purchased do
@@ -3620,6 +3690,11 @@ function DataService:Save(player: Player)
 	end
 	data.LastOnline = os.time()
 	self.BeforeSave:Fire(player, data)
+	-- NaN / inf can't be saved (the whole save would fail): repair them first
+	local fixed = Util.Sanitize(data, TEMPLATE)
+	if fixed > 0 then
+		warn("[DataService] Repaired " .. fixed .. " invalid numbers before saving " .. player.Name)
+	end
 	local ok, err = retry(function()
 		(store :: DataStore):UpdateAsync(keyFor(player), function()
 			return data
@@ -3700,8 +3775,25 @@ function DataService:TeamHasPass(player: Player, key: string): boolean
 	return false
 end
 
--- Global income multiplier of the wallet that `player` uses
-function DataService:GetMultiplier(player: Player): number
+-- Global income multiplier of the wallet that `player` uses.
+-- permanentOnly = the player's own rebirths + passes (no duo, boosts or events),
+-- used for offline earnings
+function DataService:GetMultiplier(player: Player, permanentOnly: boolean?): number
+	if permanentOnly then
+		local own = profiles[player]
+		if not own then
+			return 1
+		end
+		local mult = 1 + own.Rebirths * Config.Rebirth.MultiplierPerRebirth
+		local monetization = S and S.MonetizationService
+		if monetization and monetization:HasPass(player, "DoubleCash") then
+			mult *= 2
+		end
+		if monetization and monetization:HasPass(player, "VIP") then
+			mult *= 1.5
+		end
+		return mult
+	end
 	local host = self:GetWalletOwner(player)
 	local data = profiles[host]
 	if not data then
@@ -3724,7 +3816,10 @@ function DataService:GetMultiplier(player: Player): number
 	if boosted then
 		mult *= 2
 	end
-	mult *= workspace:GetAttribute("EventMultiplier") or 1
+	local event = workspace:GetAttribute("EventMultiplier")
+	if Util.IsFinite(event) and event > 0 then
+		mult *= event
+	end
 	return mult
 end
 
@@ -3778,30 +3873,55 @@ function DataService:Sync(player: Player)
 end
 
 -- Add cash to the player's wallet. `earned` = counts toward TotalEarned (income), default true
+-- every wallet change goes through these; a bad number (NaN / inf) must never
+-- reach the saved data, so it's refused here (and totals are capped)
+local MAX_CASH = 1e300
+
+local function capped(n: number): number
+	return math.clamp(n, 0, MAX_CASH)
+end
+
+local function validAmount(amount: any, what: string): boolean
+	if Util.IsFinite(amount) then
+		return true
+	end
+	warn("[DataService] Ignored invalid " .. what .. " amount: " .. tostring(amount))
+	return false
+end
+
 function DataService:AddCash(player: Player, amount: number, earned: boolean?)
+	if not validAmount(amount, "cash") then
+		return
+	end
 	local host = self:GetWalletOwner(player)
 	local data = profiles[host]
 	if not data then
 		return
 	end
-	data.Cash = math.max(0, data.Cash + amount)
+	data.Cash = capped(data.Cash + amount)
 	if earned ~= false and amount > 0 then
-		data.TotalEarned += amount
+		data.TotalEarned = capped(data.TotalEarned + amount)
 	end
 	self:Sync(host)
 end
 
 function DataService:SetCash(player: Player, amount: number)
+	if not validAmount(amount, "cash") then
+		return
+	end
 	local host = self:GetWalletOwner(player)
 	local data = profiles[host]
 	if not data then
 		return
 	end
-	data.Cash = math.max(0, amount)
+	data.Cash = capped(amount)
 	self:Sync(host)
 end
 
 function DataService:SpendCash(player: Player, amount: number): boolean
+	if not validAmount(amount, "spend") or amount < 0 then
+		return false
+	end
 	local host = self:GetWalletOwner(player)
 	local data = profiles[host]
 	if not data or data.Cash < amount then
@@ -3813,13 +3933,16 @@ function DataService:SpendCash(player: Player, amount: number): boolean
 end
 
 function DataService:AddVault(player: Player, amount: number)
+	if not validAmount(amount, "vault") then
+		return
+	end
 	local host = self:GetWalletOwner(player)
 	local data = profiles[host]
 	if not data then
 		return
 	end
-	data.Vault += amount
-	data.TotalEarned += amount
+	data.Vault = capped(data.Vault + amount)
+	data.TotalEarned = capped(data.TotalEarned + amount)
 	for _, member in self:GetTeam(host) do
 		member:SetAttribute("Vault", data.Vault)
 		member:SetAttribute("TotalEarned", data.TotalEarned)
@@ -3835,12 +3958,15 @@ function DataService:CollectVault(player: Player): number
 	end
 	local amount = data.Vault
 	data.Vault = 0
-	data.Cash += amount
+	data.Cash = capped(data.Cash + amount)
 	self:Sync(host)
 	return amount
 end
 
 function DataService:AddBoost(player: Player, seconds: number)
+	if not validAmount(seconds, "boost") then
+		return
+	end
 	local data = profiles[player]
 	if not data then
 		return
@@ -6083,7 +6209,7 @@ function RewardService:Init(services)
 		if not data or type(settings) ~= "table" then
 			return
 		end
-		if type(settings.MusicVolume) == "number" then
+		if Util.IsFinite(settings.MusicVolume) then
 			data.Settings.MusicVolume = math.clamp(settings.MusicVolume, 0, 1)
 		end
 		if type(settings.SFX) == "boolean" then
@@ -7269,11 +7395,11 @@ function TycoonService:Init(services)
 	S.DataService.PlayerLoaded:Connect(function(player, data)
 		self:_assign(player, data)
 	end)
+	-- offline earnings use the player's OWN tower (also while they're a duo
+	-- partner). Computed from data, so it works no matter whether the tower
+	-- was already cleared when the leave-save runs.
 	S.DataService.BeforeSave:Connect(function(player, data)
-		local plot = playerPlot[player]
-		if plot and plot.Owner == player then
-			data.LastIncome = plot.Income * S.DataService:GetMultiplier(player)
-		end
+		data.LastIncome = self:GetOfflineIncome(player)
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		self:_onLeave(player)
@@ -7394,6 +7520,18 @@ function TycoonService:GetIncome(player: Player): number
 		return 0
 	end
 	return plot.Income * S.DataService:GetMultiplier(plot.Owner)
+end
+
+-- income per second used for offline earnings: the player's full tower
+-- (wrecked items repair while they're away) with permanent multipliers only
+function TycoonService:GetOfflineIncome(player: Player): number
+	local data = S.DataService:Get(player)
+	if not data then
+		return 0
+	end
+	local fast = S.MonetizationService ~= nil and S.MonetizationService:HasPass(player, "FastDroppers")
+	local income = TycoonItems.ComputeIncome(data.Purchased, nil, data.Secrets, fast)
+	return income * S.DataService:GetMultiplier(player, true)
 end
 
 function TycoonService:IsFloorUnlocked(plot, floor: number): boolean

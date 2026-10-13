@@ -88,7 +88,7 @@ local function parseAmount(text: string?): number?
 	end
 	text = text:lower():gsub(",", "")
 	local number, suffix = text:match("^(%-?[%d%.]+)(%a*)$")
-	number = tonumber(number)
+	number = Util.Number(number)
 	if not number then
 		return nil
 	end
@@ -96,7 +96,7 @@ local function parseAmount(text: string?): number?
 	if not mult then
 		return nil
 	end
-	return number * mult
+	return Util.Number(number * mult)
 end
 
 local function getCharacterParts(player: Player)
@@ -192,7 +192,9 @@ local function eachTarget(executor: Player, selector: string?, harmful: boolean,
 	local myRank = AdminService:GetRank(executor)
 	local affected = {}
 	for _, target in targets do
-		if harmful and target ~= executor and AdminService:GetRank(target) >= myRank then
+		-- staff can't be harmed by equal/lower ranks (the Owner can do anything,
+		-- which also lets Studio play-testers - all Owners - test on each other)
+		if harmful and target ~= executor and myRank < 4 and AdminService:GetRank(target) >= myRank then
 			continue
 		end
 		local ok, err = pcall(fn, target)
@@ -324,11 +326,11 @@ local function buildCommands()
 		end,
 	})
 	charCommand("speed", { "ws", "walkspeed" }, 1, "Set walk speed: ;speed me 50", false, function(_, _, humanoid, _, args)
-		humanoid.WalkSpeed = math.clamp(tonumber(args[2]) or 16, 0, 500)
+		humanoid.WalkSpeed = math.clamp(Util.Number(args[2]) or 16, 0, 500)
 	end)
 	charCommand("jump", { "jp", "jumppower" }, 1, "Set jump power: ;jump me 100", false, function(_, _, humanoid, _, args)
 		humanoid.UseJumpPower = true
-		humanoid.JumpPower = math.clamp(tonumber(args[2]) or 50, 0, 1000)
+		humanoid.JumpPower = math.clamp(Util.Number(args[2]) or 50, 0, 1000)
 	end)
 	charCommand("heal", {}, 1, "Fully heal players", false, function(_, _, humanoid)
 		humanoid.Health = humanoid.MaxHealth
@@ -580,11 +582,11 @@ local function buildCommands()
 		Args = "<player> <amount>",
 		Desc = "Add rebirths (without resetting the tycoon)",
 		Run = function(executor, args)
-			local amount = math.floor(tonumber(args[2]) or 1)
+			local amount = math.clamp(math.floor(Util.Number(args[2]) or 1), -1000, 1000)
 			local affected = eachTarget(executor, args[1], false, function(target)
 				local data = S.DataService:Get(target)
 				if data then
-					data.Rebirths = math.max(0, data.Rebirths + amount)
+					data.Rebirths = math.clamp(data.Rebirths + amount, 0, 10000)
 					S.DataService:Sync(target)
 				end
 			end)
@@ -655,8 +657,8 @@ local function buildCommands()
 		Args = "<minutes> [multiplier]",
 		Desc = "Server-wide cash multiplier event",
 		Run = function(executor, args)
-			local minutes = math.clamp(tonumber(args[1]) or 10, 1, 600)
-			local mult = math.clamp(tonumber(args[2]) or 2, 1, 100)
+			local minutes = math.clamp(Util.Number(args[1]) or 10, 1, 600)
+			local mult = math.clamp(Util.Number(args[2]) or 2, 1, 100)
 			workspace:SetAttribute("EventMultiplier", mult)
 			workspace:SetAttribute("EventEnds", os.time() + minutes * 60)
 			for _, p in Players:GetPlayers() do
@@ -678,7 +680,7 @@ local function buildCommands()
 		Args = "<soundId>",
 		Desc = "Play a song for everyone",
 		Run = function(_, args)
-			local id = tonumber(args[1])
+			local id = Util.Number(args[1])
 			if not id then
 				return "Invalid sound id"
 			end
@@ -717,7 +719,7 @@ local function buildCommands()
 		Args = "<0-24>",
 		Desc = "Set the time of day",
 		Run = function(_, args)
-			local t = tonumber(args[1])
+			local t = Util.Number(args[1])
 			if not t then
 				return "Invalid time"
 			end
@@ -777,7 +779,7 @@ local function buildCommands()
 		Args = "<player> [percent]",
 		Desc = "Wreck part of a tower (test the repair system)",
 		Run = function(executor, args)
-			local percent = math.clamp(tonumber(args[2]) or 25, 1, 100)
+			local percent = math.clamp(Util.Number(args[2]) or 25, 1, 100)
 			local total = 0
 			local affected = eachTarget(executor, args[1], true, function(target)
 				local plot = S.TycoonService:GetPlot(target)
@@ -799,7 +801,7 @@ local function buildCommands()
 			if not plot then
 				return "You have no tower"
 			end
-			S.TycoonService:TeleportToFloor(executor, plot.Index, tonumber(args[1]) or 1)
+			S.TycoonService:TeleportToFloor(executor, plot.Index, Util.Number(args[1]) or 1)
 			return "Teleported"
 		end,
 	})
@@ -810,7 +812,7 @@ local function buildCommands()
 		Args = "<player> <floor>",
 		Desc = "Instantly build a tower up to a floor",
 		Run = function(executor, args)
-			local floor = math.clamp(math.floor(tonumber(args[2]) or 1), 1, Config.Tycoon.Floors + 1)
+			local floor = math.clamp(math.floor(Util.Number(args[2]) or 1), 1, Config.Tycoon.Floors + 1)
 			local affected = eachTarget(executor, args[1], false, function(target)
 				S.TycoonService:UnlockAll(target, floor)
 			end)
@@ -880,7 +882,8 @@ local function buildCommands()
 				return "User not found"
 			end
 			for _, target in targets do
-				if target ~= executor and AdminService:GetRank(target) < AdminService:GetRank(executor) then
+				local myRank = AdminService:GetRank(executor)
+				if target ~= executor and (myRank >= 4 or AdminService:GetRank(target) < myRank) then
 					AdminService:Ban(target.UserId, reason, executor.Name)
 					target:Kick("You are banned: " .. reason)
 					table.insert(banned, target)
@@ -992,7 +995,7 @@ local function buildCommands()
 		Args = "<player> <1-3>",
 		Desc = "Give a player an admin rank (this server)",
 		Run = function(executor, args)
-			local rank = math.clamp(math.floor(tonumber(args[2]) or 2), 0, 3)
+			local rank = math.clamp(math.floor(Util.Number(args[2]) or 2), 0, 3)
 			local affected = eachTarget(executor, args[1], false, function(target)
 				if target ~= executor then
 					tempRanks[target.UserId] = rank

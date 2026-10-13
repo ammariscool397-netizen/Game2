@@ -215,6 +215,10 @@ function DataService:_onJoin(player: Player)
 		data = Util.DeepCopy(TEMPLATE)
 	else
 		Util.Reconcile(data, TEMPLATE)
+		local fixed = Util.Sanitize(data, TEMPLATE)
+		if fixed > 0 then
+			warn("[DataService] Repaired " .. fixed .. " invalid numbers in " .. player.Name .. "'s data")
+		end
 	end
 	-- drop purchases of items that no longer exist (old versions)
 	for id in data.Purchased do
@@ -261,6 +265,11 @@ function DataService:Save(player: Player)
 	end
 	data.LastOnline = os.time()
 	self.BeforeSave:Fire(player, data)
+	-- NaN / inf can't be saved (the whole save would fail): repair them first
+	local fixed = Util.Sanitize(data, TEMPLATE)
+	if fixed > 0 then
+		warn("[DataService] Repaired " .. fixed .. " invalid numbers before saving " .. player.Name)
+	end
 	local ok, err = retry(function()
 		(store :: DataStore):UpdateAsync(keyFor(player), function()
 			return data
@@ -341,8 +350,25 @@ function DataService:TeamHasPass(player: Player, key: string): boolean
 	return false
 end
 
--- Global income multiplier of the wallet that `player` uses
-function DataService:GetMultiplier(player: Player): number
+-- Global income multiplier of the wallet that `player` uses.
+-- permanentOnly = the player's own rebirths + passes (no duo, boosts or events),
+-- used for offline earnings
+function DataService:GetMultiplier(player: Player, permanentOnly: boolean?): number
+	if permanentOnly then
+		local own = profiles[player]
+		if not own then
+			return 1
+		end
+		local mult = 1 + own.Rebirths * Config.Rebirth.MultiplierPerRebirth
+		local monetization = S and S.MonetizationService
+		if monetization and monetization:HasPass(player, "DoubleCash") then
+			mult *= 2
+		end
+		if monetization and monetization:HasPass(player, "VIP") then
+			mult *= 1.5
+		end
+		return mult
+	end
 	local host = self:GetWalletOwner(player)
 	local data = profiles[host]
 	if not data then
@@ -365,7 +391,10 @@ function DataService:GetMultiplier(player: Player): number
 	if boosted then
 		mult *= 2
 	end
-	mult *= workspace:GetAttribute("EventMultiplier") or 1
+	local event = workspace:GetAttribute("EventMultiplier")
+	if Util.IsFinite(event) and event > 0 then
+		mult *= event
+	end
 	return mult
 end
 
@@ -419,30 +448,55 @@ function DataService:Sync(player: Player)
 end
 
 -- Add cash to the player's wallet. `earned` = counts toward TotalEarned (income), default true
+-- every wallet change goes through these; a bad number (NaN / inf) must never
+-- reach the saved data, so it's refused here (and totals are capped)
+local MAX_CASH = 1e300
+
+local function capped(n: number): number
+	return math.clamp(n, 0, MAX_CASH)
+end
+
+local function validAmount(amount: any, what: string): boolean
+	if Util.IsFinite(amount) then
+		return true
+	end
+	warn("[DataService] Ignored invalid " .. what .. " amount: " .. tostring(amount))
+	return false
+end
+
 function DataService:AddCash(player: Player, amount: number, earned: boolean?)
+	if not validAmount(amount, "cash") then
+		return
+	end
 	local host = self:GetWalletOwner(player)
 	local data = profiles[host]
 	if not data then
 		return
 	end
-	data.Cash = math.max(0, data.Cash + amount)
+	data.Cash = capped(data.Cash + amount)
 	if earned ~= false and amount > 0 then
-		data.TotalEarned += amount
+		data.TotalEarned = capped(data.TotalEarned + amount)
 	end
 	self:Sync(host)
 end
 
 function DataService:SetCash(player: Player, amount: number)
+	if not validAmount(amount, "cash") then
+		return
+	end
 	local host = self:GetWalletOwner(player)
 	local data = profiles[host]
 	if not data then
 		return
 	end
-	data.Cash = math.max(0, amount)
+	data.Cash = capped(amount)
 	self:Sync(host)
 end
 
 function DataService:SpendCash(player: Player, amount: number): boolean
+	if not validAmount(amount, "spend") or amount < 0 then
+		return false
+	end
 	local host = self:GetWalletOwner(player)
 	local data = profiles[host]
 	if not data or data.Cash < amount then
@@ -454,13 +508,16 @@ function DataService:SpendCash(player: Player, amount: number): boolean
 end
 
 function DataService:AddVault(player: Player, amount: number)
+	if not validAmount(amount, "vault") then
+		return
+	end
 	local host = self:GetWalletOwner(player)
 	local data = profiles[host]
 	if not data then
 		return
 	end
-	data.Vault += amount
-	data.TotalEarned += amount
+	data.Vault = capped(data.Vault + amount)
+	data.TotalEarned = capped(data.TotalEarned + amount)
 	for _, member in self:GetTeam(host) do
 		member:SetAttribute("Vault", data.Vault)
 		member:SetAttribute("TotalEarned", data.TotalEarned)
@@ -476,12 +533,15 @@ function DataService:CollectVault(player: Player): number
 	end
 	local amount = data.Vault
 	data.Vault = 0
-	data.Cash += amount
+	data.Cash = capped(data.Cash + amount)
 	self:Sync(host)
 	return amount
 end
 
 function DataService:AddBoost(player: Player, seconds: number)
+	if not validAmount(seconds, "boost") then
+		return
+	end
 	local data = profiles[player]
 	if not data then
 		return

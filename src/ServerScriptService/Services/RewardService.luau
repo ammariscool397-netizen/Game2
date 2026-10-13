@@ -28,7 +28,7 @@ function RewardService:Init(services)
 		if not data or type(settings) ~= "table" then
 			return
 		end
-		if type(settings.MusicVolume) == "number" then
+		if Util.IsFinite(settings.MusicVolume) then
 			data.Settings.MusicVolume = math.clamp(settings.MusicVolume, 0, 1)
 		end
 		if type(settings.SFX) == "boolean" then
