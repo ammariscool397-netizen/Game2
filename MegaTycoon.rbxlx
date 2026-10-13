@@ -6600,8 +6600,10 @@ function QuestService:_towerData(player: Player)
 	return S.DataService:GetWallet(player) or S.DataService:Get(player)
 end
 
--- can this kind of quest be done right now?
-function QuestService:_available(kind: string, player: Player, data): boolean
+-- can this kind of quest be done? (new = picking a new quest; existing quests
+-- are only dropped when they became impossible, not when they're slow - e.g.
+-- the tower is still rebuilding after a rejoin and has no income yet)
+function QuestService:_available(kind: string, player: Player, data, new: boolean?): boolean
 	local tower = self:_towerData(player)
 	if kind == "Floor" then
 		return tower ~= nil and nextFloor(tower) ~= nil
@@ -6614,7 +6616,7 @@ function QuestService:_available(kind: string, player: Player, data): boolean
 	elseif kind == "Buy" then
 		return tower ~= nil and count(tower.Purchased) < TycoonItems.BuyableCount
 	elseif kind == "Earn" then
-		return S.TycoonService:GetIncome(player) > 0
+		return not new or S.TycoonService:GetIncome(player) > 0
 	end
 	return QC.Types[kind] ~= nil
 end
@@ -6622,7 +6624,7 @@ end
 function QuestService:_new(player: Player, data, taken: { [string]: boolean })
 	local kinds = {}
 	for kind in QC.Types do
-		if not taken[kind] and self:_available(kind, player, data) then
+		if not taken[kind] and self:_available(kind, player, data, true) then
 			table.insert(kinds, kind)
 		end
 	end

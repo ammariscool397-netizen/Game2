@@ -60,9 +60,10 @@ jobs:
       - name: Gameplay simulation tests
         run: lune run tests/sim/run.luau -- MegaTycoon.rbxlx
 
-      - name: Gameplay simulation tests (reversed event order)
+      - name: Gameplay simulation tests (reversed event order, another seed)
         env:
           SIM_SIGNAL_ORDER: reverse
+          SIM_SEED: ${{ github.run_number }}
         run: lune run tests/sim/run.luau -- MegaTycoon.rbxlx
 
   build-and-publish:
