@@ -139,7 +139,7 @@ local function buildDaily()
 	local function refresh()
 		local streak = player:GetAttribute("DailyStreak") or 0
 		local last = player:GetAttribute("LastDaily") or 0
-		local since = os.time() - last
+		local since = Util.ServerNow() - last
 		local available = since >= Config.Daily.Cooldown
 		local nextDay = streak
 		if available then

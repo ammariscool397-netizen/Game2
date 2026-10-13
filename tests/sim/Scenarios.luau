@@ -2267,4 +2267,32 @@ add({
 	end,
 })
 
+---------------------------------------------------------------------------
+-- A phone with a wrong clock still shows the right timers
+---------------------------------------------------------------------------
+add({
+	Name = "client_clock",
+	Run = function(T, place)
+		T.Engine.ClientClockSkew = -3 * 3600 -- device clock 3 hours behind
+		local game, me = T.Boot(place)
+		T.Wait(6)
+		T.Server(function()
+			T.Service("DataService"):AddBoost(me, 15 * 60)
+		end)
+		T.Wait(1.5)
+		local label = T.FindText(me.PlayerGui, "2x Boost")
+		T.Check(label ~= nil, "boost timer shown")
+		if label then
+			local minutes = tonumber(label.Text:match("(%d+):%d%d"))
+			T.Check(minutes ~= nil and minutes >= 14 and minutes <= 15, "boost timer is right despite the device clock (" .. label.Text .. ")")
+		end
+		-- the daily reward is available (server time), not "come back in 3h"
+		T.Client(function()
+			T.Controller("UI"):Open("Daily")
+		end)
+		T.Wait(1.5)
+		T.Check(T.FindButton(me.PlayerGui, "^CLAIM$") ~= nil, "daily claim button available")
+	end,
+})
+
 return Scenarios

@@ -1123,6 +1123,10 @@ method("Terrain", "FillWedge", function(_, ...)
 	checkArgs("FillWedge", { "CFrame", "Vector3", "EnumItem" }, ...)
 end)
 
+method("Workspace", "GetServerTimeNow", function()
+	return Engine.EpochBase + Engine.Now
+end)
+
 method("WorldRoot", "Raycast", function(_, origin, direction, params)
 	checkArgs("Raycast", { "Vector3", "Vector3" }, origin, direction)
 	if direction.Y >= 0 then
@@ -1877,8 +1881,11 @@ end
 local function vclock()
 	return Engine.Now
 end
+-- a client's os.time() is its device clock: tests can make it wrong
+Engine.ClientClockSkew = 0
 local function vtime()
-	return math.floor(Engine.EpochBase + Engine.Now)
+	local skew = Engine.Context == "client" and Engine.ClientClockSkew or 0
+	return math.floor(Engine.EpochBase + Engine.Now + skew)
 end
 
 local function joinArgs(...)

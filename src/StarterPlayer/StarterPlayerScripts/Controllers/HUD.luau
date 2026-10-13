@@ -266,14 +266,15 @@ function HUD:Refresh()
 	vaultLabel.Text = (not hasAuto and vault > 0) and ("🏦 Vault: " .. Util.Money(vault) .. " (step on a vault pad!)") or ""
 
 	local parts = {}
+	local now = Util.ServerNow()
 	local boostEnd = player:GetAttribute("BoostEnd") or 0
-	if boostEnd > os.time() then
-		table.insert(parts, "🚀 2x Boost " .. Util.Clock(boostEnd - os.time()))
+	if boostEnd > now then
+		table.insert(parts, "🚀 2x Boost " .. Util.Clock(boostEnd - now))
 	end
 	local eventMult = workspace:GetAttribute("EventMultiplier") or 1
 	local eventEnds = workspace:GetAttribute("EventEnds") or 0
-	if eventMult ~= 1 and eventEnds > os.time() then
-		table.insert(parts, "🔥 " .. eventMult .. "x Event " .. Util.Clock(eventEnds - os.time()))
+	if eventMult ~= 1 and eventEnds > now then
+		table.insert(parts, "🔥 " .. eventMult .. "x Event " .. Util.Clock(eventEnds - now))
 	end
 	boostLabel.Text = table.concat(parts, "   ")
 	floorLabel.Text = currentFloor()
@@ -289,7 +290,7 @@ function HUD:Refresh()
 
 	-- badges
 	local lastDaily = player:GetAttribute("LastDaily") or 0
-	self:SetBadge("Daily", os.time() - lastDaily >= Config.Daily.Cooldown)
+	self:SetBadge("Daily", now - lastDaily >= Config.Daily.Cooldown)
 	local cost = player:GetAttribute("RebirthCost") or math.huge
 	self:SetBadge("Rebirth", (player:GetAttribute("Cash") or 0) >= cost and not player:GetAttribute("DuoHost"))
 	local found = player:GetAttribute("SecretsFound") or ""

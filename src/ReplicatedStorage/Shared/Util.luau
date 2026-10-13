@@ -100,6 +100,15 @@ function Util.Clock(seconds: number): string
 	return string.format("%d:%02d", seconds // 60, seconds % 60)
 end
 
+-- The server's clock (os.time() on a client is the device clock, which can
+-- be hours off; server timestamps like BoostEnd must be compared with this)
+function Util.ServerNow(): number
+	local ok, now = pcall(function()
+		return workspace:GetServerTimeNow()
+	end)
+	return ok and now or os.time()
+end
+
 -- Runs fn(...) protected, so one bug can't kill a loop that keeps the game
 -- running. Logs the first few failures per label (no output spam).
 local failures: { [string]: number } = {}
