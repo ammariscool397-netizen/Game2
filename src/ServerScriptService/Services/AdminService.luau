@@ -659,17 +659,7 @@ local function buildCommands()
 		Run = function(executor, args)
 			local minutes = math.clamp(Util.Number(args[1]) or 10, 1, 600)
 			local mult = math.clamp(Util.Number(args[2]) or 2, 1, 100)
-			workspace:SetAttribute("EventMultiplier", mult)
-			workspace:SetAttribute("EventEnds", os.time() + minutes * 60)
-			for _, p in Players:GetPlayers() do
-				S.DataService:RefreshMultiplier(p)
-			end
-			Remotes.Announce:FireAllClients({
-				Title = "🔥 " .. mult .. "x CASH EVENT! 🔥",
-				Text = "Started by " .. executor.DisplayName .. " for " .. minutes .. " minutes!",
-				Color = Color3.fromRGB(255, 90, 40),
-			})
-			Remotes.VFX:FireAllClients("Confetti", {})
+			S.DataService:StartEvent(mult, minutes * 60, "🔥 " .. mult .. "x CASH EVENT! 🔥", "Started by " .. executor.DisplayName .. " for " .. minutes .. " minutes!")
 			return mult .. "x event for " .. minutes .. " min"
 		end,
 	})

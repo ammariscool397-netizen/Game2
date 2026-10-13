@@ -94,7 +94,8 @@ your income. Claim them from the tracker in the bottom-right corner. Saved.
 
 **🎁 Playtime gifts** — 6 gifts unlock during your first hour in a server.
 
-**⭐ Free bonuses** — +10% income for Roblox Premium, +10% per friend in the server.
+**⭐ Free bonuses** — +10% income for Roblox Premium, +10% per friend in the server,
+and an automatic **2x Cash Hour** event every 45 minutes (`Config.AutoEvents`).
 
 **👥 Duo building** — invite anyone in the server; you build **one tower** together with
 **one shared wallet** (saved to the owner). Game passes help the whole duo. Leave any

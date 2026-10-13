@@ -612,6 +612,14 @@ Config.GamePasses = {
 	},
 }
 
+-- Automatic server-wide cash events (a reason to stay in the server)
+Config.AutoEvents = {
+	Enabled = true,
+	EveryMinutes = 45, -- the first one starts this long after the server starts
+	DurationMinutes = 5,
+	Multiplier = 2,
+}
+
 -- Free income bonuses: Roblox Premium members, and friends playing together
 -- (per friend in the server, up to MaxFriends). Shown in the HUD.
 Config.Bonuses = {
@@ -2856,17 +2864,7 @@ local function buildCommands()
 		Run = function(executor, args)
 			local minutes = math.clamp(Util.Number(args[1]) or 10, 1, 600)
 			local mult = math.clamp(Util.Number(args[2]) or 2, 1, 100)
-			workspace:SetAttribute("EventMultiplier", mult)
-			workspace:SetAttribute("EventEnds", os.time() + minutes * 60)
-			for _, p in Players:GetPlayers() do
-				S.DataService:RefreshMultiplier(p)
-			end
-			Remotes.Announce:FireAllClients({
-				Title = "🔥 " .. mult .. "x CASH EVENT! 🔥",
-				Text = "Started by " .. executor.DisplayName .. " for " .. minutes .. " minutes!",
-				Color = Color3.fromRGB(255, 90, 40),
-			})
-			Remotes.VFX:FireAllClients("Confetti", {})
+			S.DataService:StartEvent(mult, minutes * 60, "🔥 " .. mult .. "x CASH EVENT! 🔥", "Started by " .. executor.DisplayName .. " for " .. minutes .. " minutes!")
 			return mult .. "x event for " .. minutes .. " min"
 		end,
 	})
@@ -3754,8 +3752,36 @@ function DataService:Start()
 		while true do
 			task.wait(1)
 			Util.Try("Boost expiry", self._expireBoosts, self)
+			Util.Try("Auto events", self._autoEvent, self)
 		end
 	end)
+end
+
+-- start a server-wide cash event (admins: ;doublecash, and Config.AutoEvents)
+function DataService:StartEvent(multiplier: number, seconds: number, title: string, text: string)
+	workspace:SetAttribute("EventMultiplier", multiplier)
+	workspace:SetAttribute("EventEnds", os.time() + seconds)
+	for _, p in Players:GetPlayers() do
+		self:RefreshMultiplier(p)
+	end
+	Remotes.Announce:FireAllClients({ Title = title, Text = text, Color = Color3.fromRGB(255, 90, 40) })
+	Remotes.VFX:FireAllClients("Confetti", {})
+end
+
+function DataService:_autoEvent()
+	local AE = Config.AutoEvents
+	if not AE or not AE.Enabled then
+		return
+	end
+	self._nextAutoEvent = self._nextAutoEvent or os.time() + AE.EveryMinutes * 60
+	if os.time() < self._nextAutoEvent then
+		return
+	end
+	self._nextAutoEvent = os.time() + AE.EveryMinutes * 60
+	if (workspace:GetAttribute("EventMultiplier") or 1) ~= 1 then
+		return -- an admin event is already running
+	end
+	self:StartEvent(AE.Multiplier, AE.DurationMinutes * 60, "🔥 " .. AE.Multiplier .. "x CASH HOUR! 🔥", "Everyone earns " .. AE.Multiplier .. "x for " .. AE.DurationMinutes .. " minutes!")
 end
 
 function DataService:_expireBoosts()

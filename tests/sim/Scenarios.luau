@@ -239,7 +239,8 @@ add({
 		T.Wait(3)
 		T.Check(data.Rebirths == 1, "rebirthed")
 		T.Check(count(data.Purchased) == 1, "tower reset after rebirth")
-		T.Check(player:GetAttribute("Multiplier") == 1.5, "rebirth multiplier 1.5x (got " .. tostring(player:GetAttribute("Multiplier")) .. ")")
+		local permanent = DataService:GetMultiplier(player, true)
+		T.Check(permanent == 1.5, "rebirth multiplier 1.5x (got " .. tostring(permanent) .. ")")
 		local items = 0
 		for _ in plot.Built do
 			items += 1
@@ -2346,6 +2347,38 @@ add({
 		end
 		T.Wait(0.5)
 		T.Check(#T.Sent(cheater, "ClientCommand") == launches, "remote launch pad touches do nothing")
+	end,
+})
+
+---------------------------------------------------------------------------
+-- Automatic cash events
+---------------------------------------------------------------------------
+add({
+	Name = "auto_event",
+	MaxSeconds = 2 * 3600,
+	Run = function(T, place)
+		local game, me = T.Boot(place)
+		local ws = game:GetService("Workspace")
+		local Config = T.Shared("Config")
+		local AE = Config.AutoEvents
+		T.SetDt(2)
+		T.Wait(AE.EveryMinutes * 60 - 30)
+		T.Check(ws:GetAttribute("EventMultiplier") == 1, "no event before the first one is due")
+		T.WaitFor(function()
+			return ws:GetAttribute("EventMultiplier") == AE.Multiplier
+		end, 90, "first auto event")
+		T.Check(me:GetAttribute("Multiplier") == AE.Multiplier, "the event multiplies income")
+		T.Wait(5)
+		T.Check(T.FindText(me.PlayerGui, "x Event") ~= nil, "HUD shows the event timer")
+		T.WaitFor(function()
+			return ws:GetAttribute("EventMultiplier") == 1
+		end, AE.DurationMinutes * 60 + 30, "event end")
+		T.Check(me:GetAttribute("Multiplier") == 1, "income back to normal")
+		-- an admin event running when the next one is due: no stacking
+		T.Wait(AE.EveryMinutes * 60 - AE.DurationMinutes * 60 - 120)
+		T.Admin(me, ";doublecash 10 3")
+		T.Wait(240)
+		T.Check(ws:GetAttribute("EventMultiplier") == 3, "auto event doesn't replace an admin event")
 	end,
 })
 

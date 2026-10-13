@@ -198,6 +198,14 @@ Config.GamePasses = {
 	},
 }
 
+-- Automatic server-wide cash events (a reason to stay in the server)
+Config.AutoEvents = {
+	Enabled = true,
+	EveryMinutes = 45, -- the first one starts this long after the server starts
+	DurationMinutes = 5,
+	Multiplier = 2,
+}
+
 -- Free income bonuses: Roblox Premium members, and friends playing together
 -- (per friend in the server, up to MaxFriends). Shown in the HUD.
 Config.Bonuses = {

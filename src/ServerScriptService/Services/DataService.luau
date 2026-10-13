@@ -224,8 +224,36 @@ function DataService:Start()
 		while true do
 			task.wait(1)
 			Util.Try("Boost expiry", self._expireBoosts, self)
+			Util.Try("Auto events", self._autoEvent, self)
 		end
 	end)
+end
+
+-- start a server-wide cash event (admins: ;doublecash, and Config.AutoEvents)
+function DataService:StartEvent(multiplier: number, seconds: number, title: string, text: string)
+	workspace:SetAttribute("EventMultiplier", multiplier)
+	workspace:SetAttribute("EventEnds", os.time() + seconds)
+	for _, p in Players:GetPlayers() do
+		self:RefreshMultiplier(p)
+	end
+	Remotes.Announce:FireAllClients({ Title = title, Text = text, Color = Color3.fromRGB(255, 90, 40) })
+	Remotes.VFX:FireAllClients("Confetti", {})
+end
+
+function DataService:_autoEvent()
+	local AE = Config.AutoEvents
+	if not AE or not AE.Enabled then
+		return
+	end
+	self._nextAutoEvent = self._nextAutoEvent or os.time() + AE.EveryMinutes * 60
+	if os.time() < self._nextAutoEvent then
+		return
+	end
+	self._nextAutoEvent = os.time() + AE.EveryMinutes * 60
+	if (workspace:GetAttribute("EventMultiplier") or 1) ~= 1 then
+		return -- an admin event is already running
+	end
+	self:StartEvent(AE.Multiplier, AE.DurationMinutes * 60, "🔥 " .. AE.Multiplier .. "x CASH HOUR! 🔥", "Everyone earns " .. AE.Multiplier .. "x for " .. AE.DurationMinutes .. " minutes!")
 end
 
 function DataService:_expireBoosts()
