@@ -153,7 +153,7 @@ function ObbyService:Init(services)
 	local startLine = Part({ Name = "StartLine", Size = Vector3.new(1, 14, 18), Position = Vector3.new(START_X - 9, 7, 0), Transparency = 1, CanCollide = false, Parent = folder })
 	startLine.Touched:Connect(function(hit)
 		local player = BuildKit.PlayerFromHit(hit)
-		if player and (player:GetAttribute("ObbyStage") or 0) == 0 then
+		if player and (player:GetAttribute("ObbyStage") or 0) == 0 and BuildKit.IsNear(player, startLine) then
 			startTimes[player] = os.clock()
 			player:SetAttribute("ObbyStage", 0)
 		end
@@ -183,7 +183,7 @@ function ObbyService:Init(services)
 				BuildKit.Billboard(pad, "CHECKPOINT " .. thisStage, { Size = UDim2.fromOffset(180, 36), Offset = Vector3.new(0, 5, 0), Color = Color3.fromRGB(150, 255, 170), MaxDistance = 90 })
 				pad.Touched:Connect(function(hit)
 					local player = BuildKit.PlayerFromHit(hit)
-					if player and (player:GetAttribute("ObbyStage") or 0) < thisStage then
+					if player and (player:GetAttribute("ObbyStage") or 0) < thisStage and BuildKit.IsNear(player, pad) then
 						player:SetAttribute("ObbyStage", thisStage)
 						cloth.Color = Color3.fromRGB(255, 220, 40)
 						Remotes.Notify:FireClient(player, { Text = "Checkpoint " .. thisStage .. " reached!", Type = "success" })
@@ -254,7 +254,7 @@ function ObbyService:_buildFinish(pad: BasePart)
 
 	pad.Touched:Connect(function(hit)
 		local player = BuildKit.PlayerFromHit(hit)
-		if not player or finishDebounce[player] then
+		if not player or finishDebounce[player] or not BuildKit.IsNear(player, pad) then
 			return
 		end
 		if (player:GetAttribute("ObbyStage") or 0) <= 0 then

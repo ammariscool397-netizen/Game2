@@ -2158,7 +2158,17 @@ end
 ---------------------------------------------------------------------------
 -- interaction helpers for tests
 ---------------------------------------------------------------------------
+-- the player walks onto `part` (their character moves there, then touches it)
 function Engine.Touch(part, player)
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart")
+	assert(root, "player has no character to touch with")
+	character:PivotTo(CFrame.new(part.Position + Vector3.new(0, 3, 0)))
+	fireIfExists(part, "Touched", root)
+end
+
+-- an exploit-style touch: fired from wherever the character is
+function Engine.RemoteTouch(part, player)
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart")
 	assert(root, "player has no character to touch with")

@@ -2295,4 +2295,58 @@ add({
 	end,
 })
 
+---------------------------------------------------------------------------
+-- Exploiters faking touches from across the map get nothing
+---------------------------------------------------------------------------
+add({
+	Name = "touch_exploits",
+	Run = function(T, place)
+		local game, me = T.Boot(place)
+		local cheater = T.AddPlayer("Cheater")
+		T.Wait(6)
+		local DataService = T.Service("DataService")
+		local TycoonService = T.Service("TycoonService")
+		local data = DataService:Get(cheater)
+		T.MoveTo(cheater, CFrame.new(0, 5, 0)) -- the lobby
+		local cash = data.Cash
+		-- every secret, from the lobby
+		for _, model in game:GetService("Workspace"):FindFirstChild("Secrets"):GetChildren() do
+			T.Engine.RemoteTouch(model:FindFirstChild("Hitbox"), cheater)
+		end
+		T.Wait(0.5)
+		T.Check(count(data.Secrets) == 0 and data.Cash == cash, "remote secret touches give nothing")
+		-- obby checkpoints + finish
+		local obby = game:GetService("Workspace"):FindFirstChild("Obby")
+		for _, d in obby:GetDescendants() do
+			-- (not the kill bricks: those only ever hurt whoever touches them)
+			if d:IsA("BasePart") and d.Material == Enum.Material.Neon and not d:GetAttribute("Kill") then
+				T.Engine.RemoteTouch(d, cheater)
+			end
+		end
+		T.Wait(0.5)
+		T.Check((cheater:GetAttribute("ObbyStage") or 0) == 0 and data.ObbyCompletions == 0, "remote obby touches give nothing")
+		-- own tower buttons + vault from the lobby
+		DataService:AddCash(cheater, 1e6, false)
+		local plot = TycoonService:GetPlot(cheater)
+		local owned = count(data.Purchased)
+		for _, button in plot.ButtonObjs do
+			T.Engine.RemoteTouch(button.Pad, cheater)
+		end
+		T.Wait(1)
+		T.Check(count(data.Purchased) == owned, "remote button touches buy nothing")
+		-- ...but walking onto them works
+		local id, button = next(plot.ButtonObjs)
+		T.Engine.Touch(button.Pad, cheater)
+		T.Wait(1)
+		T.Check(data.Purchased[id], "walking onto a button still buys it")
+		-- the cloud launch pad
+		local launches = #T.Sent(cheater, "ClientCommand")
+		for _, pad in T.Service("WorldBuilder").LaunchPads do
+			T.Engine.RemoteTouch(pad.Part, cheater)
+		end
+		T.Wait(0.5)
+		T.Check(#T.Sent(cheater, "ClientCommand") == launches, "remote launch pad touches do nothing")
+	end,
+})
+
 return Scenarios

@@ -108,7 +108,7 @@ Games.CoinRush = {
 					return
 				end
 				local player = BuildKit.PlayerFromHit(hit)
-				if player and ctx.Alive[player] then
+				if player and ctx.Alive[player] and BuildKit.IsNear(player, coin) then
 					taken = true
 					coins -= 1
 					ctx.Scores[player] = (ctx.Scores[player] or 0) + 1
@@ -178,7 +178,7 @@ Games.FallingTiles = {
 							return
 						end
 						local player = BuildKit.PlayerFromHit(hit)
-						if not player or not ctx.Alive[player] or not ctx.Started then
+						if not player or not ctx.Alive[player] or not ctx.Started or not BuildKit.IsNear(player, tile) then
 							return
 						end
 						triggered = true

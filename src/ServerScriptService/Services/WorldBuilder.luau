@@ -742,7 +742,7 @@ function WorldBuilder:Init()
 		local debounce = {}
 		pad.Part.Touched:Connect(function(hit)
 			local player = BuildKit.PlayerFromHit(hit)
-			if player and not debounce[player] then
+			if player and not debounce[player] and BuildKit.IsNear(player, pad.Part) then
 				debounce[player] = true
 				Remotes.ClientCommand:FireClient(player, "launch", pad.Target)
 				task.delay(4, function()

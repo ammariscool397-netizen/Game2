@@ -585,7 +585,7 @@ function TycoonService:_buildItem(plot, item, withEffects: boolean)
 			table.insert(plot.VaultLabels, extra.VaultLabel)
 			extra.VaultPad.Touched:Connect(function(hit)
 				local player = BuildKit.PlayerFromHit(hit)
-				if player and isMember(player, plot) and os.clock() - plot.LastPad > 1 then
+				if player and isMember(player, plot) and os.clock() - plot.LastPad > 1 and BuildKit.IsNear(player, extra.VaultPad) then
 					plot.LastPad = os.clock()
 					self:CollectVault(player)
 				end
@@ -722,7 +722,7 @@ function TycoonService:_refreshButtons(plot)
 						return
 					end
 					local player = BuildKit.PlayerFromHit(hit)
-					if not player or not isMember(player, plot) then
+					if not player or not isMember(player, plot) or not BuildKit.IsNear(player, button.Pad) then
 						return
 					end
 					busy = true

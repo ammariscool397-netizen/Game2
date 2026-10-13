@@ -3497,6 +3497,17 @@ function BuildKit.Size(n: number, from: number?, to: number?)
 	return NumberSequence.new({ NumberSequenceKeypoint.new(0, from or n), NumberSequenceKeypoint.new(1, to or 0) })
 end
 
+-- Is the player really at `part`? Exploits can fake touches with parts
+-- anywhere on the map, so every rewarding touch checks the distance too.
+function BuildKit.IsNear(player: Player, part: BasePart, slack: number?): boolean
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root then
+		return false
+	end
+	return (root.Position - part.Position).Magnitude <= part.Size.Magnitude / 2 + (slack or 12)
+end
+
 -- Is `hit` part of a character? Returns (player, humanoid)
 function BuildKit.PlayerFromHit(hit: BasePart): (Player?, Humanoid?)
 	local model = hit:FindFirstAncestorOfClass("Model")
@@ -4370,7 +4381,7 @@ local function spawnCollectible(position: Vector3, kind: string, seconds: number
 			return
 		end
 		local player = BuildKit.PlayerFromHit(hit)
-		if player then
+		if player and BuildKit.IsNear(player, part) then
 			taken = true
 			local amount = rewardFor(player, seconds, minimum)
 			S.DataService:AddCash(player, amount, false)
@@ -5310,7 +5321,7 @@ Games.CoinRush = {
 					return
 				end
 				local player = BuildKit.PlayerFromHit(hit)
-				if player and ctx.Alive[player] then
+				if player and ctx.Alive[player] and BuildKit.IsNear(player, coin) then
 					taken = true
 					coins -= 1
 					ctx.Scores[player] = (ctx.Scores[player] or 0) + 1
@@ -5380,7 +5391,7 @@ Games.FallingTiles = {
 							return
 						end
 						local player = BuildKit.PlayerFromHit(hit)
-						if not player or not ctx.Alive[player] or not ctx.Started then
+						if not player or not ctx.Alive[player] or not ctx.Started or not BuildKit.IsNear(player, tile) then
 							return
 						end
 						triggered = true
@@ -6349,7 +6360,7 @@ function ObbyService:Init(services)
 	local startLine = Part({ Name = "StartLine", Size = Vector3.new(1, 14, 18), Position = Vector3.new(START_X - 9, 7, 0), Transparency = 1, CanCollide = false, Parent = folder })
 	startLine.Touched:Connect(function(hit)
 		local player = BuildKit.PlayerFromHit(hit)
-		if player and (player:GetAttribute("ObbyStage") or 0) == 0 then
+		if player and (player:GetAttribute("ObbyStage") or 0) == 0 and BuildKit.IsNear(player, startLine) then
 			startTimes[player] = os.clock()
 			player:SetAttribute("ObbyStage", 0)
 		end
@@ -6379,7 +6390,7 @@ function ObbyService:Init(services)
 				BuildKit.Billboard(pad, "CHECKPOINT " .. thisStage, { Size = UDim2.fromOffset(180, 36), Offset = Vector3.new(0, 5, 0), Color = Color3.fromRGB(150, 255, 170), MaxDistance = 90 })
 				pad.Touched:Connect(function(hit)
 					local player = BuildKit.PlayerFromHit(hit)
-					if player and (player:GetAttribute("ObbyStage") or 0) < thisStage then
+					if player and (player:GetAttribute("ObbyStage") or 0) < thisStage and BuildKit.IsNear(player, pad) then
 						player:SetAttribute("ObbyStage", thisStage)
 						cloth.Color = Color3.fromRGB(255, 220, 40)
 						Remotes.Notify:FireClient(player, { Text = "Checkpoint " .. thisStage .. " reached!", Type = "success" })
@@ -6450,7 +6461,7 @@ function ObbyService:_buildFinish(pad: BasePart)
 
 	pad.Touched:Connect(function(hit)
 		local player = BuildKit.PlayerFromHit(hit)
-		if not player or finishDebounce[player] then
+		if not player or finishDebounce[player] or not BuildKit.IsNear(player, pad) then
 			return
 		end
 		if (player:GetAttribute("ObbyStage") or 0) <= 0 then
@@ -7031,7 +7042,7 @@ function SecretService:_spawnGem(folder: Folder, secret, position: Vector3)
 	local busy = {}
 	hitbox.Touched:Connect(function(hit)
 		local player = BuildKit.PlayerFromHit(hit)
-		if player and not busy[player] then
+		if player and not busy[player] and BuildKit.IsNear(player, hitbox) then
 			busy[player] = true
 			self:Find(player, secret.Id)
 			task.delay(2, function()
@@ -8527,7 +8538,7 @@ function TycoonService:_buildItem(plot, item, withEffects: boolean)
 			table.insert(plot.VaultLabels, extra.VaultLabel)
 			extra.VaultPad.Touched:Connect(function(hit)
 				local player = BuildKit.PlayerFromHit(hit)
-				if player and isMember(player, plot) and os.clock() - plot.LastPad > 1 then
+				if player and isMember(player, plot) and os.clock() - plot.LastPad > 1 and BuildKit.IsNear(player, extra.VaultPad) then
 					plot.LastPad = os.clock()
 					self:CollectVault(player)
 				end
@@ -8664,7 +8675,7 @@ function TycoonService:_refreshButtons(plot)
 						return
 					end
 					local player = BuildKit.PlayerFromHit(hit)
-					if not player or not isMember(player, plot) then
+					if not player or not isMember(player, plot) or not BuildKit.IsNear(player, button.Pad) then
 						return
 					end
 					busy = true
@@ -9901,7 +9912,7 @@ function WorldBuilder:Init()
 		local debounce = {}
 		pad.Part.Touched:Connect(function(hit)
 			local player = BuildKit.PlayerFromHit(hit)
-			if player and not debounce[player] then
+			if player and not debounce[player] and BuildKit.IsNear(player, pad.Part) then
 				debounce[player] = true
 				Remotes.ClientCommand:FireClient(player, "launch", pad.Target)
 				task.delay(4, function()

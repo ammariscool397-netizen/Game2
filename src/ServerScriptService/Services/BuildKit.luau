@@ -113,6 +113,17 @@ function BuildKit.Size(n: number, from: number?, to: number?)
 	return NumberSequence.new({ NumberSequenceKeypoint.new(0, from or n), NumberSequenceKeypoint.new(1, to or 0) })
 end
 
+-- Is the player really at `part`? Exploits can fake touches with parts
+-- anywhere on the map, so every rewarding touch checks the distance too.
+function BuildKit.IsNear(player: Player, part: BasePart, slack: number?): boolean
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root then
+		return false
+	end
+	return (root.Position - part.Position).Magnitude <= part.Size.Magnitude / 2 + (slack or 12)
+end
+
 -- Is `hit` part of a character? Returns (player, humanoid)
 function BuildKit.PlayerFromHit(hit: BasePart): (Player?, Humanoid?)
 	local model = hit:FindFirstAncestorOfClass("Model")

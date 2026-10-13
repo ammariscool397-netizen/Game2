@@ -143,7 +143,7 @@ local function spawnCollectible(position: Vector3, kind: string, seconds: number
 			return
 		end
 		local player = BuildKit.PlayerFromHit(hit)
-		if player then
+		if player and BuildKit.IsNear(player, part) then
 			taken = true
 			local amount = rewardFor(player, seconds, minimum)
 			S.DataService:AddCash(player, amount, false)

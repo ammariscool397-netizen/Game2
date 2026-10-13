@@ -67,7 +67,7 @@ function SecretService:_spawnGem(folder: Folder, secret, position: Vector3)
 	local busy = {}
 	hitbox.Touched:Connect(function(hit)
 		local player = BuildKit.PlayerFromHit(hit)
-		if player and not busy[player] then
+		if player and not busy[player] and BuildKit.IsNear(player, hitbox) then
 			busy[player] = true
 			self:Find(player, secret.Id)
 			task.delay(2, function()
