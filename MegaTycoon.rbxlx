@@ -519,6 +519,16 @@ Config.Disasters = {
 		CashEvery = 1.5,
 		CashIncomeSeconds = 10,
 	},
+	Earthquake = {
+		Weight = 2,
+		Duration = 25,
+		WaveEvery = 3, -- seconds between shocks
+		Damage = 6, -- per shock, if you're not in a shelter
+		KnockoutFraction = 0.03, -- share of an unshielded tower wrecked per shock
+		KnockoutSeconds = 90,
+		GeodeCount = 6, -- cash geodes pushed out of the ground
+		GeodeIncomeSeconds = 15,
+	},
 }
 
 ---------------------------------------------------------------------------
@@ -824,6 +834,16 @@ Config.Minigames = {
 			SurviveMin = 6000,
 			WinnerIncomeSeconds = 60,
 			WinnerMin = 4000,
+		},
+		LavaRise = {
+			DisplayName = "Lava Rise",
+			Description = "The lava is rising! Climb the spiral tower - last ones standing win.",
+			Duration = 60,
+			RiseSpeed = 1.5, -- studs per second
+			SurviveIncomeSeconds = 90,
+			SurviveMin = 5000,
+			WinnerIncomeSeconds = 90,
+			WinnerMin = 6000,
 		},
 	},
 }
@@ -2898,7 +2918,7 @@ local function buildCommands()
 		Name = "minigame",
 		Aliases = { "startminigame", "mg" },
 		Rank = 2,
-		Args = "[CoinRush|FallingTiles|MeteorShower]",
+		Args = "[CoinRush|FallingTiles|MeteorShower|LavaRise]",
 		Desc = "Start a minigame now",
 		Run = function(_, args)
 			if not S.MinigameService then
@@ -2943,6 +2963,7 @@ local function buildCommands()
 	disasterCommand("meteors", { "meteorstorm" }, "Meteors", "Start a meteor storm")
 	disasterCommand("tornado", { "twister" }, "Tornado", "Summon a tornado")
 	disasterCommand("ufo", { "aliens", "invasion" }, "UFO", "Start a UFO invasion")
+	disasterCommand("earthquake", { "quake" }, "Earthquake", "Start an earthquake")
 	register({
 		Name = "stopdisaster",
 		Aliases = { "stopevent", "calm" },
@@ -4297,12 +4318,13 @@ local stopRequested = false
 local folder: Folder
 local rng = Random.new()
 
-local KINDS = { "Nuke", "Meteors", "Tornado", "UFO" }
+local KINDS = { "Nuke", "Meteors", "Tornado", "UFO", "Earthquake" }
 local TITLES = {
 	Nuke = "☢️ NUKE INCOMING!",
 	Meteors = "☄️ METEOR STORM!",
 	Tornado = "🌪️ TORNADO WARNING!",
 	UFO = "🛸 UFO INVASION!",
+	Earthquake = "🌍 EARTHQUAKE!",
 }
 
 local function broadcast(state)
@@ -4767,6 +4789,72 @@ function handlers.UFO(by: string?)
 end
 
 ---------------------------------------------------------------------------
+-- 🌍 Earthquake
+---------------------------------------------------------------------------
+local function crack(position: Vector3, length: number, angle: number)
+	local cf = CFrame.new(position) * CFrame.Angles(0, angle, 0)
+	local model = Instance.new("Model")
+	model.Name = "Crack"
+	BuildKit.Part({ Name = "Rim", Size = Vector3.new(2.2, 0.4, length), CFrame = cf, Color = Color3.fromRGB(45, 35, 28), Material = Enum.Material.Slate, CanCollide = false, CanTouch = false, CanQuery = false, Parent = model })
+	BuildKit.Part({ Name = "Glow", Size = Vector3.new(0.8, 0.5, length - 1), CFrame = cf, Color = Color3.fromRGB(255, 110, 20), Material = Enum.Material.Neon, CanCollide = false, CanTouch = false, CanQuery = false, Parent = model })
+	model.Parent = folder
+	return model
+end
+
+function handlers.Earthquake(by: string?)
+	local cfg = DC.Earthquake
+	Remotes.Announce:FireAllClients({
+		Title = TITLES.Earthquake,
+		Text = (by and (by .. " shook the ground! ") or "") .. "Hold on tight - and grab the cash geodes it digs up!",
+		Color = Color3.fromRGB(210, 150, 90),
+	})
+	for _ = 1, cfg.GeodeCount do
+		local a = rng:NextNumber(0, math.pi * 2)
+		local r = rng:NextNumber(40, 220)
+		spawnCollectible(Vector3.new(math.cos(a) * r, 2.5, math.sin(a) * r), "Crystal", cfg.GeodeIncomeSeconds, 750, true)
+	end
+	local cracks = {}
+	local notified = {}
+	local endTime = os.clock() + cfg.Duration
+	local nextShock = os.clock() + 1
+	local lastTick = 0
+	while os.clock() < endTime and not stopRequested do
+		local now = os.clock()
+		if now - lastTick >= 1 then
+			lastTick = now
+			broadcast({ Phase = "Active", Kind = "Earthquake", TimeLeft = math.ceil(endTime - now) })
+		end
+		if now >= nextShock then
+			nextShock = now + cfg.WaveEvery
+			broadcast({ Phase = "Shock", Kind = "Earthquake", Intensity = rng:NextNumber(0.6, 1) })
+			for _, info in mainMapPlayers() do
+				if not DisasterService:IsSheltered(info.Root.Position) then
+					info.Humanoid:TakeDamage(cfg.Damage)
+					fling(info.Player, Vector3.new(rng:NextNumber(-12, 12), 28, rng:NextNumber(-12, 12)))
+				end
+			end
+			for _, plot in S.TycoonService:GetPlots() do
+				if plot.Owner and not S.TycoonService:IsShielded(plot) then
+					local wrecked = S.TycoonService:KnockOutFraction(plot, cfg.KnockoutFraction, cfg.KnockoutSeconds)
+					if wrecked > 0 and not notified[plot] then
+						notified[plot] = true
+						notifyPlot(plot, "🌍 The earthquake is shaking your tower apart! Wrecked upgrades rebuild by themselves.")
+					end
+				end
+			end
+			local a = rng:NextNumber(0, math.pi * 2)
+			local r = rng:NextNumber(20, 200)
+			table.insert(cracks, crack(Vector3.new(math.cos(a) * r, 0.6, math.sin(a) * r), rng:NextNumber(18, 45), rng:NextNumber(0, math.pi)))
+		end
+		task.wait(0.1)
+	end
+	task.wait(1)
+	for _, model in cracks do
+		model:Destroy()
+	end
+end
+
+---------------------------------------------------------------------------
 function DisasterService:Init(services)
 	S = services
 	folder = Instance.new("Folder")
@@ -4846,7 +4934,7 @@ function DisasterService:Trigger(kind: string, by: string?): string
 		end
 	end
 	if not key then
-		return "Unknown disaster. Options: Nuke, Meteors, Tornado, UFO"
+		return "Unknown disaster. Options: " .. table.concat(KINDS, ", ")
 	end
 	table.insert(queue, { Kind = key, By = by })
 	if active then
@@ -5552,6 +5640,64 @@ Games.MeteorShower = {
 	end,
 }
 
+Games.LavaRise = {
+	Setup = function(ctx)
+		local c = ctx.Center
+		Part({ Name = "Floor", Size = Vector3.new(70, 2, 70), Position = c, Color = Color3.fromRGB(70, 70, 80), Material = Enum.Material.Slate, Parent = ctx.Folder })
+		barrier(ctx.Folder, c, 70, 110)
+		-- a spiral of platforms around a central pillar
+		Part({ Name = "Pillar", Size = Vector3.new(8, 100, 8), Position = c + Vector3.new(0, 50, 0), Color = Color3.fromRGB(50, 50, 60), Material = Enum.Material.Basalt, Parent = ctx.Folder })
+		for i = 1, 28 do
+			local angle = i * math.rad(32)
+			local height = 3 + i * 3.2
+			Part({
+				Name = "Step",
+				Size = Vector3.new(9, 1.2, 9),
+				Position = c + Vector3.new(math.cos(angle) * 16, height, math.sin(angle) * 16),
+				Color = Color3.fromHSV((i / 28) % 1, 0.6, 1),
+				Parent = ctx.Folder,
+			})
+		end
+		Part({ Name = "Summit", Size = Vector3.new(14, 1.2, 14), Position = c + Vector3.new(0, 3 + 29 * 3.2, 0), Color = Color3.fromRGB(255, 210, 40), Material = Enum.Material.Neon, Parent = ctx.Folder })
+		ctx.Lava = Part({
+			Name = "Lava",
+			Size = Vector3.new(76, 4, 76),
+			Position = c - Vector3.new(0, 6, 0),
+			Color = Color3.fromRGB(255, 80, 0),
+			Material = Enum.Material.Neon,
+			CanCollide = false,
+			Parent = ctx.Folder,
+		})
+		BuildKit.Light(ctx.Lava, Color3.fromRGB(255, 110, 20), 60, 3)
+		ctx.SpawnRadius = 25
+		ctx.FallDepth = 1000 -- the lava decides
+	end,
+	Run = function(ctx)
+		local info = MG.Games.LavaRise
+		local lava = ctx.Lava :: BasePart
+		local startY = lava.Position.Y
+		local elapsed = 0
+		ctx:Loop(info.Duration, function(dt)
+			elapsed += dt
+			local top = startY + elapsed * info.RiseSpeed
+			lava.Position = Vector3.new(ctx.Center.X, top, ctx.Center.Z)
+			for player in ctx.Alive do
+				local root = getRoot(player)
+				if root and root.Position.Y < top + lava.Size.Y / 2 + 1 then
+					ctx:Eliminate(player, "🌋 The lava got you!")
+				end
+			end
+			if ctx.StartCount > 1 then
+				return ctx:AliveCount() <= 1
+			end
+			return ctx:AliveCount() == 0
+		end)
+	end,
+	Rewards = function(ctx)
+		return ctx:SurvivalRewards(MG.Games.LavaRise)
+	end,
+}
+
 ---------------------------------------------------------------------------
 -- Round context
 ---------------------------------------------------------------------------
@@ -5686,7 +5832,12 @@ function MinigameService:ForceStart(name: string?): string
 			end
 		end
 		if not key then
-			return "Unknown minigame. Options: CoinRush, FallingTiles, MeteorShower"
+			local names = {}
+			for k in Games do
+				table.insert(names, k)
+			end
+			table.sort(names)
+			return "Unknown minigame. Options: " .. table.concat(names, ", ")
 		end
 	else
 		local keys = {}
@@ -10432,6 +10583,7 @@ local function buildServerPage()
 		{ "☄️ Meteors", Color3.fromRGB(255, 120, 0), "meteors", 130 },
 		{ "🌪️ Tornado", Color3.fromRGB(150, 160, 180), "tornado", 130 },
 		{ "🛸 UFOs", Theme.Green, "ufo", 110 },
+		{ "🌍 Quake", Color3.fromRGB(200, 140, 80), "earthquake", 110 },
 		{ "⏹ Stop", Theme.SubText, "stopdisaster", 100 },
 	})
 	buttonRow({
@@ -10445,6 +10597,7 @@ local function buildServerPage()
 		{ "🪙 Coin Rush", Theme.Accent, "minigame CoinRush" },
 		{ "🟥 Falling Tiles", Theme.Red, "minigame FallingTiles" },
 		{ "☄️ Meteors", Color3.fromRGB(255, 120, 0), "minigame MeteorShower" },
+		{ "🌋 Lava Rise", Color3.fromRGB(255, 80, 0), "minigame LavaRise" },
 	})
 	section("🌍 World")
 	buttonRow({
@@ -12069,7 +12222,18 @@ local ACTIVE_TEXT = {
 	Meteors = { "☄️ METEOR STORM", "Dodge the red circles • grab cash crystals", Color3.fromRGB(255, 120, 30) },
 	Tornado = { "🌪️ TORNADO", "Stay away from the funnel!", Color3.fromRGB(170, 180, 200) },
 	UFO = { "🛸 UFO INVASION", "Avoid the tractor beams • grab alien cash", Color3.fromRGB(120, 255, 80) },
+	Earthquake = { "🌍 EARTHQUAKE", "Hold on! • grab the cash geodes", Color3.fromRGB(210, 150, 90) },
 }
+
+-- one shock of an earthquake: the camera shakes, the ground rumbles, dust flies
+local function quakeShock(intensity: number)
+	shake(1.6 * intensity, 1.3)
+	UIKit.PlaySound("Boom", 0.5 * intensity, 0.45)
+	local root = getRoot()
+	if root and C.VFX then
+		C.VFX:Burst(root.Position - Vector3.new(0, 2.5, 0), Color3.fromRGB(150, 120, 90), 25, 1.5)
+	end
+end
 
 local function onState(state)
 	local phase, kind = state.Phase, state.Kind
@@ -12104,6 +12268,8 @@ local function onState(state)
 		end
 	elseif phase == "Meteor" then
 		meteor(state.Target, state.Delay or 1.4, state.Radius or 12, state.Shield == true)
+	elseif phase == "Shock" and kind == "Earthquake" then
+		quakeShock(tonumber(state.Intensity) or 1)
 	elseif phase == "End" then
 		stopSiren()
 		clearBeam()

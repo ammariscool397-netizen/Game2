@@ -313,6 +313,64 @@ Games.MeteorShower = {
 	end,
 }
 
+Games.LavaRise = {
+	Setup = function(ctx)
+		local c = ctx.Center
+		Part({ Name = "Floor", Size = Vector3.new(70, 2, 70), Position = c, Color = Color3.fromRGB(70, 70, 80), Material = Enum.Material.Slate, Parent = ctx.Folder })
+		barrier(ctx.Folder, c, 70, 110)
+		-- a spiral of platforms around a central pillar
+		Part({ Name = "Pillar", Size = Vector3.new(8, 100, 8), Position = c + Vector3.new(0, 50, 0), Color = Color3.fromRGB(50, 50, 60), Material = Enum.Material.Basalt, Parent = ctx.Folder })
+		for i = 1, 28 do
+			local angle = i * math.rad(32)
+			local height = 3 + i * 3.2
+			Part({
+				Name = "Step",
+				Size = Vector3.new(9, 1.2, 9),
+				Position = c + Vector3.new(math.cos(angle) * 16, height, math.sin(angle) * 16),
+				Color = Color3.fromHSV((i / 28) % 1, 0.6, 1),
+				Parent = ctx.Folder,
+			})
+		end
+		Part({ Name = "Summit", Size = Vector3.new(14, 1.2, 14), Position = c + Vector3.new(0, 3 + 29 * 3.2, 0), Color = Color3.fromRGB(255, 210, 40), Material = Enum.Material.Neon, Parent = ctx.Folder })
+		ctx.Lava = Part({
+			Name = "Lava",
+			Size = Vector3.new(76, 4, 76),
+			Position = c - Vector3.new(0, 6, 0),
+			Color = Color3.fromRGB(255, 80, 0),
+			Material = Enum.Material.Neon,
+			CanCollide = false,
+			Parent = ctx.Folder,
+		})
+		BuildKit.Light(ctx.Lava, Color3.fromRGB(255, 110, 20), 60, 3)
+		ctx.SpawnRadius = 25
+		ctx.FallDepth = 1000 -- the lava decides
+	end,
+	Run = function(ctx)
+		local info = MG.Games.LavaRise
+		local lava = ctx.Lava :: BasePart
+		local startY = lava.Position.Y
+		local elapsed = 0
+		ctx:Loop(info.Duration, function(dt)
+			elapsed += dt
+			local top = startY + elapsed * info.RiseSpeed
+			lava.Position = Vector3.new(ctx.Center.X, top, ctx.Center.Z)
+			for player in ctx.Alive do
+				local root = getRoot(player)
+				if root and root.Position.Y < top + lava.Size.Y / 2 + 1 then
+					ctx:Eliminate(player, "🌋 The lava got you!")
+				end
+			end
+			if ctx.StartCount > 1 then
+				return ctx:AliveCount() <= 1
+			end
+			return ctx:AliveCount() == 0
+		end)
+	end,
+	Rewards = function(ctx)
+		return ctx:SurvivalRewards(MG.Games.LavaRise)
+	end,
+}
+
 ---------------------------------------------------------------------------
 -- Round context
 ---------------------------------------------------------------------------
@@ -447,7 +505,12 @@ function MinigameService:ForceStart(name: string?): string
 			end
 		end
 		if not key then
-			return "Unknown minigame. Options: CoinRush, FallingTiles, MeteorShower"
+			local names = {}
+			for k in Games do
+				table.insert(names, k)
+			end
+			table.sort(names)
+			return "Unknown minigame. Options: " .. table.concat(names, ", ")
 		end
 	else
 		local keys = {}

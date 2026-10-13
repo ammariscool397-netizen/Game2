@@ -693,7 +693,7 @@ local function buildCommands()
 		Name = "minigame",
 		Aliases = { "startminigame", "mg" },
 		Rank = 2,
-		Args = "[CoinRush|FallingTiles|MeteorShower]",
+		Args = "[CoinRush|FallingTiles|MeteorShower|LavaRise]",
 		Desc = "Start a minigame now",
 		Run = function(_, args)
 			if not S.MinigameService then
@@ -738,6 +738,7 @@ local function buildCommands()
 	disasterCommand("meteors", { "meteorstorm" }, "Meteors", "Start a meteor storm")
 	disasterCommand("tornado", { "twister" }, "Tornado", "Summon a tornado")
 	disasterCommand("ufo", { "aliens", "invasion" }, "UFO", "Start a UFO invasion")
+	disasterCommand("earthquake", { "quake" }, "Earthquake", "Start an earthquake")
 	register({
 		Name = "stopdisaster",
 		Aliases = { "stopevent", "calm" },

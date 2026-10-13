@@ -365,6 +365,7 @@ local function buildServerPage()
 		{ "☄️ Meteors", Color3.fromRGB(255, 120, 0), "meteors", 130 },
 		{ "🌪️ Tornado", Color3.fromRGB(150, 160, 180), "tornado", 130 },
 		{ "🛸 UFOs", Theme.Green, "ufo", 110 },
+		{ "🌍 Quake", Color3.fromRGB(200, 140, 80), "earthquake", 110 },
 		{ "⏹ Stop", Theme.SubText, "stopdisaster", 100 },
 	})
 	buttonRow({
@@ -378,6 +379,7 @@ local function buildServerPage()
 		{ "🪙 Coin Rush", Theme.Accent, "minigame CoinRush" },
 		{ "🟥 Falling Tiles", Theme.Red, "minigame FallingTiles" },
 		{ "☄️ Meteors", Color3.fromRGB(255, 120, 0), "minigame MeteorShower" },
+		{ "🌋 Lava Rise", Color3.fromRGB(255, 80, 0), "minigame LavaRise" },
 	})
 	section("🌍 World")
 	buttonRow({

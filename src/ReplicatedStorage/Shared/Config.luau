@@ -105,6 +105,16 @@ Config.Disasters = {
 		CashEvery = 1.5,
 		CashIncomeSeconds = 10,
 	},
+	Earthquake = {
+		Weight = 2,
+		Duration = 25,
+		WaveEvery = 3, -- seconds between shocks
+		Damage = 6, -- per shock, if you're not in a shelter
+		KnockoutFraction = 0.03, -- share of an unshielded tower wrecked per shock
+		KnockoutSeconds = 90,
+		GeodeCount = 6, -- cash geodes pushed out of the ground
+		GeodeIncomeSeconds = 15,
+	},
 }
 
 ---------------------------------------------------------------------------
@@ -410,6 +420,16 @@ Config.Minigames = {
 			SurviveMin = 6000,
 			WinnerIncomeSeconds = 60,
 			WinnerMin = 4000,
+		},
+		LavaRise = {
+			DisplayName = "Lava Rise",
+			Description = "The lava is rising! Climb the spiral tower - last ones standing win.",
+			Duration = 60,
+			RiseSpeed = 1.5, -- studs per second
+			SurviveIncomeSeconds = 90,
+			SurviveMin = 5000,
+			WinnerIncomeSeconds = 90,
+			WinnerMin = 6000,
 		},
 	},
 }

@@ -763,7 +763,18 @@ local ACTIVE_TEXT = {
 	Meteors = { "☄️ METEOR STORM", "Dodge the red circles • grab cash crystals", Color3.fromRGB(255, 120, 30) },
 	Tornado = { "🌪️ TORNADO", "Stay away from the funnel!", Color3.fromRGB(170, 180, 200) },
 	UFO = { "🛸 UFO INVASION", "Avoid the tractor beams • grab alien cash", Color3.fromRGB(120, 255, 80) },
+	Earthquake = { "🌍 EARTHQUAKE", "Hold on! • grab the cash geodes", Color3.fromRGB(210, 150, 90) },
 }
+
+-- one shock of an earthquake: the camera shakes, the ground rumbles, dust flies
+local function quakeShock(intensity: number)
+	shake(1.6 * intensity, 1.3)
+	UIKit.PlaySound("Boom", 0.5 * intensity, 0.45)
+	local root = getRoot()
+	if root and C.VFX then
+		C.VFX:Burst(root.Position - Vector3.new(0, 2.5, 0), Color3.fromRGB(150, 120, 90), 25, 1.5)
+	end
+end
 
 local function onState(state)
 	local phase, kind = state.Phase, state.Kind
@@ -798,6 +809,8 @@ local function onState(state)
 		end
 	elseif phase == "Meteor" then
 		meteor(state.Target, state.Delay or 1.4, state.Radius or 12, state.Shield == true)
+	elseif phase == "Shock" and kind == "Earthquake" then
+		quakeShock(tonumber(state.Intensity) or 1)
 	elseif phase == "End" then
 		stopSiren()
 		clearBeam()

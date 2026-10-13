@@ -108,6 +108,8 @@ time and your own tower comes back exactly as you left it.
 - ☄️ **Meteor storm** — warning circles, fireballs, explosions; leaves **cash crystals**
 - 🌪️ **Tornado** — sweeps across the map, flings players, wrecks what it touches
 - 🛸 **UFO invasion** — tractor beams abduct players, UFOs drop **alien cash**
+- 🌍 **Earthquake** — the camera shakes, the ground cracks open, shocks hurt anyone
+  outside a shelter and crack unshielded towers; **cash geodes** pop out of the ground
 - 🛡️ **Nuke Shield Dome** (floor 2 special) protects your whole tower *and everyone inside it*.
   The public bunker and your own Panic Bunker (floor 1) keep you alive
 - 🔧 Wrecked upgrades rebuild automatically (or instantly with the Instant Repair product)
@@ -127,7 +129,7 @@ graveyard, waterfall cliff, ring road, day/night cycle, public nuke bunker.
   **Launch a Nuke**, **Meteor Storm**, Server Cash Rain
 - Secure `ProcessReceipt` with purchase history (no double grants)
 
-**Minigames** — Coin Rush, Falling Tiles, Meteor Dodge (every 2.5 min, press JOIN)
+**Minigames** — Coin Rush, Falling Tiles, Meteor Dodge, **Lava Rise** (every 2.5 min, press JOIN)
 **Obby** — west road: jumps, kill bricks, spinners, trusses, checkpoints, finish reward
 **Extras** — loading screen, music playlist, VFX everywhere, daily rewards, codes,
 settings (music, SFX, low graphics), chat tags (`[Owner]` `[👑 VIP]` `[🕵️ Secret Master]` `[R5]`)
@@ -142,7 +144,7 @@ Open the **Admin Panel** with the 🛡️ button or **F2**.
 | Rank | Commands |
 |---|---|
 | **Mod (1)** | `cmds` `logs` `tp` `bring` `to` `home` `floor` `speed` `jump` `heal` `god` `ungod` `ff` `unff` `kill` `freeze` `thaw` `sparkles` `fire` `smoke` `unfx` `invisible` `visible` `respawn` `jail` `unjail` `fly` `unfly` `noclip` `clip` `view` `unview` `m` `h` |
-| **Admin (2)** | `kick` `givecash` `takecash` `setcash` `giverebirth` `rebirth` `unlockall` `unlockfloor` `explode` `giant` `tiny` `normal` `confetti` `cashrain` `doublecash` `music` `stopmusic` `minigame` `time` `nuke` `meteors` `tornado` `ufo` `stopdisaster` `repair` `wreck` `givesecrets` `duo` `unduo` |
+| **Admin (2)** | `kick` `givecash` `takecash` `setcash` `giverebirth` `rebirth` `unlockall` `unlockfloor` `explode` `giant` `tiny` `normal` `confetti` `cashrain` `doublecash` `music` `stopmusic` `minigame` `time` `nuke` `meteors` `tornado` `ufo` `earthquake` `stopdisaster` `repair` `wreck` `givesecrets` `duo` `unduo` |
 | **Head Admin (3)** | `ban` `unban` `resetdata` `resetsecrets` `givepass` `removepass` |
 | **Owner (4)** | `admin` `unadmin` `shutdown` |
 

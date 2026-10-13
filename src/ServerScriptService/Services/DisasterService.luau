@@ -33,12 +33,13 @@ local stopRequested = false
 local folder: Folder
 local rng = Random.new()
 
-local KINDS = { "Nuke", "Meteors", "Tornado", "UFO" }
+local KINDS = { "Nuke", "Meteors", "Tornado", "UFO", "Earthquake" }
 local TITLES = {
 	Nuke = "☢️ NUKE INCOMING!",
 	Meteors = "☄️ METEOR STORM!",
 	Tornado = "🌪️ TORNADO WARNING!",
 	UFO = "🛸 UFO INVASION!",
+	Earthquake = "🌍 EARTHQUAKE!",
 }
 
 local function broadcast(state)
@@ -503,6 +504,72 @@ function handlers.UFO(by: string?)
 end
 
 ---------------------------------------------------------------------------
+-- 🌍 Earthquake
+---------------------------------------------------------------------------
+local function crack(position: Vector3, length: number, angle: number)
+	local cf = CFrame.new(position) * CFrame.Angles(0, angle, 0)
+	local model = Instance.new("Model")
+	model.Name = "Crack"
+	BuildKit.Part({ Name = "Rim", Size = Vector3.new(2.2, 0.4, length), CFrame = cf, Color = Color3.fromRGB(45, 35, 28), Material = Enum.Material.Slate, CanCollide = false, CanTouch = false, CanQuery = false, Parent = model })
+	BuildKit.Part({ Name = "Glow", Size = Vector3.new(0.8, 0.5, length - 1), CFrame = cf, Color = Color3.fromRGB(255, 110, 20), Material = Enum.Material.Neon, CanCollide = false, CanTouch = false, CanQuery = false, Parent = model })
+	model.Parent = folder
+	return model
+end
+
+function handlers.Earthquake(by: string?)
+	local cfg = DC.Earthquake
+	Remotes.Announce:FireAllClients({
+		Title = TITLES.Earthquake,
+		Text = (by and (by .. " shook the ground! ") or "") .. "Hold on tight - and grab the cash geodes it digs up!",
+		Color = Color3.fromRGB(210, 150, 90),
+	})
+	for _ = 1, cfg.GeodeCount do
+		local a = rng:NextNumber(0, math.pi * 2)
+		local r = rng:NextNumber(40, 220)
+		spawnCollectible(Vector3.new(math.cos(a) * r, 2.5, math.sin(a) * r), "Crystal", cfg.GeodeIncomeSeconds, 750, true)
+	end
+	local cracks = {}
+	local notified = {}
+	local endTime = os.clock() + cfg.Duration
+	local nextShock = os.clock() + 1
+	local lastTick = 0
+	while os.clock() < endTime and not stopRequested do
+		local now = os.clock()
+		if now - lastTick >= 1 then
+			lastTick = now
+			broadcast({ Phase = "Active", Kind = "Earthquake", TimeLeft = math.ceil(endTime - now) })
+		end
+		if now >= nextShock then
+			nextShock = now + cfg.WaveEvery
+			broadcast({ Phase = "Shock", Kind = "Earthquake", Intensity = rng:NextNumber(0.6, 1) })
+			for _, info in mainMapPlayers() do
+				if not DisasterService:IsSheltered(info.Root.Position) then
+					info.Humanoid:TakeDamage(cfg.Damage)
+					fling(info.Player, Vector3.new(rng:NextNumber(-12, 12), 28, rng:NextNumber(-12, 12)))
+				end
+			end
+			for _, plot in S.TycoonService:GetPlots() do
+				if plot.Owner and not S.TycoonService:IsShielded(plot) then
+					local wrecked = S.TycoonService:KnockOutFraction(plot, cfg.KnockoutFraction, cfg.KnockoutSeconds)
+					if wrecked > 0 and not notified[plot] then
+						notified[plot] = true
+						notifyPlot(plot, "🌍 The earthquake is shaking your tower apart! Wrecked upgrades rebuild by themselves.")
+					end
+				end
+			end
+			local a = rng:NextNumber(0, math.pi * 2)
+			local r = rng:NextNumber(20, 200)
+			table.insert(cracks, crack(Vector3.new(math.cos(a) * r, 0.6, math.sin(a) * r), rng:NextNumber(18, 45), rng:NextNumber(0, math.pi)))
+		end
+		task.wait(0.1)
+	end
+	task.wait(1)
+	for _, model in cracks do
+		model:Destroy()
+	end
+end
+
+---------------------------------------------------------------------------
 function DisasterService:Init(services)
 	S = services
 	folder = Instance.new("Folder")
@@ -582,7 +649,7 @@ function DisasterService:Trigger(kind: string, by: string?): string
 		end
 	end
 	if not key then
-		return "Unknown disaster. Options: Nuke, Meteors, Tornado, UFO"
+		return "Unknown disaster. Options: " .. table.concat(KINDS, ", ")
 	end
 	table.insert(queue, { Kind = key, By = by })
 	if active then

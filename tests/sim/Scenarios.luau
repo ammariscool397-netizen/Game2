@@ -1319,7 +1319,7 @@ local function playMinigame(T, key: string)
 	end, 3, "arena cleanup")
 end
 
-for _, key in { "CoinRush", "FallingTiles", "MeteorShower" } do
+for _, key in { "CoinRush", "FallingTiles", "MeteorShower", "LavaRise" } do
 	add({
 		Name = "minigame_" .. key,
 		Run = function(T, place)
@@ -2379,6 +2379,107 @@ add({
 		T.Admin(me, ";doublecash 10 3")
 		T.Wait(240)
 		T.Check(ws:GetAttribute("EventMultiplier") == 3, "auto event doesn't replace an admin event")
+	end,
+})
+
+add({
+	Name = "lava_rise",
+	Run = function(T, place)
+		local game, me = T.Boot(place, { Name = "Climber" })
+		local lazy = T.AddPlayer("Lazy")
+		T.Wait(6)
+		T.Admin(me, ";minigame LavaRise")
+		T.Wait(2)
+		T.Engine.FireServerAs(lazy, T.Remote("MinigameJoin"))
+		T.Engine.FireServerAs(me, T.Remote("MinigameJoin"))
+		T.WaitFor(function()
+			return me:GetAttribute("InMinigame") and lazy:GetAttribute("InMinigame")
+		end, 30, "both in the arena")
+		local folder = game:GetService("Workspace"):FindFirstChild("Minigame_LavaRise")
+		local summit = folder and folder:FindFirstChild("Summit")
+		T.Check(summit ~= nil, "spiral tower with a summit")
+		-- climb to the top; the lazy one stays on the floor
+		T.Wait(4)
+		T.MoveTo(me, CFrame.new(summit.Position + Vector3.new(0, 4, 0)))
+		T.WaitFor(function()
+			return lazy:GetAttribute("InMinigame") == nil
+		end, 20, "lava to catch the player on the floor")
+		T.Check(T.Noticed(lazy, "lava"), "eliminated by the lava")
+		T.WaitFor(function()
+			return me:GetAttribute("InMinigame") == nil
+		end, 10, "round end")
+		local results
+		for _, args in T.Sent(me, "MinigameState") do
+			if args[1].Phase == "Results" then
+				results = args[1]
+			end
+		end
+		local winner = results and results.Results[1]
+		T.Check(winner and winner.Name == "Climber" and winner.Winner, "the climber wins")
+	end,
+})
+
+add({
+	Name = "earthquake",
+	Run = function(T, place)
+		local game, me = T.Boot(place)
+		local sheltered = T.AddPlayer("Sheltered")
+		T.Wait(6)
+		local TycoonService = T.Service("TycoonService")
+		local DataService = T.Service("DataService")
+		TycoonService:UnlockAll(me, 1)
+		local plot = TycoonService:GetPlot(me)
+		waitBuilt(T, plot)
+		local shelter = T.Service("WorldBuilder").Shelter
+		T.MoveTo(sheltered, CFrame.new(shelter.CFrame.Position - Vector3.new(0, shelter.Size.Y / 2 - 3, 0)))
+		T.MoveTo(me, CFrame.new(60, 4, 60))
+		local since = T.Engine.Now
+		T.Check(T.Admin(me, ";quake"), "earthquake command")
+		local ws = game:GetService("Workspace")
+		T.WaitFor(function()
+			return ws:GetAttribute("Disaster") == "Earthquake"
+		end, 5, "quake start")
+		T.Wait(4)
+		local folder = ws:FindFirstChild("Disasters")
+		local geodes, cracks = 0, 0
+		for _, child in folder:GetChildren() do
+			if child.Name == "Crystal" then
+				geodes += 1
+			elseif child.Name == "Crack" then
+				cracks += 1
+			end
+		end
+		T.Check(geodes > 0, "cash geodes dug up (" .. geodes .. ")")
+		T.Check(cracks > 0, "the ground cracks")
+		local geode = folder:FindFirstChild("Crystal")
+		if geode then
+			local cash = DataService:Get(me).Cash
+			T.Engine.Touch(geode, me)
+			T.Wait(0.3)
+			T.Check(DataService:Get(me).Cash > cash, "geodes pay out")
+			T.MoveTo(me, CFrame.new(60, 4, 60))
+		end
+		T.WaitFor(function()
+			return ws:GetAttribute("Disaster") == nil
+		end, 40, "quake end")
+		local shocks = 0
+		for _, args in T.Sent(me, "Disaster", since) do
+			if args[1].Phase == "Shock" then
+				shocks += 1
+			end
+		end
+		T.Check(shocks >= 6, "several shocks (" .. shocks .. ")")
+		T.Check(T.Humanoid(me).Health < 100, "exposed player got hurt")
+		T.Check(T.Humanoid(sheltered).Health == 100, "the bunker protects")
+		T.Check(TycoonService:WreckedCount(plot) > 0, "unshielded tower got cracked")
+		T.Wait(2)
+		local left = 0
+		for _, child in folder:GetChildren() do
+			if child.Name == "Crack" then
+				left += 1
+			end
+		end
+		T.Check(left == 0, "cracks close afterwards")
 	end,
 })
 
