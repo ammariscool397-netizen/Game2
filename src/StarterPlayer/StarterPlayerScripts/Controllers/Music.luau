@@ -169,6 +169,11 @@ function Music:Play(id: string, name: string?)
 		end
 		if not sound.IsLoaded or sound.TimeLength == 0 then
 			failures += 1
+			if mode == "Override" then
+				-- a DJ track that doesn't load: back to the normal playlist
+				override = nil
+				mode = player:GetAttribute("InMinigame") and "Minigame" or "Lobby"
+			end
 			local playlist = Config.Music[mode] or Config.Music.Lobby
 			if failures >= #playlist + 1 then
 				titleLabel.Text = "No music (set IDs in Config)"

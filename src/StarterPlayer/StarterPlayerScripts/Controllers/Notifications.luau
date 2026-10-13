@@ -1,4 +1,5 @@
 --[[ Notifications - toast messages (top right) + big announcement banners ]]
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
@@ -7,6 +8,7 @@ local UIKit = require(Shared.UIKit)
 local Remotes = require(Shared.Remotes)
 
 local Theme = UIKit.Theme
+local player = Players.LocalPlayer
 
 local Notifications = {}
 local C
@@ -40,11 +42,30 @@ function Notifications:Init(controllers)
 	local layout = UIKit.List(holder, 8, Enum.FillDirection.Vertical, Enum.HorizontalAlignment.Right)
 	layout.VerticalAlignment = Enum.VerticalAlignment.Top
 
+	-- messages that arrive while the loading screen is up (welcome, offline
+	-- earnings...) wait for it, or nobody would ever see them
+	local function afterLoading(fn)
+		if player:GetAttribute("LoadingDone") then
+			fn()
+			return
+		end
+		task.spawn(function()
+			local waited = 0
+			while not player:GetAttribute("LoadingDone") and waited < 45 do
+				waited += task.wait(0.25)
+			end
+			fn()
+		end)
+	end
 	Remotes.Notify.OnClientEvent:Connect(function(data)
-		self:Toast(data.Text, data.Type, data.Duration)
+		afterLoading(function()
+			self:Toast(data.Text, data.Type, data.Duration)
+		end)
 	end)
 	Remotes.Announce.OnClientEvent:Connect(function(data)
-		self:Banner(data.Title, data.Text, data.Color)
+		afterLoading(function()
+			self:Banner(data.Title, data.Text, data.Color)
+		end)
 	end)
 end
 
@@ -107,8 +128,14 @@ function Notifications:Toast(text: string, kind: string?, duration: number?)
 	end)
 end
 
+local MAX_QUEUED_BANNERS = 3
+
 function Notifications:Banner(title: string, text: string?, color: Color3?)
 	table.insert(bannerQueue, { title, text, color })
+	-- a busy server can announce a lot: keep only the newest few (old news is stale)
+	while #bannerQueue > MAX_QUEUED_BANNERS do
+		table.remove(bannerQueue, 1)
+	end
 	if bannerBusy then
 		return
 	end
@@ -143,7 +170,11 @@ function Notifications:_showBanner(title: string, text: string?, color: Color3?)
 	TweenService:Create(frame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.new(0.5, 0, 0, 70) }):Play()
 	shine.Position = UDim2.new(-0.3, 0, 0, 0)
 	TweenService:Create(shine, TweenInfo.new(1.2, Enum.EasingStyle.Quad), { Position = UDim2.new(1.1, 0, 0, 0) }):Play()
-	task.wait(4.5)
+	-- shorter when more banners are waiting
+	local shown = 0
+	while shown < 4.5 and not (shown >= 2.2 and #bannerQueue > 0) do
+		shown += task.wait(0.1)
+	end
 	local out = TweenService:Create(frame, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Position = UDim2.new(0.5, 0, 0, -130) })
 	out:Play()
 	out.Completed:Wait()

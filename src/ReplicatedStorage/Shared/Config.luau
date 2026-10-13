@@ -198,6 +198,14 @@ Config.GamePasses = {
 	},
 }
 
+-- Free income bonuses: Roblox Premium members, and friends playing together
+-- (per friend in the server, up to MaxFriends). Shown in the HUD.
+Config.Bonuses = {
+	PremiumPercent = 10,
+	FriendPercent = 10,
+	MaxFriends = 5,
+}
+
 -- Auto Builder: how often it buys (seconds) and how many upgrades per go
 Config.AutoBuild = {
 	Interval = 2,

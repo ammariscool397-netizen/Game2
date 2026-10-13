@@ -584,7 +584,7 @@ local EVENTS = {
 	BasePart = { "Touched", "TouchEnded" },
 	Humanoid = { "Died", "HealthChanged", "StateChanged", "Running", "Jumping" },
 	Player = { "CharacterAdded", "CharacterRemoving", "Chatted" },
-	Players = { "PlayerAdded", "PlayerRemoving" },
+	Players = { "PlayerAdded", "PlayerRemoving", "PlayerMembershipChanged" },
 	RemoteEvent = { "OnServerEvent", "OnClientEvent" },
 	BindableEvent = { "Event" },
 	GuiButton = { "Activated", "MouseButton1Click", "MouseButton1Down", "MouseButton1Up", "MouseButton2Click" },
@@ -1259,6 +1259,21 @@ method("Player", "GetRankInGroup", function(_, groupId)
 end)
 method("Player", "IsInGroup", function()
 	return false
+end)
+-- friendships for tests: Engine.Friends[userId] = { [otherUserId] = true }
+Engine.Friends = {}
+method("Player", "IsFriendsWith", function(self, userId)
+	assert(type(userId) == "number", "IsFriendsWith expects a number")
+	local mine = Engine.Friends[self.UserId]
+	local theirs = Engine.Friends[userId]
+	return (mine ~= nil and mine[userId] == true) or (theirs ~= nil and theirs[self.UserId] == true)
+end)
+local memberships: { [string]: any } = {}
+prop("Player", "MembershipType", function(_, native)
+	return memberships[native:GetDebugId()] or Enum.MembershipType.None
+end, function(_, native, value)
+	assert(nativeTypeof(value) == "EnumItem", "MembershipType must be an EnumItem")
+	memberships[native:GetDebugId()] = value
 end)
 
 ---------------------------------------------------------------------------

@@ -51,6 +51,8 @@ local TEMPLATE = {
 }
 
 local profiles: { [Player]: any } = {}
+-- who in the server is friends with whom (asked once per pair, on join)
+local friendPairs: { [Player]: { [Player]: boolean } } = {}
 local canSave: { [Player]: boolean } = {}
 local joinTime: { [Player]: number } = {}
 
@@ -163,6 +165,19 @@ end
 
 function DataService:Start()
 	Players.PlayerAdded:Connect(function(player)
+		task.spawn(self._updateFriends, self, player)
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		friendPairs[player] = nil
+		for _, known in friendPairs do
+			known[player] = nil
+		end
+		task.defer(self._countFriends, self)
+	end)
+	Players.PlayerMembershipChanged:Connect(function(player)
+		self:RefreshMultiplier(player)
+	end)
+	Players.PlayerAdded:Connect(function(player)
 		self:_onJoin(player)
 	end)
 	Players.PlayerRemoving:Connect(function(player)
@@ -170,6 +185,7 @@ function DataService:Start()
 	end)
 	for _, player in Players:GetPlayers() do
 		task.spawn(self._onJoin, self, player)
+		task.spawn(self._updateFriends, self, player)
 	end
 
 	game:BindToClose(function()
@@ -470,7 +486,46 @@ function DataService:GetMultiplier(player: Player, permanentOnly: boolean?): num
 	if Util.IsFinite(event) and event > 0 then
 		mult *= event
 	end
-	return mult
+	return mult * self:GetSocialBonus(host)
+end
+
+-- Premium + friends-in-the-server bonus of a wallet owner (see Config.Bonuses)
+function DataService:GetSocialBonus(host: Player): number
+	local bonus = 1
+	if host.MembershipType == Enum.MembershipType.Premium then
+		bonus *= 1 + Config.Bonuses.PremiumPercent / 100
+	end
+	local friends = math.min(tonumber(host:GetAttribute("FriendsHere")) or 0, Config.Bonuses.MaxFriends)
+	return bonus * (1 + friends * Config.Bonuses.FriendPercent / 100)
+end
+
+function DataService:_updateFriends(player: Player)
+	friendPairs[player] = friendPairs[player] or {}
+	for _, other in Players:GetPlayers() do
+		if other ~= player and friendPairs[player][other] == nil then
+			local ok, isFriend = pcall(player.IsFriendsWith, player, other.UserId)
+			local value = ok and isFriend == true
+			friendPairs[player][other] = value
+			friendPairs[other] = friendPairs[other] or {}
+			friendPairs[other][player] = value
+		end
+	end
+	self:_countFriends()
+end
+
+function DataService:_countFriends()
+	for player, known in friendPairs do
+		local n = 0
+		for other, isFriend in known do
+			if isFriend and other.Parent then
+				n += 1
+			end
+		end
+		if player.Parent and player:GetAttribute("FriendsHere") ~= n then
+			player:SetAttribute("FriendsHere", n)
+			self:RefreshMultiplier(player)
+		end
+	end
 end
 
 function DataService:RefreshMultiplier(player: Player)

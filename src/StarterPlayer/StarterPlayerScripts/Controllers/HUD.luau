@@ -255,8 +255,11 @@ function HUD:Refresh()
 	local rebirths = player:GetAttribute("WalletRebirths") or player:GetAttribute("Rebirths") or 0
 	local rounded = math.floor(mult * 100 + 0.5) / 100
 	incomeLabel.Text = "+" .. Util.Money(player:GetAttribute("Income") or 0) .. "/s"
+	local friends = math.min(tonumber(player:GetAttribute("FriendsHere")) or 0, Config.Bonuses.MaxFriends)
 	local extras = (player:GetAttribute("DuoHost") and "  •  👥 Duo" or "")
 		.. ((player:GetAttribute("Pass_AutoBuild") and player:GetAttribute("AutoBuild") ~= false) and "  •  🤖 Auto" or "")
+		.. (player.MembershipType == Enum.MembershipType.Premium and ("  •  ⭐+" .. Config.Bonuses.PremiumPercent .. "%") or "")
+		.. (friends > 0 and ("  •  👫+" .. friends * Config.Bonuses.FriendPercent .. "%") or "")
 	infoLabel.Text = string.format("x%s cash  •  Rebirth %d%s", rounded >= 1000 and Util.Abbreviate(rounded) or tostring(rounded), rebirths, extras)
 	local hasAuto = player:GetAttribute("Pass_AutoCollect")
 	local vault = player:GetAttribute("Vault") or 0

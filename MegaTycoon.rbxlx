@@ -612,6 +612,14 @@ Config.GamePasses = {
 	},
 }
 
+-- Free income bonuses: Roblox Premium members, and friends playing together
+-- (per friend in the server, up to MaxFriends). Shown in the HUD.
+Config.Bonuses = {
+	PremiumPercent = 10,
+	FriendPercent = 10,
+	MaxFriends = 5,
+}
+
 -- Auto Builder: how often it buys (seconds) and how many upgrades per go
 Config.AutoBuild = {
 	Interval = 2,
@@ -3553,6 +3561,8 @@ local TEMPLATE = {
 }
 
 local profiles: { [Player]: any } = {}
+-- who in the server is friends with whom (asked once per pair, on join)
+local friendPairs: { [Player]: { [Player]: boolean } } = {}
 local canSave: { [Player]: boolean } = {}
 local joinTime: { [Player]: number } = {}
 
@@ -3665,6 +3675,19 @@ end
 
 function DataService:Start()
 	Players.PlayerAdded:Connect(function(player)
+		task.spawn(self._updateFriends, self, player)
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		friendPairs[player] = nil
+		for _, known in friendPairs do
+			known[player] = nil
+		end
+		task.defer(self._countFriends, self)
+	end)
+	Players.PlayerMembershipChanged:Connect(function(player)
+		self:RefreshMultiplier(player)
+	end)
+	Players.PlayerAdded:Connect(function(player)
 		self:_onJoin(player)
 	end)
 	Players.PlayerRemoving:Connect(function(player)
@@ -3672,6 +3695,7 @@ function DataService:Start()
 	end)
 	for _, player in Players:GetPlayers() do
 		task.spawn(self._onJoin, self, player)
+		task.spawn(self._updateFriends, self, player)
 	end
 
 	game:BindToClose(function()
@@ -3972,7 +3996,46 @@ function DataService:GetMultiplier(player: Player, permanentOnly: boolean?): num
 	if Util.IsFinite(event) and event > 0 then
 		mult *= event
 	end
-	return mult
+	return mult * self:GetSocialBonus(host)
+end
+
+-- Premium + friends-in-the-server bonus of a wallet owner (see Config.Bonuses)
+function DataService:GetSocialBonus(host: Player): number
+	local bonus = 1
+	if host.MembershipType == Enum.MembershipType.Premium then
+		bonus *= 1 + Config.Bonuses.PremiumPercent / 100
+	end
+	local friends = math.min(tonumber(host:GetAttribute("FriendsHere")) or 0, Config.Bonuses.MaxFriends)
+	return bonus * (1 + friends * Config.Bonuses.FriendPercent / 100)
+end
+
+function DataService:_updateFriends(player: Player)
+	friendPairs[player] = friendPairs[player] or {}
+	for _, other in Players:GetPlayers() do
+		if other ~= player and friendPairs[player][other] == nil then
+			local ok, isFriend = pcall(player.IsFriendsWith, player, other.UserId)
+			local value = ok and isFriend == true
+			friendPairs[player][other] = value
+			friendPairs[other] = friendPairs[other] or {}
+			friendPairs[other][player] = value
+		end
+	end
+	self:_countFriends()
+end
+
+function DataService:_countFriends()
+	for player, known in friendPairs do
+		local n = 0
+		for other, isFriend in known do
+			if isFriend and other.Parent then
+				n += 1
+			end
+		end
+		if player.Parent and player:GetAttribute("FriendsHere") ~= n then
+			player:SetAttribute("FriendsHere", n)
+			self:RefreshMultiplier(player)
+		end
+	end
 end
 
 function DataService:RefreshMultiplier(player: Player)
@@ -13079,8 +13142,11 @@ function HUD:Refresh()
 	local rebirths = player:GetAttribute("WalletRebirths") or player:GetAttribute("Rebirths") or 0
 	local rounded = math.floor(mult * 100 + 0.5) / 100
 	incomeLabel.Text = "+" .. Util.Money(player:GetAttribute("Income") or 0) .. "/s"
+	local friends = math.min(tonumber(player:GetAttribute("FriendsHere")) or 0, Config.Bonuses.MaxFriends)
 	local extras = (player:GetAttribute("DuoHost") and "  •  👥 Duo" or "")
 		.. ((player:GetAttribute("Pass_AutoBuild") and player:GetAttribute("AutoBuild") ~= false) and "  •  🤖 Auto" or "")
+		.. (player.MembershipType == Enum.MembershipType.Premium and ("  •  ⭐+" .. Config.Bonuses.PremiumPercent .. "%") or "")
+		.. (friends > 0 and ("  •  👫+" .. friends * Config.Bonuses.FriendPercent .. "%") or "")
 	infoLabel.Text = string.format("x%s cash  •  Rebirth %d%s", rounded >= 1000 and Util.Abbreviate(rounded) or tostring(rounded), rebirths, extras)
 	local hasAuto = player:GetAttribute("Pass_AutoCollect")
 	local vault = player:GetAttribute("Vault") or 0
@@ -13552,6 +13618,11 @@ function Music:Play(id: string, name: string?)
 		end
 		if not sound.IsLoaded or sound.TimeLength == 0 then
 			failures += 1
+			if mode == "Override" then
+				-- a DJ track that doesn't load: back to the normal playlist
+				override = nil
+				mode = player:GetAttribute("InMinigame") and "Minigame" or "Lobby"
+			end
 			local playlist = Config.Music[mode] or Config.Music.Lobby
 			if failures >= #playlist + 1 then
 				titleLabel.Text = "No music (set IDs in Config)"
@@ -13597,6 +13668,7 @@ return Music
           <Properties>
             <string name="Name">Notifications</string>
             <string name="Source"><![CDATA[--[[ Notifications - toast messages (top right) + big announcement banners ]]
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
@@ -13605,6 +13677,7 @@ local UIKit = require(Shared.UIKit)
 local Remotes = require(Shared.Remotes)
 
 local Theme = UIKit.Theme
+local player = Players.LocalPlayer
 
 local Notifications = {}
 local C
@@ -13638,11 +13711,30 @@ function Notifications:Init(controllers)
 	local layout = UIKit.List(holder, 8, Enum.FillDirection.Vertical, Enum.HorizontalAlignment.Right)
 	layout.VerticalAlignment = Enum.VerticalAlignment.Top
 
+	-- messages that arrive while the loading screen is up (welcome, offline
+	-- earnings...) wait for it, or nobody would ever see them
+	local function afterLoading(fn)
+		if player:GetAttribute("LoadingDone") then
+			fn()
+			return
+		end
+		task.spawn(function()
+			local waited = 0
+			while not player:GetAttribute("LoadingDone") and waited < 45 do
+				waited += task.wait(0.25)
+			end
+			fn()
+		end)
+	end
 	Remotes.Notify.OnClientEvent:Connect(function(data)
-		self:Toast(data.Text, data.Type, data.Duration)
+		afterLoading(function()
+			self:Toast(data.Text, data.Type, data.Duration)
+		end)
 	end)
 	Remotes.Announce.OnClientEvent:Connect(function(data)
-		self:Banner(data.Title, data.Text, data.Color)
+		afterLoading(function()
+			self:Banner(data.Title, data.Text, data.Color)
+		end)
 	end)
 end
 
@@ -13705,8 +13797,14 @@ function Notifications:Toast(text: string, kind: string?, duration: number?)
 	end)
 end
 
+local MAX_QUEUED_BANNERS = 3
+
 function Notifications:Banner(title: string, text: string?, color: Color3?)
 	table.insert(bannerQueue, { title, text, color })
+	-- a busy server can announce a lot: keep only the newest few (old news is stale)
+	while #bannerQueue > MAX_QUEUED_BANNERS do
+		table.remove(bannerQueue, 1)
+	end
 	if bannerBusy then
 		return
 	end
@@ -13741,7 +13839,11 @@ function Notifications:_showBanner(title: string, text: string?, color: Color3?)
 	TweenService:Create(frame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.new(0.5, 0, 0, 70) }):Play()
 	shine.Position = UDim2.new(-0.3, 0, 0, 0)
 	TweenService:Create(shine, TweenInfo.new(1.2, Enum.EasingStyle.Quad), { Position = UDim2.new(1.1, 0, 0, 0) }):Play()
-	task.wait(4.5)
+	-- shorter when more banners are waiting
+	local shown = 0
+	while shown < 4.5 and not (shown >= 2.2 and #bannerQueue > 0) do
+		shown += task.wait(0.1)
+	end
 	local out = TweenService:Create(frame, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Position = UDim2.new(0.5, 0, 0, -130) })
 	out:Play()
 	out.Completed:Wait()

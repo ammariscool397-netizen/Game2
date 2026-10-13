@@ -2226,4 +2226,45 @@ add({
 	end,
 })
 
+---------------------------------------------------------------------------
+-- Premium + friends bonus, and messages that arrive during the loading screen
+---------------------------------------------------------------------------
+add({
+	Name = "social_bonus",
+	Run = function(T, place)
+		T.Engine.Friends[3001] = { [3002] = true, [3003] = true }
+		local game, me = T.Boot(place, { Name = "Social", UserId = 3001 })
+		T.Wait(6)
+		-- the welcome toast was sent during the loading screen: still shown after it
+		T.Check(T.FindText(me.PlayerGui, "is yours") ~= nil, "welcome message visible after the loading screen")
+		local Config = T.Shared("Config")
+		local base = me:GetAttribute("Multiplier")
+		T.Check(base == 1, "no bonus alone")
+		T.AddPlayer("Friend1", { UserId = 3002 })
+		T.Wait(2)
+		T.Check(me:GetAttribute("FriendsHere") == 1, "friend detected")
+		T.Check(math.abs(me:GetAttribute("Multiplier") - (1 + Config.Bonuses.FriendPercent / 100)) < 1e-9, "+10% for a friend in the server")
+		local friend2 = T.AddPlayer("Friend2", { UserId = 3003 })
+		local stranger = T.AddPlayer("Stranger", { UserId = 3004 })
+		T.Wait(2)
+		T.Check(me:GetAttribute("FriendsHere") == 2, "two friends, the stranger doesn't count")
+		T.Check(stranger:GetAttribute("FriendsHere") == 0, "stranger has no friends here")
+		T.Engine.RemovePlayer(friend2)
+		T.Wait(1)
+		T.Check(me:GetAttribute("FriendsHere") == 1, "friend leaving lowers the bonus")
+		-- premium
+		me.MembershipType = Enum.MembershipType.Premium
+		T.Server(function()
+			T.Engine.FireIfExists(game:GetService("Players"), "PlayerMembershipChanged", me)
+		end)
+		T.Wait(0.5)
+		local expected = (1 + Config.Bonuses.PremiumPercent / 100) * (1 + Config.Bonuses.FriendPercent / 100)
+		T.Check(math.abs(me:GetAttribute("Multiplier") - expected) < 1e-9, "Premium adds +10%")
+		T.Wait(1)
+		T.Check(T.FindText(me.PlayerGui, "⭐%+10%%") ~= nil and T.FindText(me.PlayerGui, "👫%+10%%") ~= nil, "HUD shows the bonuses")
+		-- offline earnings don't include temporary social bonuses
+		T.Check(T.Service("TycoonService"):GetOfflineIncome(me) == T.Shared("TycoonItems").ComputeIncome(T.Service("DataService"):Get(me).Purchased, nil, {}, false), "offline income ignores social bonuses")
+	end,
+})
+
 return Scenarios
