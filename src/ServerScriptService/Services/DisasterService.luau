@@ -354,7 +354,6 @@ function handlers.Tornado(by: string?)
 	local mid = Vector3.new(rng:NextNumber(-150, 150), 0, rng:NextNumber(-150, 150))
 	local b = a + math.pi + rng:NextNumber(-0.6, 0.6)
 	local endPos = Vector3.new(math.cos(b) * 700, 0, math.sin(b) * 700)
-	local path = { startPos, mid, endPos }
 	local total = (mid - startPos).Magnitude + (endPos - mid).Magnitude
 
 	local model, core = persistentCore("Tornado", "Tornado", startPos)

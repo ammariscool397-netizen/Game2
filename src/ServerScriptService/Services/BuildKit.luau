@@ -34,13 +34,13 @@ end
 
 -- Floating text above a part
 function BuildKit.Billboard(adornee: BasePart, text: string, props: { [string]: any }?)
-	props = props or {}
+	local p: { [string]: any } = props or {}
 	local gui = Instance.new("BillboardGui")
-	gui.Name = props.Name or "Billboard"
-	gui.Size = props.Size or UDim2.fromOffset(200, 50)
-	gui.StudsOffset = props.Offset or Vector3.new(0, 3, 0)
-	gui.AlwaysOnTop = props.AlwaysOnTop or false
-	gui.MaxDistance = props.MaxDistance or 120
+	gui.Name = p.Name or "Billboard"
+	gui.Size = p.Size or UDim2.fromOffset(200, 50)
+	gui.StudsOffset = p.Offset or Vector3.new(0, 3, 0)
+	gui.AlwaysOnTop = p.AlwaysOnTop or false
+	gui.MaxDistance = p.MaxDistance or 120
 	gui.LightInfluence = 0
 	gui.Adornee = adornee
 	local label = Instance.new("TextLabel")
@@ -49,8 +49,8 @@ function BuildKit.Billboard(adornee: BasePart, text: string, props: { [string]: 
 	label.BackgroundTransparency = 1
 	label.Text = text
 	label.TextScaled = true
-	label.Font = props.Font or Enum.Font.FredokaOne
-	label.TextColor3 = props.Color or Color3.new(1, 1, 1)
+	label.Font = p.Font or Enum.Font.FredokaOne
+	label.TextColor3 = p.Color or Color3.new(1, 1, 1)
 	local stroke = Instance.new("UIStroke")
 	stroke.Thickness = 2.5
 	stroke.Parent = label
@@ -61,21 +61,21 @@ end
 
 -- Text painted on the face of a part
 function BuildKit.SurfaceText(part: BasePart, face: Enum.NormalId, text: string, props: { [string]: any }?)
-	props = props or {}
+	local p: { [string]: any } = props or {}
 	local gui = Instance.new("SurfaceGui")
 	gui.Face = face
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	gui.PixelsPerStud = props.PixelsPerStud or 30
+	gui.PixelsPerStud = p.PixelsPerStud or 30
 	gui.LightInfluence = 0
-	gui.Brightness = props.Brightness or 1.5
+	gui.Brightness = p.Brightness or 1.5
 	local label = Instance.new("TextLabel")
 	label.Name = "Label"
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 1
 	label.Text = text
 	label.TextScaled = true
-	label.Font = props.Font or Enum.Font.FredokaOne
-	label.TextColor3 = props.Color or Color3.new(1, 1, 1)
+	label.Font = p.Font or Enum.Font.FredokaOne
+	label.TextColor3 = p.Color or Color3.new(1, 1, 1)
 	local stroke = Instance.new("UIStroke")
 	stroke.Thickness = 3
 	stroke.Parent = label

@@ -41,7 +41,7 @@ local function getHumanoid(player: Player): Humanoid?
 end
 
 local function rebirthScale(player: Player): number
-	return 1 + (player:GetAttribute("Rebirths") or 0)
+	return 1 + (tonumber(player:GetAttribute("Rebirths")) or 0)
 end
 
 -- the bigger of a fixed minimum (scaled by rebirths) or N seconds of the player's income

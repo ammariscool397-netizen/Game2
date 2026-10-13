@@ -17,7 +17,6 @@ local BuildKit = require(script.Parent.BuildKit)
 
 local Part = BuildKit.Part
 local FH = Config.Tycoon.FloorHeight
-local FLOORS = Config.Tycoon.Floors
 
 local TycoonBuilder = {}
 

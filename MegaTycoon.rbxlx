@@ -954,21 +954,24 @@ local FUNCTIONS = {
 
 local folder: Folder
 if RunService:IsServer() then
-	folder = ReplicatedStorage:FindFirstChild("Remotes") :: Folder
-	if not folder then
-		folder = Instance.new("Folder")
-		folder.Name = "Remotes"
+	local existing = ReplicatedStorage:FindFirstChild("Remotes")
+	if existing then
+		folder = existing :: Folder
+	else
+		local created = Instance.new("Folder")
+		created.Name = "Remotes"
 		for _, name in EVENTS do
 			local remote = Instance.new("RemoteEvent")
 			remote.Name = name
-			remote.Parent = folder
+			remote.Parent = created
 		end
 		for _, name in FUNCTIONS do
 			local remote = Instance.new("RemoteFunction")
 			remote.Name = name
-			remote.Parent = folder
+			remote.Parent = created
 		end
-		folder.Parent = ReplicatedStorage
+		created.Parent = ReplicatedStorage
+		folder = created
 	end
 else
 	folder = ReplicatedStorage:WaitForChild("Remotes") :: Folder
@@ -2245,7 +2248,7 @@ local function computeRank(player: Player): number
 end
 
 function AdminService:GetRank(player: Player): number
-	return player:GetAttribute("AdminRank") or 0
+	return tonumber(player:GetAttribute("AdminRank")) or 0
 end
 
 local function filterBroadcast(text: string, from: Player): string?
@@ -2263,8 +2266,8 @@ local function parseAmount(text: string?): number?
 	if not text then
 		return nil
 	end
-	text = text:lower():gsub(",", "")
-	local number, suffix = text:match("^(%-?[%d%.]+)(%a*)$")
+	local clean = ((text :: string):lower():gsub(",", ""))
+	local number, suffix = clean:match("^(%-?[%d%.]+)(%a*)$")
 	number = Util.Number(number)
 	if not number then
 		return nil
@@ -2297,7 +2300,7 @@ local function resolvePlayers(executor: Player, selector: string?): { Player }
 			table.insert(result, p)
 		end
 	end
-	for _, token in selector:lower():split(",") do
+	for _, token in (selector :: string):lower():split(",") do
 		if token == "me" then
 			add(executor)
 		elseif token == "all" or token == "everyone" then
@@ -3262,7 +3265,7 @@ function AdminService:Execute(executor: Player, text: string): (boolean, string)
 	if #args == 0 then
 		return false, "Type a command"
 	end
-	local name = table.remove(args, 1):lower()
+	local name = (table.remove(args, 1) :: string):lower()
 	local command = byName[name]
 	if not command then
 		return false, "Unknown command '" .. name .. "'. Try " .. prefix .. "cmds"
@@ -3398,13 +3401,13 @@ end
 
 -- Floating text above a part
 function BuildKit.Billboard(adornee: BasePart, text: string, props: { [string]: any }?)
-	props = props or {}
+	local p: { [string]: any } = props or {}
 	local gui = Instance.new("BillboardGui")
-	gui.Name = props.Name or "Billboard"
-	gui.Size = props.Size or UDim2.fromOffset(200, 50)
-	gui.StudsOffset = props.Offset or Vector3.new(0, 3, 0)
-	gui.AlwaysOnTop = props.AlwaysOnTop or false
-	gui.MaxDistance = props.MaxDistance or 120
+	gui.Name = p.Name or "Billboard"
+	gui.Size = p.Size or UDim2.fromOffset(200, 50)
+	gui.StudsOffset = p.Offset or Vector3.new(0, 3, 0)
+	gui.AlwaysOnTop = p.AlwaysOnTop or false
+	gui.MaxDistance = p.MaxDistance or 120
 	gui.LightInfluence = 0
 	gui.Adornee = adornee
 	local label = Instance.new("TextLabel")
@@ -3413,8 +3416,8 @@ function BuildKit.Billboard(adornee: BasePart, text: string, props: { [string]: 
 	label.BackgroundTransparency = 1
 	label.Text = text
 	label.TextScaled = true
-	label.Font = props.Font or Enum.Font.FredokaOne
-	label.TextColor3 = props.Color or Color3.new(1, 1, 1)
+	label.Font = p.Font or Enum.Font.FredokaOne
+	label.TextColor3 = p.Color or Color3.new(1, 1, 1)
 	local stroke = Instance.new("UIStroke")
 	stroke.Thickness = 2.5
 	stroke.Parent = label
@@ -3425,21 +3428,21 @@ end
 
 -- Text painted on the face of a part
 function BuildKit.SurfaceText(part: BasePart, face: Enum.NormalId, text: string, props: { [string]: any }?)
-	props = props or {}
+	local p: { [string]: any } = props or {}
 	local gui = Instance.new("SurfaceGui")
 	gui.Face = face
 	gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-	gui.PixelsPerStud = props.PixelsPerStud or 30
+	gui.PixelsPerStud = p.PixelsPerStud or 30
 	gui.LightInfluence = 0
-	gui.Brightness = props.Brightness or 1.5
+	gui.Brightness = p.Brightness or 1.5
 	local label = Instance.new("TextLabel")
 	label.Name = "Label"
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 1
 	label.Text = text
 	label.TextScaled = true
-	label.Font = props.Font or Enum.Font.FredokaOne
-	label.TextColor3 = props.Color or Color3.new(1, 1, 1)
+	label.Font = p.Font or Enum.Font.FredokaOne
+	label.TextColor3 = p.Color or Color3.new(1, 1, 1)
 	local stroke = Instance.new("UIStroke")
 	stroke.Thickness = 3
 	stroke.Parent = label
@@ -4506,7 +4509,6 @@ function handlers.Tornado(by: string?)
 	local mid = Vector3.new(rng:NextNumber(-150, 150), 0, rng:NextNumber(-150, 150))
 	local b = a + math.pi + rng:NextNumber(-0.6, 0.6)
 	local endPos = Vector3.new(math.cos(b) * 700, 0, math.sin(b) * 700)
-	local path = { startPos, mid, endPos }
 	local total = (mid - startPos).Magnitude + (endPos - mid).Magnitude
 
 	local model, core = persistentCore("Tornado", "Tornado", startPos)
@@ -5169,7 +5171,7 @@ local function getHumanoid(player: Player): Humanoid?
 end
 
 local function rebirthScale(player: Player): number
-	return 1 + (player:GetAttribute("Rebirths") or 0)
+	return 1 + (tonumber(player:GetAttribute("Rebirths")) or 0)
 end
 
 -- the bigger of a fixed minimum (scaled by rebirths) or N seconds of the player's income
@@ -6809,7 +6811,7 @@ function RewardService:Init(services)
 end
 
 local function incomeCash(player: Player, minutes: number, minimum: number): number
-	return math.max(minimum * (1 + (player:GetAttribute("Rebirths") or 0)), S.TycoonService:GetIncome(player) * minutes * 60)
+	return math.max(minimum * (1 + (tonumber(player:GetAttribute("Rebirths")) or 0)), S.TycoonService:GetIncome(player) * minutes * 60)
 end
 
 function RewardService:GetDailyReward(player: Player, streak: number): number
@@ -6894,7 +6896,6 @@ return RewardService
 	permanently builds a relic in your tower (+5% income, survives rebirths).
 ]]
 local BadgeService = game:GetService("BadgeService")
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -7061,7 +7062,6 @@ local BuildKit = require(script.Parent.BuildKit)
 
 local Part = BuildKit.Part
 local FH = Config.Tycoon.FloorHeight
-local FLOORS = Config.Tycoon.Floors
 
 local TycoonBuilder = {}
 
@@ -9976,8 +9976,8 @@ local C
 
 local commandBox: TextBox
 local resultLabel: TextLabel
-local pages = {}
-local tabButtons = {}
+local pages: { [string]: ScrollingFrame } = {}
+local tabButtons: { [string]: TextButton } = {}
 local currentTab = "Commands"
 
 ---------------------------------------------------------------------------
@@ -10484,7 +10484,6 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
 local Animator = {}
-local C
 
 local spinning: { [BasePart]: { Base: CFrame, Speed: number, Phase: number, Spin: boolean, Bob: boolean } } = {}
 local pulsing: { [BasePart]: { Color: Color3, Phase: number } } = {}
@@ -10493,10 +10492,11 @@ local uiSpin: { [GuiObject]: boolean } = {}
 local lowGraphics = false
 local RANGE = 260
 
-local function track(part: Instance)
-	if not part:IsA("BasePart") or spinning[part] then
+local function track(instance: Instance)
+	if not instance:IsA("BasePart") or spinning[instance :: BasePart] then
 		return
 	end
+	local part = instance :: BasePart
 	spinning[part] = {
 		Base = part.CFrame,
 		Speed = 1.2 + math.random() * 0.8,
@@ -10555,8 +10555,7 @@ function Animator:SetLowGraphics(enabled: boolean)
 	end
 end
 
-function Animator:Init(controllers)
-	C = controllers
+function Animator:Init()
 	for _, tag in { "Spin", "Bob" } do
 		for _, part in CollectionService:GetTagged(tag) do
 			track(part)
@@ -14905,7 +14904,7 @@ function effects.BuildIn(params)
 		return
 	end
 	local parts = {}
-	for _, d in model:GetDescendants() do
+	for _, d in (model :: Instance):GetDescendants() do
 		if d:IsA("BasePart") and not d:HasTag("Spin") and not d:HasTag("Bob") then
 			table.insert(parts, d)
 		end

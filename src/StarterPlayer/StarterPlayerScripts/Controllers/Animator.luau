@@ -13,7 +13,6 @@ local RunService = game:GetService("RunService")
 local player = Players.LocalPlayer
 
 local Animator = {}
-local C
 
 local spinning: { [BasePart]: { Base: CFrame, Speed: number, Phase: number, Spin: boolean, Bob: boolean } } = {}
 local pulsing: { [BasePart]: { Color: Color3, Phase: number } } = {}
@@ -22,10 +21,11 @@ local uiSpin: { [GuiObject]: boolean } = {}
 local lowGraphics = false
 local RANGE = 260
 
-local function track(part: Instance)
-	if not part:IsA("BasePart") or spinning[part] then
+local function track(instance: Instance)
+	if not instance:IsA("BasePart") or spinning[instance :: BasePart] then
 		return
 	end
+	local part = instance :: BasePart
 	spinning[part] = {
 		Base = part.CFrame,
 		Speed = 1.2 + math.random() * 0.8,
@@ -84,8 +84,7 @@ function Animator:SetLowGraphics(enabled: boolean)
 	end
 end
 
-function Animator:Init(controllers)
-	C = controllers
+function Animator:Init()
 	for _, tag in { "Spin", "Bob" } do
 		for _, part in CollectionService:GetTagged(tag) do
 			track(part)

@@ -23,8 +23,8 @@ local C
 
 local commandBox: TextBox
 local resultLabel: TextLabel
-local pages = {}
-local tabButtons = {}
+local pages: { [string]: ScrollingFrame } = {}
+local tabButtons: { [string]: TextButton } = {}
 local currentTab = "Commands"
 
 ---------------------------------------------------------------------------

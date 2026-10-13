@@ -43,21 +43,24 @@ local FUNCTIONS = {
 
 local folder: Folder
 if RunService:IsServer() then
-	folder = ReplicatedStorage:FindFirstChild("Remotes") :: Folder
-	if not folder then
-		folder = Instance.new("Folder")
-		folder.Name = "Remotes"
+	local existing = ReplicatedStorage:FindFirstChild("Remotes")
+	if existing then
+		folder = existing :: Folder
+	else
+		local created = Instance.new("Folder")
+		created.Name = "Remotes"
 		for _, name in EVENTS do
 			local remote = Instance.new("RemoteEvent")
 			remote.Name = name
-			remote.Parent = folder
+			remote.Parent = created
 		end
 		for _, name in FUNCTIONS do
 			local remote = Instance.new("RemoteFunction")
 			remote.Name = name
-			remote.Parent = folder
+			remote.Parent = created
 		end
-		folder.Parent = ReplicatedStorage
+		created.Parent = ReplicatedStorage
+		folder = created
 	end
 else
 	folder = ReplicatedStorage:WaitForChild("Remotes") :: Folder

@@ -46,7 +46,7 @@ function RewardService:Init(services)
 end
 
 local function incomeCash(player: Player, minutes: number, minimum: number): number
-	return math.max(minimum * (1 + (player:GetAttribute("Rebirths") or 0)), S.TycoonService:GetIncome(player) * minutes * 60)
+	return math.max(minimum * (1 + (tonumber(player:GetAttribute("Rebirths")) or 0)), S.TycoonService:GetIncome(player) * minutes * 60)
 end
 
 function RewardService:GetDailyReward(player: Player, streak: number): number

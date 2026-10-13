@@ -288,7 +288,7 @@ function effects.BuildIn(params)
 		return
 	end
 	local parts = {}
-	for _, d in model:GetDescendants() do
+	for _, d in (model :: Instance):GetDescendants() do
 		if d:IsA("BasePart") and not d:HasTag("Spin") and not d:HasTag("Bob") then
 			table.insert(parts, d)
 		end

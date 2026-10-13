@@ -4,7 +4,6 @@
 	permanently builds a relic in your tower (+5% income, survives rebirths).
 ]]
 local BadgeService = game:GetService("BadgeService")
-local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")

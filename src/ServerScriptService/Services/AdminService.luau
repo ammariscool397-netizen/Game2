@@ -68,7 +68,7 @@ local function computeRank(player: Player): number
 end
 
 function AdminService:GetRank(player: Player): number
-	return player:GetAttribute("AdminRank") or 0
+	return tonumber(player:GetAttribute("AdminRank")) or 0
 end
 
 local function filterBroadcast(text: string, from: Player): string?
@@ -86,8 +86,8 @@ local function parseAmount(text: string?): number?
 	if not text then
 		return nil
 	end
-	text = text:lower():gsub(",", "")
-	local number, suffix = text:match("^(%-?[%d%.]+)(%a*)$")
+	local clean = ((text :: string):lower():gsub(",", ""))
+	local number, suffix = clean:match("^(%-?[%d%.]+)(%a*)$")
 	number = Util.Number(number)
 	if not number then
 		return nil
@@ -120,7 +120,7 @@ local function resolvePlayers(executor: Player, selector: string?): { Player }
 			table.insert(result, p)
 		end
 	end
-	for _, token in selector:lower():split(",") do
+	for _, token in (selector :: string):lower():split(",") do
 		if token == "me" then
 			add(executor)
 		elseif token == "all" or token == "everyone" then
@@ -1085,7 +1085,7 @@ function AdminService:Execute(executor: Player, text: string): (boolean, string)
 	if #args == 0 then
 		return false, "Type a command"
 	end
-	local name = table.remove(args, 1):lower()
+	local name = (table.remove(args, 1) :: string):lower()
 	local command = byName[name]
 	if not command then
 		return false, "Unknown command '" .. name .. "'. Try " .. prefix .. "cmds"

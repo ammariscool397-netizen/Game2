@@ -48,6 +48,15 @@ jobs:
       - name: Build place file
         run: rojo build default.project.json -o MegaTycoon.rbxlx
 
+      - name: Type check (luau-lsp)
+        run: |
+          curl -sSL -o lsp.zip https://github.com/JohnnyMorganz/luau-lsp/releases/download/1.32.1/luau-lsp-linux.zip
+          unzip -o lsp.zip -d "$HOME/bin"
+          chmod +x "$HOME/bin/luau-lsp"
+          curl -sSL -o globalTypes.d.luau https://raw.githubusercontent.com/JohnnyMorganz/luau-lsp/1.32.1/scripts/globalTypes.d.luau
+          rojo sourcemap default.project.json -o sourcemap.json
+          luau-lsp analyze --definitions=globalTypes.d.luau --sourcemap=sourcemap.json --no-strict-dm-types src
+
       - name: Gameplay simulation tests
         run: lune run tests/sim/run.luau -- MegaTycoon.rbxlx
 
