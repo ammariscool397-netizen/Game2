@@ -10,7 +10,7 @@ lune run tests/sim/run.luau -- MegaTycoon.rbxlx              # every scenario
 lune run tests/sim/run.luau -- MegaTycoon.rbxlx quests       # one scenario
 lune run tests/sim/run.luau -- MegaTycoon.rbxlx quests --verbose
 SIM_SIGNAL_ORDER=reverse SIM_SEED=7 lune run tests/sim/run.luau -- MegaTycoon.rbxlx
-SIM_SLOW=1 lune run tests/sim/run.luau -- MegaTycoon.rbxlx    # + slow ones (8-hour soak)
+SIM_SLOW=1 lune run tests/sim/run.luau -- MegaTycoon.rbxlx    # + slow ones (5-hour soak)
 ```
 
 A scenario fails on any script error (server or client), failed check, or warning

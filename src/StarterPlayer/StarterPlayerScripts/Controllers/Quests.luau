@@ -92,6 +92,7 @@ local function render()
 		end
 	end
 	title.Text = (collapsed and "▸ " or "▾ ") .. "📜 QUESTS" .. (ready > 0 and ("  (" .. ready .. " ready!)") or "")
+	tracker.Visible = #Quests.List > 0 and not player:GetAttribute("InMinigame")
 	rowsFrame.Visible = not collapsed
 	local height = 30 + (collapsed and 0 or (#Quests.List * (ROW_HEIGHT + 6)))
 	TweenService:Create(tracker, TweenInfo.new(0.2), { Size = UDim2.fromOffset(300, height) }):Play()
@@ -154,7 +155,7 @@ function Quests:Init(controllers)
 	end)
 	-- out of the way during minigames
 	player:GetAttributeChangedSignal("InMinigame"):Connect(function()
-		tracker.Visible = not player:GetAttribute("InMinigame")
+		tracker.Visible = #self.List > 0 and not player:GetAttribute("InMinigame")
 	end)
 	render()
 end

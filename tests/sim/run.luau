@@ -2,7 +2,7 @@
 	Runs the Mega Tycoon simulation tests.
 	  lune run tests/sim/run.luau [place.rbxlx] [scenario] [--verbose]
 	Without a scenario name, every scenario runs in its own process
-	(slow ones like the 8-hour soak only with SIM_SLOW=1).
+	(slow ones like the 5-hour soak only with SIM_SLOW=1).
 ]]
 local process = require("@lune/process")
 local stdio = require("@lune/stdio")

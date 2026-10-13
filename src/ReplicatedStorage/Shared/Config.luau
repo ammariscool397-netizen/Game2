@@ -522,6 +522,12 @@ Config.Tips = {
 	"Minigames start every few minutes - join them for big rewards!",
 	"You earn cash while offline. Come back to collect it!",
 	"Codes can be redeemed in the Codes menu. Try RELEASE!",
+	"Finish quests (bottom right) for big rewards - a new one appears every time you claim!",
+	"Stay in the server: playtime gifts open during your first hour.",
+	"Follow the glowing beam - it points to the next upgrade you can afford.",
+	"Playing with friends? Every friend in the server gives +10% income!",
+	"Every 45 minutes there's a 2x CASH HOUR for everyone.",
+	"Earthquakes dig up cash geodes - grab them before they vanish!",
 }
 
 return Config

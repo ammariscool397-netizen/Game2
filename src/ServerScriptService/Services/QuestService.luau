@@ -281,6 +281,12 @@ end
 
 function QuestService:Init(services)
 	S = services
+	if not QC.Enabled then
+		Remotes.ClaimQuest.OnServerInvoke = function()
+			return false, "Quests are turned off."
+		end
+		return
+	end
 	Remotes.ClaimQuest.OnServerInvoke = function(player, slot)
 		return self:Claim(player, slot)
 	end
@@ -297,6 +303,9 @@ function QuestService:Init(services)
 end
 
 function QuestService:Start()
+	if not QC.Enabled then
+		return
+	end
 	-- batch updates (income progress changes every second)
 	while true do
 		task.wait(1)

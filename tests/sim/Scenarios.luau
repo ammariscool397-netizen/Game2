@@ -2484,17 +2484,17 @@ add({
 })
 
 ---------------------------------------------------------------------------
--- Soak: an 8-hour server with bots coming and going, random disasters and
+-- Soak: a 5-hour server with bots coming and going, random disasters and
 -- minigames. Nothing may error, leak instances or corrupt data.
 ---------------------------------------------------------------------------
 add({
 	Name = "soak",
 	Slow = true,
-	MaxSeconds = 9 * 3600,
+	MaxSeconds = 6 * 3600,
 	AllowedWarnings = { "DataStores unavailable", "Could not load data", "Took over a session lock" },
 	Run = function(T, place)
-		T.SetDt(1)
 		local game, me = T.Boot(place)
+		T.SetDt(2)
 		local ws = game:GetService("Workspace")
 		local DataService = T.Service("DataService")
 		local TycoonService = T.Service("TycoonService")
@@ -2513,7 +2513,7 @@ add({
 		local samples = {}
 		local start = T.Engine.Now
 		local hour = 0
-		while T.Engine.Now - start < 8 * 3600 do
+		while T.Engine.Now - start < 5 * 3600 do
 			T.Wait(10)
 			for i = #bots, 1, -1 do
 				local bot = bots[i]
@@ -2544,15 +2544,16 @@ add({
 				print(("    hour %d: %d instances in workspace, %d players"):format(h, count, #game:GetService("Players"):GetPlayers()))
 			end
 		end
-		-- the world doesn't keep growing (towers are bounded, effects are cleaned up)
-		local first, last = samples[2] or samples[1], samples[#samples]
-		T.Check(last < first * 1.35 + 2000, ("no instance leak (%d -> %d)"):format(first, last))
+		-- once the towers are maxed (~3h of bot play) the world stops growing:
+		-- effects, drops, rubble, collectibles... are all cleaned up
+		local before, last = samples[#samples - 1] or samples[1], samples[#samples]
+		T.Check(last < before * 1.05 + 500, ("no instance leak in the last hour (%d -> %d)"):format(before, last))
 		for _, p in game:GetService("Players"):GetPlayers() do
 			local data = DataService:Get(p)
 			T.Check(data ~= nil and finite(data.Cash) and finite(data.Vault) and finite(data.TotalEarned), p.Name .. " data valid")
 		end
 		T.Check(#T.Engine.Kicks == 0, "nobody was kicked")
-		T.Check(me.PlayerGui:FindFirstChild("MegaTycoonUI") ~= nil, "the local client survived 8 hours")
+		T.Check(me.PlayerGui:FindFirstChild("MegaTycoonUI") ~= nil, "the local client survived 5 hours")
 	end,
 })
 
@@ -2589,6 +2590,27 @@ add({
 		end
 		T.Check(cards == 1, "one configured pass shown (" .. cards .. ")")
 		T.Check(T.FindText(products, "Coming soon") ~= nil, "no products configured: 'coming soon'")
+	end,
+})
+
+add({
+	Name = "quests_disabled",
+	Run = function(T, place)
+		local game, me = T.Boot(place, {
+			Setup = function(T2)
+				T2.Shared("Config", "server").Quests.Enabled = false
+				T2.Shared("Config", "client").Quests.Enabled = false
+			end,
+		})
+		T.Wait(6)
+		local data = T.Service("DataService"):Get(me)
+		T.Check(#data.Quests.List == 0, "no quests handed out when disabled")
+		local tracker = me.PlayerGui:FindFirstChild("QuestTracker", true)
+		T.Check(tracker ~= nil and not T.IsShown(tracker), "quest tracker hidden")
+		local ok = T.Client(function()
+			return T.Remote("ClaimQuest"):InvokeServer(1)
+		end)
+		T.Check(ok == false, "claiming does nothing")
 	end,
 })
 

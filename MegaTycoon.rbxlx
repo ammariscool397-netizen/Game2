@@ -936,6 +936,12 @@ Config.Tips = {
 	"Minigames start every few minutes - join them for big rewards!",
 	"You earn cash while offline. Come back to collect it!",
 	"Codes can be redeemed in the Codes menu. Try RELEASE!",
+	"Finish quests (bottom right) for big rewards - a new one appears every time you claim!",
+	"Stay in the server: playtime gifts open during your first hour.",
+	"Follow the glowing beam - it points to the next upgrade you can afford.",
+	"Playing with friends? Every friend in the server gives +10% income!",
+	"Every 45 minutes there's a 2x CASH HOUR for everyone.",
+	"Earthquakes dig up cash geodes - grab them before they vanish!",
 }
 
 return Config
@@ -6993,6 +6999,12 @@ end
 
 function QuestService:Init(services)
 	S = services
+	if not QC.Enabled then
+		Remotes.ClaimQuest.OnServerInvoke = function()
+			return false, "Quests are turned off."
+		end
+		return
+	end
 	Remotes.ClaimQuest.OnServerInvoke = function(player, slot)
 		return self:Claim(player, slot)
 	end
@@ -7009,6 +7021,9 @@ function QuestService:Init(services)
 end
 
 function QuestService:Start()
+	if not QC.Enabled then
+		return
+	end
 	-- batch updates (income progress changes every second)
 	while true do
 		task.wait(1)
@@ -14570,6 +14585,7 @@ local function render()
 		end
 	end
 	title.Text = (collapsed and "▸ " or "▾ ") .. "📜 QUESTS" .. (ready > 0 and ("  (" .. ready .. " ready!)") or "")
+	tracker.Visible = #Quests.List > 0 and not player:GetAttribute("InMinigame")
 	rowsFrame.Visible = not collapsed
 	local height = 30 + (collapsed and 0 or (#Quests.List * (ROW_HEIGHT + 6)))
 	TweenService:Create(tracker, TweenInfo.new(0.2), { Size = UDim2.fromOffset(300, height) }):Play()
@@ -14632,7 +14648,7 @@ function Quests:Init(controllers)
 	end)
 	-- out of the way during minigames
 	player:GetAttributeChangedSignal("InMinigame"):Connect(function()
-		tracker.Visible = not player:GetAttribute("InMinigame")
+		tracker.Visible = #self.List > 0 and not player:GetAttribute("InMinigame")
 	end)
 	render()
 end
