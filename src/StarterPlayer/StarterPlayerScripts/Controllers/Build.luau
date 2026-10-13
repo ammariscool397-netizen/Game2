@@ -114,6 +114,11 @@ local function computeGains()
 	end
 end
 
+local function pct(x: number): string
+	return tostring(math.floor(x * 100 + 0.5)) .. "%"
+end
+
+-- (numbers come from TycoonItems so the text always matches the real math)
 local function describe(item): string
 	local kind = item.Kind
 	if kind == "Dropper" then
@@ -125,26 +130,25 @@ local function describe(item): string
 	elseif kind == "Generator" then
 		return "Passive cash machine"
 	elseif kind == "Conveyor" then
-		return "+15% drop income on this floor"
+		return "+" .. pct(TycoonItems.ConveyorBonus) .. " drop income on this floor"
 	elseif kind == "Boost" then
 		return "x" .. item.Multiplier .. " everything on this floor"
 	elseif kind == "Decor" then
-		return "+2% income on this floor"
+		return "+" .. pct(TycoonItems.DecorBonus) .. " income on this floor"
 	elseif kind == "Wall" then
-		return "+1% income on this floor"
+		return "+" .. pct(TycoonItems.WallBonus) .. " income on this floor"
 	elseif kind == "Unlock" then
 		return item.Floor == 1 and "Your starting base" or "Opens a whole new floor!"
 	elseif kind == "Special" then
+		local bonus = pct(item.Bonus or TycoonItems.SpecialBonus)
 		if item.Effect == "Bunker" then
-			return "Nuke-proof bunker + 8% ALL income"
+			return "Nuke-proof bunker + " .. bonus .. " ALL income"
 		elseif item.Effect == "Shield" then
-			return "Protects your tower from ALL disasters + 8%"
+			return "Protects your tower from ALL disasters + " .. bonus
 		end
-		return "+8% ALL income"
-	elseif kind == "Trophy" then
-		return "+8% ALL income"
-	elseif kind == "Roof" then
-		return "+10% ALL income"
+		return "+" .. bonus .. " ALL income"
+	elseif kind == "Trophy" or kind == "Roof" then
+		return "+" .. pct(item.Bonus or 0) .. " ALL income"
 	end
 	return ""
 end

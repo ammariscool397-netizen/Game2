@@ -930,6 +930,9 @@ function TycoonService:Rebirth(player: Player, free: boolean?)
 	self:Rebuild(player)
 	if S.QuestService then
 		S.QuestService:Refresh(player)
+		if plot and plot.Partner then
+			S.QuestService:Refresh(plot.Partner) -- the tower they build was reset too
+		end
 	end
 
 	Remotes.VFX:FireClient(player, "Rebirth", { Rebirths = data.Rebirths })
