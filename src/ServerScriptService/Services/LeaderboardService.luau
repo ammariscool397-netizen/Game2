@@ -97,7 +97,7 @@ function LeaderboardService:Refresh()
 			for _, entry in pages:GetCurrentPage() do
 				local userId = tonumber(entry.key)
 				if userId then
-					table.insert(rows, { Name = nameFor(userId), Value = entry.value })
+					table.insert(rows, { Name = nameFor(userId), Value = S.DataService.DecodeEarned(entry.value) })
 				end
 			end
 		end

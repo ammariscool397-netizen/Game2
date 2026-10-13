@@ -430,6 +430,60 @@ function effects.Flash()
 	VFX:Flash(Color3.new(1, 1, 1), 0.5)
 end
 
+function effects.ShieldHit(params)
+	local center, radius = params.Center, params.Radius or 130
+	if typeof(center) ~= "Vector3" then
+		return
+	end
+	local sphere = localPart({
+		Shape = Enum.PartType.Ball,
+		Size = Vector3.one * radius * 2,
+		Position = center,
+		Color = Color3.fromRGB(120, 220, 255),
+		Material = Enum.Material.ForceField,
+		Transparency = 0,
+	})
+	TweenService:Create(sphere, TweenInfo.new(2.5, Enum.EasingStyle.Quad), { Transparency = 1, Size = Vector3.one * radius * 2.08 }):Play()
+	Debris:AddItem(sphere, 2.6)
+end
+
+function effects.SecretFound(params)
+	local color = params.Color or Color3.fromRGB(255, 220, 80)
+	VFX:Flash(color, 0.8)
+	VFX:ScreenConfetti(90)
+	UIKit.PlaySound("Win", 0.6, 1.1)
+	local label = UIKit.Label({
+		Text = "🕵️ SECRET FOUND!",
+		Size = UDim2.fromOffset(640, 90),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.34),
+		TextColor3 = color,
+		ZIndex = 48,
+		Parent = C.UI.FX,
+	})
+	local sub = UIKit.Label({
+		Text = tostring(params.Name) .. "  (" .. tostring(params.Count) .. "/" .. tostring(params.Total) .. ")",
+		Size = UDim2.fromOffset(640, 40),
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.42),
+		ZIndex = 48,
+		Parent = C.UI.FX,
+	})
+	for _, l in { label, sub } do
+		local scale = UIKit.new("UIScale", { Scale = 0, Parent = l })
+		TweenService:Create(scale, TweenInfo.new(0.6, Enum.EasingStyle.Elastic, Enum.EasingDirection.Out), { Scale = 1 }):Play()
+	end
+	task.delay(3, function()
+		for _, l in { label, sub } do
+			TweenService:Create(l, TweenInfo.new(0.5), { TextTransparency = 1 }):Play()
+			Debris:AddItem(l, 0.6)
+		end
+	end)
+	if params.Cash then
+		VFX:CashToCounter(params.Cash)
+	end
+end
+
 function effects.SpeedLines(params)
 	local cam = camera()
 	local baseFov = 70

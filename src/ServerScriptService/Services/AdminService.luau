@@ -726,6 +726,140 @@ local function buildCommands()
 		end,
 	})
 
+	-- disasters
+	local function disasterCommand(name, aliases, kind, desc)
+		register({
+			Name = name,
+			Aliases = aliases,
+			Rank = 2,
+			Args = "",
+			Desc = desc,
+			Run = function(executor)
+				if not S.DisasterService then
+					return "Disasters unavailable"
+				end
+				return S.DisasterService:Trigger(kind, executor.DisplayName)
+			end,
+		})
+	end
+	disasterCommand("nuke", { "nuclear", "bomb" }, "Nuke", "Launch a nuke (30s warning, bunkers save you)")
+	disasterCommand("meteors", { "meteorstorm" }, "Meteors", "Start a meteor storm")
+	disasterCommand("tornado", { "twister" }, "Tornado", "Summon a tornado")
+	disasterCommand("ufo", { "aliens", "invasion" }, "UFO", "Start a UFO invasion")
+	register({
+		Name = "stopdisaster",
+		Aliases = { "stopevent", "calm" },
+		Rank = 2,
+		Args = "",
+		Desc = "Stop the current disaster",
+		Run = function()
+			return S.DisasterService and S.DisasterService:Stop() or "Disasters unavailable"
+		end,
+	})
+	register({
+		Name = "repair",
+		Aliases = { "fix" },
+		Rank = 2,
+		Args = "<player>",
+		Desc = "Instantly repair wrecked upgrades",
+		Run = function(executor, args)
+			local total = 0
+			local affected = eachTarget(executor, args[1], false, function(target)
+				total += S.TycoonService:RepairAll(target)
+			end)
+			return "Repaired " .. total .. " items for " .. namesOf(affected)
+		end,
+	})
+	register({
+		Name = "wreck",
+		Aliases = { "damage" },
+		Rank = 2,
+		Args = "<player> [percent]",
+		Desc = "Wreck part of a tower (test the repair system)",
+		Run = function(executor, args)
+			local percent = math.clamp(tonumber(args[2]) or 25, 1, 100)
+			local total = 0
+			local affected = eachTarget(executor, args[1], true, function(target)
+				local plot = S.TycoonService:GetPlot(target)
+				if plot then
+					total += S.TycoonService:KnockOutFraction(plot, percent / 100, Config.Disasters.Nuke.KnockoutSeconds)
+				end
+			end)
+			return "Wrecked " .. total .. " items: " .. namesOf(affected)
+		end,
+	})
+	register({
+		Name = "floor",
+		Aliases = { "gofloor" },
+		Rank = 1,
+		Args = "<1-9>",
+		Desc = "Teleport to a floor of your tower (9 = roof)",
+		Run = function(executor, args)
+			local plot = S.TycoonService:GetPlot(executor)
+			if not plot then
+				return "You have no tower"
+			end
+			S.TycoonService:TeleportToFloor(executor, plot.Index, tonumber(args[1]) or 1)
+			return "Teleported"
+		end,
+	})
+	register({
+		Name = "unlockfloor",
+		Aliases = { "buildto" },
+		Rank = 2,
+		Args = "<player> <floor>",
+		Desc = "Instantly build a tower up to a floor",
+		Run = function(executor, args)
+			local floor = math.clamp(math.floor(tonumber(args[2]) or 1), 1, Config.Tycoon.Floors + 1)
+			local affected = eachTarget(executor, args[1], false, function(target)
+				S.TycoonService:UnlockAll(target, floor)
+			end)
+			return "Built up to floor " .. floor .. ": " .. namesOf(affected)
+		end,
+	})
+	register({
+		Name = "givesecrets",
+		Aliases = { "allsecrets" },
+		Rank = 2,
+		Args = "<player>",
+		Desc = "Unlock all 12 secrets",
+		Run = function(executor, args)
+			local affected = eachTarget(executor, args[1], false, function(target)
+				S.SecretService:FindAll(target)
+			end)
+			return "Gave all secrets to " .. namesOf(affected)
+		end,
+	})
+	register({
+		Name = "duo",
+		Aliases = { "forceduo" },
+		Rank = 2,
+		Args = "<host> <partner>",
+		Desc = "Put two players in a duo",
+		Run = function(executor, args)
+			local host = resolvePlayers(executor, args[1])[1]
+			local partner = args[2] and resolvePlayers(executor, args[2])[1]
+			if not host or not partner or host == partner then
+				return "Usage: duo <host> <partner>"
+			end
+			local _, message = S.DuoService:Join(host, partner)
+			return message
+		end,
+	})
+	register({
+		Name = "unduo",
+		Aliases = { "breakduo" },
+		Rank = 2,
+		Args = "<player>",
+		Desc = "End a player's duo",
+		Run = function(executor, args)
+			local affected = eachTarget(executor, args[1], false, function(target)
+				S.DuoService:Leave(target)
+			end)
+			return "Ended duo: " .. namesOf(affected)
+		end,
+	})
+
 	---------------- Head Admin (3) ----------------
 	register({
 		Name = "ban",
@@ -778,6 +912,19 @@ local function buildCommands()
 		end,
 	})
 	register({
+		Name = "resetsecrets",
+		Aliases = {},
+		Rank = 3,
+		Args = "<player>",
+		Desc = "Forget all found secrets",
+		Run = function(executor, args)
+			local affected = eachTarget(executor, args[1], true, function(target)
+				S.SecretService:Reset(target)
+			end)
+			return "Reset secrets: " .. namesOf(affected)
+		end,
+	})
+	register({
 		Name = "resetdata",
 		Aliases = { "wipe" },
 		Rank = 3,
@@ -787,6 +934,7 @@ local function buildCommands()
 			local affected = eachTarget(executor, args[1], true, function(target)
 				S.DataService:ResetData(target)
 				S.TycoonService:Rebuild(target)
+				S.DataService:Sync(target)
 			end)
 			return "Reset " .. namesOf(affected)
 		end,

@@ -10,7 +10,7 @@ local EVENTS = {
 	"Announce", -- server -> all    { Title, Text, Color }
 	"VFX", -- server -> client  (effectName, params)
 	"Music", -- server -> client  (action, params)
-	"ClientCommand", -- server -> client  (command, ...) used by admin fly/noclip/etc
+	"ClientCommand", -- server -> client  (command, ...) fly/noclip/fling/launch/abduct/openfloors...
 	"MinigameState", -- server -> client  state table
 	"MinigameJoin", -- client -> server
 	"RequestRebirth", -- client -> server
@@ -18,6 +18,14 @@ local EVENTS = {
 	"BuyProduct", -- client -> server  (productKey)
 	"GoHome", -- client -> server
 	"SaveSettings", -- client -> server  (settings)
+	"TycoonUpdate", -- server -> client  { Type = "Bought"|"Reset"|"Disabled"|"Repaired"|"Secret", ... }
+	"BuyAll", -- client -> server
+	"TeleportFloor", -- client -> server  (plotIndex, floor)
+	"Disaster", -- server -> client  disaster state
+	"DuoInvite", -- client -> server  (targetUserId)
+	"DuoRespond", -- client -> server  (hostUserId, accept)
+	"DuoLeave", -- client -> server  (kick partner if host / leave if partner)
+	"DuoInvited", -- server -> client  { HostName, HostUserId, Timeout }
 }
 
 local FUNCTIONS = {
@@ -25,7 +33,8 @@ local FUNCTIONS = {
 	"ClaimDaily", -- () -> ok, message
 	"AdminCommand", -- (text) -> ok, message
 	"AdminData", -- (what) -> data
-	"GetLeaderboard", -- () -> rows
+	"BuyItem", -- (itemId) -> ok, message
+	"GetTycoonState", -- () -> state
 }
 
 local folder: Folder

@@ -1,0 +1,73 @@
+# Builds the place with Rojo and uploads it to your Roblox game with Open Cloud.
+#
+# One-time setup (see README "Auto-publish to Roblox"):
+#   1. Publish the place once from Studio (File > Publish to Roblox) so the game exists.
+#   2. Creator Dashboard > Open Cloud > API Keys > Create API Key:
+#        Access permissions: "universe-places" (Place Publishing) -> Write, for your experience.
+#        IP restrictions: add 0.0.0.0/0 (GitHub runners use changing IPs).
+#   3. GitHub repo > Settings > Secrets and variables > Actions:
+#        Secret   ROBLOX_API_KEY      = the API key
+#        Variable ROBLOX_UNIVERSE_ID  = your experience's Universe ID
+#        Variable ROBLOX_PLACE_ID     = your place ID
+#
+# Every push saves a new version of the place ("Saved" = not live yet, open it in
+# Studio to see it). Run the workflow manually with "Published" to make it live.
+name: Build & publish to Roblox
+
+on:
+  push:
+    branches: [main, master, "claude/**"]
+  workflow_dispatch:
+    inputs:
+      versionType:
+        description: "Saved = new version, not live yet. Published = live for players."
+        required: true
+        default: Saved
+        type: choice
+        options: [Saved, Published]
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rojo
+        run: |
+          curl -sSL -o rojo.zip https://github.com/rojo-rbx/rojo/releases/download/v7.4.4/rojo-7.4.4-linux-x86_64.zip
+          mkdir -p "$HOME/bin"
+          unzip -o rojo.zip -d "$HOME/bin"
+          chmod +x "$HOME/bin/rojo"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Build place file
+        run: rojo build default.project.json -o MegaTycoon.rbxlx
+
+      - name: Upload place file as an artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MegaTycoon-place
+          path: MegaTycoon.rbxlx
+
+      - name: Publish to Roblox (Open Cloud)
+        env:
+          ROBLOX_API_KEY: ${{ secrets.ROBLOX_API_KEY }}
+          UNIVERSE_ID: ${{ vars.ROBLOX_UNIVERSE_ID }}
+          PLACE_ID: ${{ vars.ROBLOX_PLACE_ID }}
+          VERSION_TYPE: ${{ github.event.inputs.versionType || 'Saved' }}
+        run: |
+          if [ -z "$ROBLOX_API_KEY" ] || [ -z "$UNIVERSE_ID" ] || [ -z "$PLACE_ID" ]; then
+            echo "::notice::Roblox publishing is not set up yet (add the ROBLOX_API_KEY secret and the ROBLOX_UNIVERSE_ID / ROBLOX_PLACE_ID variables). The place file was still built and attached as an artifact."
+            exit 0
+          fi
+          status=$(curl -sS -o response.json -w "%{http_code}" -X POST \
+            "https://apis.roblox.com/universes/v1/${UNIVERSE_ID}/places/${PLACE_ID}/versions?versionType=${VERSION_TYPE}" \
+            -H "x-api-key: ${ROBLOX_API_KEY}" \
+            -H "Content-Type: application/xml" \
+            --data-binary @MegaTycoon.rbxlx)
+          cat response.json; echo
+          if [ "$status" -ne 200 ]; then
+            echo "::error::Roblox publish failed (HTTP $status). Check the API key permissions, IP restrictions and IDs."
+            exit 1
+          fi
+          echo "::notice::Uploaded to Roblox as a ${VERSION_TYPE} version: $(cat response.json)"

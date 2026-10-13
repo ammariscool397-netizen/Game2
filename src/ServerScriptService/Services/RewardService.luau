@@ -43,10 +43,14 @@ function RewardService:Init(services)
 	end)
 end
 
+local function incomeCash(player: Player, minutes: number, minimum: number): number
+	return math.max(minimum * (1 + (player:GetAttribute("Rebirths") or 0)), S.TycoonService:GetIncome(player) * minutes * 60)
+end
+
 function RewardService:GetDailyReward(player: Player, streak: number): number
 	local rewards = Config.Daily.Rewards
-	local base = rewards[((streak - 1) % #rewards) + 1]
-	local amount = base * (1 + (player:GetAttribute("Rebirths") or 0))
+	local index = ((streak - 1) % #rewards) + 1
+	local amount = incomeCash(player, Config.Daily.IncomeMinutes[index] or 1, rewards[index])
 	if S.MonetizationService:HasPass(player, "VIP") then
 		amount *= 2
 	end
@@ -99,7 +103,7 @@ function RewardService:Redeem(player: Player, code: any): (boolean, string)
 	data.RedeemedCodes[code] = true
 	local parts = {}
 	if reward.Cash then
-		local amount = reward.Cash * (1 + data.Rebirths)
+		local amount = incomeCash(player, reward.IncomeMinutes or 0, reward.Cash)
 		S.DataService:AddCash(player, amount, false)
 		table.insert(parts, "+" .. Util.Money(amount))
 		Remotes.VFX:FireClient(player, "CashBurst", { Amount = amount })

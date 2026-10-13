@@ -41,6 +41,10 @@ local function untrack(part: Instance)
 	end
 end
 
+function Animator:IsLowGraphics(): boolean
+	return lowGraphics
+end
+
 function Animator:SetLowGraphics(enabled: boolean)
 	lowGraphics = enabled
 	for _, d in workspace:GetDescendants() do

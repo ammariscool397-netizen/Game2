@@ -359,6 +359,20 @@ local function buildServerPage()
 		{ "🔄 Free Rebirth (me)", Theme.Purple, "rebirth me", 200 },
 		{ "👑 VIP (me)", Theme.Accent, "givepass me VIP", 140 },
 	})
+	section("💥 Disasters")
+	buttonRow({
+		{ "☢️ NUKE", Theme.Red, "nuke", 120 },
+		{ "☄️ Meteors", Color3.fromRGB(255, 120, 0), "meteors", 130 },
+		{ "🌪️ Tornado", Color3.fromRGB(150, 160, 180), "tornado", 130 },
+		{ "🛸 UFOs", Theme.Green, "ufo", 110 },
+		{ "⏹ Stop", Theme.SubText, "stopdisaster", 100 },
+	})
+	buttonRow({
+		{ "🔧 Repair me", Theme.Accent2, "repair me", 150 },
+		{ "💥 Wreck me 25%", Theme.Red, "wreck me 25", 170 },
+		{ "🏢 Build to F4", Theme.Accent, "unlockfloor me 4", 160 },
+		{ "🕵️ All secrets", Theme.Purple, "givesecrets me", 160 },
+	})
 	section("🎮 Minigames")
 	buttonRow({
 		{ "🪙 Coin Rush", Theme.Accent, "minigame CoinRush" },

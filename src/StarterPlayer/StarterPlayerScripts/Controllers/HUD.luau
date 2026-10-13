@@ -1,4 +1,5 @@
---[[ HUD - cash counter, multiplier/boost info and the side menu buttons ]]
+--[[ HUD - cash counter, income, multiplier/boost info, floor indicator,
+	repair alert and the side menu buttons ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -19,9 +20,13 @@ local C
 
 local displayedCash = 0
 local cashLabel: TextLabel
+local incomeLabel: TextLabel
 local infoLabel: TextLabel
 local vaultLabel: TextLabel
 local boostLabel: TextLabel
+local floorLabel: TextLabel
+local repairFrame: Frame
+local repairLabel: TextLabel
 local menuButtons: { [string]: TextButton } = {}
 
 local animVersion = 0
@@ -42,10 +47,10 @@ local function animateCash(target: number)
 			task.wait()
 		end
 	end)
-	if target > start then
+	if target > start * 1.02 then
 		local scale = cashLabel:FindFirstChildOfClass("UIScale")
 		if scale then
-			scale.Scale = 1.12
+			scale.Scale = 1.08
 			TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Scale = 1 }):Play()
 		end
 	end
@@ -80,12 +85,13 @@ local function sideButton(parent: Instance, order: number, icon: string, text: s
 	return button, holder
 end
 
-function HUD:SetBadge(name: string, visible: boolean)
+function HUD:SetBadge(name: string, visible: boolean, text: string?)
 	local button = menuButtons[name]
 	if button then
 		local badge = button:FindFirstChild("Badge") :: TextLabel?
 		if badge then
 			badge.Visible = visible
+			badge.Text = text or "!"
 		end
 	end
 end
@@ -94,7 +100,6 @@ function HUD:Init(controllers)
 	C = controllers
 	local gui = C.UI.Gui
 
-	-- cash display (top centre)
 	local cashFrame = UIKit.new("Frame", {
 		Name = "Cash",
 		Size = UDim2.fromOffset(300, 64),
@@ -110,37 +115,51 @@ function HUD:Init(controllers)
 	cashLabel = UIKit.Label({ Text = "💵 $0", Size = UDim2.new(1, -20, 1, -12), Position = UDim2.fromOffset(10, 6), Parent = cashFrame })
 	UIKit.new("UIScale", { Parent = cashLabel })
 
-	infoLabel = UIKit.Label({
-		Text = "x1 cash • Rebirth 0",
-		Size = UDim2.fromOffset(300, 22),
-		Position = UDim2.new(0.5, 0, 0, 78),
-		AnchorPoint = Vector2.new(0.5, 0),
-		Font = Theme.BodyFont,
-		Parent = gui,
-	})
-	vaultLabel = UIKit.Label({
+	local function line(y: number, color: Color3?)
+		return UIKit.Label({
+			Text = "",
+			Size = UDim2.fromOffset(340, 20),
+			Position = UDim2.new(0.5, 0, 0, y),
+			AnchorPoint = Vector2.new(0.5, 0),
+			Font = Theme.BodyFont,
+			TextColor3 = color or Theme.Text,
+			Parent = gui,
+		})
+	end
+	incomeLabel = line(76, Color3.fromRGB(140, 255, 160))
+	infoLabel = line(97)
+	vaultLabel = line(118, Color3.fromRGB(255, 220, 90))
+	boostLabel = line(139, Color3.fromRGB(255, 140, 60))
+
+	floorLabel = UIKit.Label({
 		Text = "",
-		Size = UDim2.fromOffset(300, 20),
-		Position = UDim2.new(0.5, 0, 0, 100),
-		AnchorPoint = Vector2.new(0.5, 0),
-		Font = Theme.BodyFont,
-		TextColor3 = Color3.fromRGB(255, 220, 90),
+		Size = UDim2.fromOffset(220, 26),
+		Position = UDim2.new(1, -12, 0, 42),
+		AnchorPoint = Vector2.new(1, 0),
+		TextXAlignment = Enum.TextXAlignment.Right,
 		Parent = gui,
 	})
-	boostLabel = UIKit.Label({
-		Text = "",
-		Size = UDim2.fromOffset(300, 20),
-		Position = UDim2.new(0.5, 0, 0, 122),
-		AnchorPoint = Vector2.new(0.5, 0),
-		Font = Theme.BodyFont,
-		TextColor3 = Color3.fromRGB(255, 140, 60),
+
+	-- wrecked-items alert (bottom centre)
+	repairFrame = UIKit.new("Frame", {
+		Size = UDim2.fromOffset(420, 46),
+		Position = UDim2.new(0.5, 0, 1, -16),
+		AnchorPoint = Vector2.new(0.5, 1),
+		BackgroundColor3 = Color3.fromRGB(70, 30, 20),
+		Visible = false,
 		Parent = gui,
 	})
+	UIKit.Corner(repairFrame, 12)
+	UIKit.Stroke(repairFrame, Color3.fromRGB(255, 120, 60), 2)
+	repairLabel = UIKit.Label({ Text = "", Size = UDim2.new(1, -150, 1, -10), Position = UDim2.fromOffset(10, 5), TextXAlignment = Enum.TextXAlignment.Left, Font = Theme.BodyFont, Parent = repairFrame })
+	UIKit.Button({ Text = "🔧 FIX NOW", Color = Color3.fromRGB(255, 130, 40), Size = UDim2.fromOffset(130, 36), Position = UDim2.new(1, -136, 0, 5), Parent = repairFrame, Callback = function()
+		Remotes.BuyProduct:FireServer("InstantRepair")
+	end })
 
 	-- side menu (left)
 	local menu = UIKit.new("Frame", {
 		Name = "Menu",
-		Size = UDim2.new(0, 160, 0, 340),
+		Size = UDim2.new(0, 160, 0, 500),
 		Position = UDim2.new(0, 10, 0.5, 0),
 		AnchorPoint = Vector2.new(0, 0.5),
 		BackgroundTransparency = 1,
@@ -148,26 +167,31 @@ function HUD:Init(controllers)
 	})
 	local grid = UIKit.new("UIGridLayout", {
 		CellSize = UDim2.fromOffset(70, 80),
-		CellPadding = UDim2.fromOffset(6, 4),
+		CellPadding = UDim2.fromOffset(6, 2),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		Parent = menu,
 	})
 	grid.FillDirectionMaxCells = 2
+	grid.VerticalAlignment = Enum.VerticalAlignment.Center
 	local menuScale = UIKit.new("UIScale", { Parent = menu })
 	local function rescale()
 		local vp = workspace.CurrentCamera.ViewportSize
-		menuScale.Scale = math.clamp(vp.Y / 800, 0.6, 1.1)
+		menuScale.Scale = math.clamp(vp.Y / 860, 0.55, 1.1)
 	end
 	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
 	rescale()
 
 	local buttons = {
 		{ "Shop", "🛒", "SHOP", Color3.fromRGB(255, 180, 0) },
+		{ "Build", "🏗️", "BUILD", Color3.fromRGB(255, 140, 40) },
 		{ "Rebirth", "🔄", "REBIRTH", Color3.fromRGB(200, 90, 255) },
+		{ "Duo", "👥", "DUO", Color3.fromRGB(0, 190, 255) },
+		{ "Floors", "🛗", "FLOORS", Color3.fromRGB(0, 160, 220) },
+		{ "Secrets", "🕵️", "SECRETS", Color3.fromRGB(120, 200, 120) },
 		{ "Daily", "🎁", "DAILY", Color3.fromRGB(255, 90, 120) },
-		{ "Codes", "🎟️", "CODES", Color3.fromRGB(0, 190, 255) },
-		{ "Settings", "⚙️", "SETTINGS", Color3.fromRGB(130, 140, 160) },
+		{ "Codes", "🎟️", "CODES", Color3.fromRGB(0, 200, 160) },
 		{ "Home", "🏠", "HOME", Color3.fromRGB(70, 200, 100) },
+		{ "Settings", "⚙️", "SETTINGS", Color3.fromRGB(130, 140, 160) },
 		{ "Admin", "🛡️", "ADMIN", Color3.fromRGB(235, 70, 70) },
 	}
 	for i, def in buttons do
@@ -175,6 +199,12 @@ function HUD:Init(controllers)
 		local button, holder = sideButton(menu, i, def[2], def[3], def[4], function()
 			if name == "Home" then
 				Remotes.GoHome:FireServer()
+			elseif name == "Floors" then
+				if C.UI.Current == "Floors" then
+					C.UI:Close()
+				else
+					C.Build:OpenFloors(nil)
+				end
 			else
 				C.UI:Toggle(name)
 			end
@@ -188,27 +218,47 @@ function HUD:Init(controllers)
 		end
 	end
 
-	-- keyboard shortcuts
 	UserInputService.InputBegan:Connect(function(input, processed)
 		if processed then
 			return
 		end
 		if input.KeyCode == Enum.KeyCode.G then
 			C.UI:Toggle("Shop")
+		elseif input.KeyCode == Enum.KeyCode.B then
+			C.UI:Toggle("Build")
 		elseif input.KeyCode == Enum.KeyCode.R then
 			C.UI:Toggle("Rebirth")
 		end
 	end)
 end
 
+local function currentFloor(): string
+	local center = player:GetAttribute("PlotCenter")
+	local character = player.Character
+	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if typeof(center) ~= "Vector3" or not root then
+		return ""
+	end
+	local d = root.Position - center
+	if Vector3.new(d.X, 0, d.Z).Magnitude > 70 then
+		return ""
+	end
+	local floor = math.floor(d.Y / Config.Tycoon.FloorHeight) + 1
+	if floor > Config.Tycoon.Floors then
+		return "🚁 Roof"
+	end
+	return "🏢 Floor " .. math.max(floor, 1)
+end
+
 function HUD:Refresh()
 	local mult = player:GetAttribute("Multiplier") or 1
-	local rebirths = player:GetAttribute("Rebirths") or 0
+	local rebirths = player:GetAttribute("WalletRebirths") or player:GetAttribute("Rebirths") or 0
 	local rounded = math.floor(mult * 100 + 0.5) / 100
-	infoLabel.Text = string.format("x%s cash  •  Rebirth %d", rounded >= 1000 and Util.Abbreviate(rounded) or tostring(rounded), rebirths)
+	incomeLabel.Text = "+" .. Util.Money(player:GetAttribute("Income") or 0) .. "/s"
+	infoLabel.Text = string.format("x%s cash  •  Rebirth %d%s", rounded >= 1000 and Util.Abbreviate(rounded) or tostring(rounded), rebirths, player:GetAttribute("DuoHost") and "  •  👥 Duo" or "")
 	local hasAuto = player:GetAttribute("Pass_AutoCollect")
 	local vault = player:GetAttribute("Vault") or 0
-	vaultLabel.Text = (not hasAuto and vault > 0) and ("🏦 Vault: " .. Util.Money(vault) .. " (step on the pad!)") or ""
+	vaultLabel.Text = (not hasAuto and vault > 0) and ("🏦 Vault: " .. Util.Money(vault) .. " (step on a vault pad!)") or ""
 
 	local parts = {}
 	local boostEnd = player:GetAttribute("BoostEnd") or 0
@@ -221,12 +271,25 @@ function HUD:Refresh()
 		table.insert(parts, "🔥 " .. eventMult .. "x Event " .. Util.Clock(eventEnds - os.time()))
 	end
 	boostLabel.Text = table.concat(parts, "   ")
+	floorLabel.Text = currentFloor()
+
+	-- wrecked items
+	if C.Build then
+		local wrecked, soonest = C.Build:WreckedCount()
+		repairFrame.Visible = wrecked > 0
+		if wrecked > 0 then
+			repairLabel.Text = string.format("🔧 %d upgrades wrecked - rebuilding in %s", wrecked, Util.Clock(math.max(0, soonest)))
+		end
+	end
 
 	-- badges
 	local lastDaily = player:GetAttribute("LastDaily") or 0
 	self:SetBadge("Daily", os.time() - lastDaily >= Config.Daily.Cooldown)
 	local cost = player:GetAttribute("RebirthCost") or math.huge
-	self:SetBadge("Rebirth", (player:GetAttribute("Cash") or 0) >= cost)
+	self:SetBadge("Rebirth", (player:GetAttribute("Cash") or 0) >= cost and not player:GetAttribute("DuoHost"))
+	local found = player:GetAttribute("SecretsFound") or ""
+	local count = found == "" and 0 or #string.split(found, ",")
+	self:SetBadge("Secrets", count > 0, tostring(count))
 end
 
 function HUD:Start()
@@ -237,16 +300,15 @@ function HUD:Start()
 	cashLabel.Text = "💵 " .. Util.Money(displayedCash)
 	player:GetAttributeChangedSignal("Cash"):Connect(function()
 		animateCash(player:GetAttribute("Cash") or 0)
-		self:Refresh()
 	end)
-	for _, attr in { "Multiplier", "Rebirths", "Vault", "BoostEnd", "LastDaily", "Pass_AutoCollect" } do
+	for _, attr in { "Multiplier", "Rebirths", "Vault", "BoostEnd", "LastDaily", "Pass_AutoCollect", "Income", "SecretsFound" } do
 		player:GetAttributeChangedSignal(attr):Connect(function()
 			self:Refresh()
 		end)
 	end
 	self:Refresh()
 	while true do
-		task.wait(1)
+		task.wait(0.5)
 		self:Refresh()
 	end
 end

@@ -44,6 +44,11 @@ local function rebirthScale(player: Player): number
 	return 1 + (player:GetAttribute("Rebirths") or 0)
 end
 
+-- the bigger of a fixed minimum (scaled by rebirths) or N seconds of the player's income
+local function incomeReward(player: Player, seconds: number, minimum: number): number
+	return math.max(minimum * rebirthScale(player), S.TycoonService:GetIncome(player) * seconds)
+end
+
 local function barrier(folder: Instance, center: Vector3, size: number, height: number)
 	for _, data in {
 		{ Vector3.new(size, height, 2), Vector3.new(0, height / 2, size / 2 + 1) },
@@ -139,9 +144,9 @@ Games.CoinRush = {
 		end
 		for player in ctx.Participants do
 			local score = ctx.Scores[player] or 0
-			local reward = score * info.CoinValue * rebirthScale(player)
+			local reward = score * incomeReward(player, info.CoinIncomeSeconds, info.CoinMin)
 			if player == best then
-				reward += info.WinnerBonus * rebirthScale(player)
+				reward += incomeReward(player, info.WinnerIncomeSeconds, info.WinnerMin)
 			end
 			table.insert(results, { Player = player, Score = score .. " coins", Reward = reward, Winner = player == best })
 		end
@@ -285,7 +290,8 @@ Games.MeteorShower = {
 					local humanoid = getHumanoid(p)
 					if root and humanoid and (root.Position - target).Magnitude <= radius then
 						humanoid:TakeDamage(55)
-						root.AssemblyLinearVelocity = ((root.Position - target).Unit + Vector3.new(0, 1.5, 0)) * 50
+						local away = root.Position - target
+						Remotes.ClientCommand:FireClient(p, "fling", ((away.Magnitude > 0.1 and away.Unit or Vector3.yAxis) + Vector3.new(0, 1.5, 0)) * 50)
 					end
 				end
 			end)
@@ -326,6 +332,7 @@ function Context:Place(player: Player)
 	if not character then
 		return
 	end
+
 	local r = self.SpawnRadius or 30
 	local offset = Vector3.new(math.random(-r, r), 6, math.random(-r, r))
 	character:PivotTo(CFrame.new(self.Center + offset))
@@ -399,10 +406,10 @@ function Context:SurvivalRewards(info)
 		local survived = self.Alive[player] ~= nil
 		local time = survived and duration or (self.EliminatedAt[player] or 0)
 		local fraction = math.clamp(time / math.max(duration, 1), 0, 1)
-		local reward = math.floor(info.SurviveReward * (survived and 1 or fraction * 0.5) * rebirthScale(player))
+		local reward = math.floor(incomeReward(player, info.SurviveIncomeSeconds, info.SurviveMin) * (survived and 1 or fraction * 0.5))
 		local winner = survived and #survivors <= 3
 		if winner then
-			reward += info.WinnerBonus * rebirthScale(player)
+			reward += incomeReward(player, info.WinnerIncomeSeconds, info.WinnerMin)
 		end
 		table.insert(results, { Player = player, Score = string.format("%.0fs", time), Reward = reward, Winner = winner })
 	end
@@ -545,6 +552,20 @@ function MinigameService:RunGame(key: string)
 		warn("[Minigames] setup failed: " .. tostring(setupErr))
 		folder:Destroy()
 		return
+	end
+
+	-- stream the arena in for everyone (in parallel) before teleporting
+	local pending = 0
+	for player in participants do
+		pending += 1
+		task.spawn(function()
+			pcall(player.RequestStreamAroundAsync, player, ctx.Center, 3)
+			pending -= 1
+		end)
+	end
+	local waitStart = os.clock()
+	while pending > 0 and os.clock() - waitStart < 3.5 do
+		task.wait(0.1)
 	end
 
 	-- send players in

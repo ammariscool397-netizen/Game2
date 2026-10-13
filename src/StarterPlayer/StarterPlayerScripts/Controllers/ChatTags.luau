@@ -36,6 +36,10 @@ function ChatTags:Init()
 		if sender:GetAttribute("Pass_VIP") then
 			table.insert(tags, "<font color='#FFD700'>[👑 VIP]</font>")
 		end
+		local found = sender:GetAttribute("SecretsFound") or ""
+		if found ~= "" and #string.split(found, ",") >= #Config.Secrets then
+			table.insert(tags, "<font color='#80FF9A'>[🕵️ Secret Master]</font>")
+		end
 		local rebirths = sender:GetAttribute("Rebirths") or 0
 		if rebirths > 0 then
 			table.insert(tags, string.format("<font color='#CE93D8'>[R%d]</font>", rebirths))

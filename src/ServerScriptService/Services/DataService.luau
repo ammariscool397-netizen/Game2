@@ -1,8 +1,14 @@
 --[[
 	DataService - loads, saves and edits player data.
+
 	Values the client needs are mirrored to Player attributes
-	(Cash, Vault, Rebirths, TotalEarned, Multiplier, BoostEnd, LastDaily, ...)
+	(Cash, Vault, Rebirths, TotalEarned, Multiplier, Income, BoostEnd, ...)
 	so UI can simply listen to GetAttributeChangedSignal.
+
+	DUO WALLETS: a duo partner spends and earns from the host's wallet.
+	AddCash / SpendCash / AddVault automatically route to the "wallet owner"
+	(the host), and the partner's Cash/Vault attributes mirror the host's.
+	The partner's own saved data is untouched while they are in a duo.
 ]]
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
@@ -14,10 +20,11 @@ local Config = require(Shared.Config)
 local Util = require(Shared.Util)
 local Signal = require(Shared.Signal)
 local Remotes = require(Shared.Remotes)
+local TycoonItems = require(Shared.TycoonItems)
 
 local DataService = {}
 DataService.PlayerLoaded = Signal.new() -- (player, data)
-DataService.BeforeSave = Signal.new()
+DataService.BeforeSave = Signal.new() -- (player, data)
 
 local S
 
@@ -26,8 +33,9 @@ local TEMPLATE = {
 	Vault = 0,
 	TotalEarned = 0,
 	Rebirths = 0,
-	Purchased = {},
+	Purchased = { F1_1 = true },
 	Passes = {}, -- passes granted by admins / simulated in Studio
+	Secrets = {},
 	RedeemedCodes = {},
 	DailyStreak = 0,
 	LastDaily = 0,
@@ -36,6 +44,8 @@ local TEMPLATE = {
 	ObbyCompletions = 0,
 	MinigameWins = 0,
 	PlayTime = 0,
+	LastOnline = 0,
+	LastIncome = 0,
 	Settings = { MusicVolume = Config.Music.DefaultVolume, SFX = true, LowGraphics = false },
 }
 
@@ -48,7 +58,7 @@ local earnedStore: OrderedDataStore? = nil
 do
 	local ok, err = pcall(function()
 		store = DataStoreService:GetDataStore(Config.DataStoreName)
-		earnedStore = DataStoreService:GetOrderedDataStore(Config.DataStoreName .. "_TotalEarned")
+		earnedStore = DataStoreService:GetOrderedDataStore(Config.DataStoreName .. "_TotalEarnedLog")
 	end)
 	if not ok then
 		warn("[DataService] DataStores unavailable: " .. tostring(err))
@@ -75,6 +85,15 @@ local function retry<T>(fn: () -> T, attempts: number?): (boolean, T | string)
 		task.wait(1 + i)
 	end
 	return false, tostring(lastErr)
+end
+
+-- Leaderboard values are stored as log10 so huge numbers still sort correctly
+function DataService.EncodeEarned(n: number): number
+	return math.floor(math.log10(math.max(n, 0) + 1) * 1e13)
+end
+
+function DataService.DecodeEarned(v: number): number
+	return 10 ^ (v / 1e13) - 1
 end
 
 ---------------------------------------------------------------------------
@@ -117,7 +136,7 @@ function DataService:Start()
 		end
 	end)
 
-	-- autosave + boost / event expiry ticks
+	-- autosave
 	task.spawn(function()
 		while true do
 			task.wait(Config.AutoSaveInterval)
@@ -126,6 +145,7 @@ function DataService:Start()
 			end
 		end
 	end)
+	-- boost / event expiry
 	task.spawn(function()
 		while true do
 			task.wait(1)
@@ -196,6 +216,13 @@ function DataService:_onJoin(player: Player)
 	else
 		Util.Reconcile(data, TEMPLATE)
 	end
+	-- drop purchases of items that no longer exist (old versions)
+	for id in data.Purchased do
+		if not TycoonItems.ById[id] then
+			data.Purchased[id] = nil
+		end
+	end
+	data.Purchased.F1_1 = true
 	profiles[player] = data
 
 	-- leaderstats
@@ -232,6 +259,7 @@ function DataService:Save(player: Player)
 		data.PlayTime += os.time() - joinTime[player]
 		joinTime[player] = os.time()
 	end
+	data.LastOnline = os.time()
 	self.BeforeSave:Fire(player, data)
 	local ok, err = retry(function()
 		(store :: DataStore):UpdateAsync(keyFor(player), function()
@@ -243,7 +271,7 @@ function DataService:Save(player: Player)
 	end
 	if earnedStore then
 		pcall(function()
-			(earnedStore :: OrderedDataStore):SetAsync(tostring(player.UserId), math.floor(math.min(data.TotalEarned, 2 ^ 52)))
+			(earnedStore :: OrderedDataStore):SetAsync(tostring(player.UserId), DataService.EncodeEarned(data.TotalEarned))
 		end)
 	end
 	return ok
@@ -261,21 +289,80 @@ function DataService:IsLoaded(player: Player)
 	return profiles[player] ~= nil
 end
 
+---------------------------------------------------------------------------
+-- Duo wallet helpers
+---------------------------------------------------------------------------
+function DataService:GetWalletOwner(player: Player): Player
+	local hostId = player:GetAttribute("DuoHost")
+	if hostId then
+		local host = Players:GetPlayerByUserId(hostId)
+		if host and profiles[host] then
+			return host
+		end
+	end
+	return player
+end
+
+function DataService:GetPartner(host: Player): Player?
+	local partnerId = host:GetAttribute("DuoPartner")
+	if partnerId then
+		local partner = Players:GetPlayerByUserId(partnerId)
+		if partner and partner.Parent then
+			return partner
+		end
+	end
+	return nil
+end
+
+function DataService:GetWallet(player: Player)
+	return profiles[self:GetWalletOwner(player)]
+end
+
+-- the host plus their partner (if any)
+function DataService:GetTeam(player: Player): { Player }
+	local host = self:GetWalletOwner(player)
+	local team = { host }
+	local partner = self:GetPartner(host)
+	if partner then
+		table.insert(team, partner)
+	end
+	return team
+end
+
+function DataService:TeamHasPass(player: Player, key: string): boolean
+	if not S.MonetizationService then
+		return false
+	end
+	for _, member in self:GetTeam(player) do
+		if S.MonetizationService:HasPass(member, key) then
+			return true
+		end
+	end
+	return false
+end
+
+-- Global income multiplier of the wallet that `player` uses
 function DataService:GetMultiplier(player: Player): number
-	local data = profiles[player]
+	local host = self:GetWalletOwner(player)
+	local data = profiles[host]
 	if not data then
 		return 1
 	end
 	local mult = 1 + data.Rebirths * Config.Rebirth.MultiplierPerRebirth
-	if S.MonetizationService then
-		if S.MonetizationService:HasPass(player, "DoubleCash") then
-			mult *= 2
-		end
-		if S.MonetizationService:HasPass(player, "VIP") then
-			mult *= 1.5
+	if self:TeamHasPass(host, "DoubleCash") then
+		mult *= 2
+	end
+	if self:TeamHasPass(host, "VIP") then
+		mult *= 1.5
+	end
+	local boosted = false
+	for _, member in self:GetTeam(host) do
+		local memberData = profiles[member]
+		if memberData and memberData.BoostEnd > os.time() then
+			boosted = true
 		end
 	end
-	if data.BoostEnd > os.time() then
+	if boosted then
 		mult *= 2
 	end
 	mult *= workspace:GetAttribute("EventMultiplier") or 1
@@ -283,73 +370,115 @@ function DataService:GetMultiplier(player: Player): number
 end
 
 function DataService:RefreshMultiplier(player: Player)
-	player:SetAttribute("Multiplier", self:GetMultiplier(player))
+	for _, member in self:GetTeam(player) do
+		member:SetAttribute("Multiplier", self:GetMultiplier(member))
+	end
 end
 
--- Push data values to attributes + leaderstats
+local function syncWallet(target: Player, wallet)
+	target:SetAttribute("Cash", wallet.Cash)
+	target:SetAttribute("Vault", wallet.Vault)
+	target:SetAttribute("TotalEarned", wallet.TotalEarned)
+	target:SetAttribute("WalletRebirths", wallet.Rebirths)
+	target:SetAttribute("RebirthCost", TycoonItems.GetRebirthCost(wallet.Rebirths))
+	local leaderstats = target:FindFirstChild("leaderstats")
+	if leaderstats then
+		(leaderstats :: any).Cash.Value = Util.Money(wallet.Cash)
+	end
+end
+
+-- Push data values to attributes + leaderstats (for the player and their duo team)
 function DataService:Sync(player: Player)
 	local data = profiles[player]
 	if not data then
 		return
 	end
-	player:SetAttribute("Cash", data.Cash)
-	player:SetAttribute("Vault", data.Vault)
+	-- personal values
 	player:SetAttribute("Rebirths", data.Rebirths)
-	player:SetAttribute("TotalEarned", data.TotalEarned)
 	player:SetAttribute("BoostEnd", data.BoostEnd)
 	player:SetAttribute("LastDaily", data.LastDaily)
 	player:SetAttribute("DailyStreak", data.DailyStreak)
-	player:SetAttribute("RebirthCost", Config.GetRebirthCost(data.Rebirths))
 	player:SetAttribute("MusicVolume", data.Settings.MusicVolume)
 	player:SetAttribute("SFX", data.Settings.SFX)
-	self:RefreshMultiplier(player)
+	local found = {}
+	for id in data.Secrets do
+		table.insert(found, id)
+	end
+	player:SetAttribute("SecretsFound", table.concat(found, ","))
 	local leaderstats = player:FindFirstChild("leaderstats")
 	if leaderstats then
-		(leaderstats :: any).Cash.Value = Util.Money(data.Cash)
-		;(leaderstats :: any).Rebirths.Value = data.Rebirths
+		(leaderstats :: any).Rebirths.Value = data.Rebirths
 	end
+	-- wallet values (host's for a duo partner)
+	local host = self:GetWalletOwner(player)
+	local wallet = profiles[host] or data
+	for _, member in self:GetTeam(host) do
+		syncWallet(member, wallet)
+	end
+	self:RefreshMultiplier(player)
 end
 
--- Add cash. `earned` = counts toward TotalEarned (income), default true
+-- Add cash to the player's wallet. `earned` = counts toward TotalEarned (income), default true
 function DataService:AddCash(player: Player, amount: number, earned: boolean?)
-	local data = profiles[player]
+	local host = self:GetWalletOwner(player)
+	local data = profiles[host]
 	if not data then
 		return
 	end
-	amount = math.floor(amount)
 	data.Cash = math.max(0, data.Cash + amount)
 	if earned ~= false and amount > 0 then
 		data.TotalEarned += amount
 	end
-	self:Sync(player)
+	self:Sync(host)
 end
 
 function DataService:SetCash(player: Player, amount: number)
-	local data = profiles[player]
+	local host = self:GetWalletOwner(player)
+	local data = profiles[host]
 	if not data then
 		return
 	end
-	data.Cash = math.max(0, math.floor(amount))
-	self:Sync(player)
+	data.Cash = math.max(0, amount)
+	self:Sync(host)
 end
 
 function DataService:SpendCash(player: Player, amount: number): boolean
-	local data = profiles[player]
+	local host = self:GetWalletOwner(player)
+	local data = profiles[host]
 	if not data or data.Cash < amount then
 		return false
 	end
 	data.Cash -= amount
-	self:Sync(player)
+	self:Sync(host)
 	return true
 end
 
 function DataService:AddVault(player: Player, amount: number)
-	local data = profiles[player]
+	local host = self:GetWalletOwner(player)
+	local data = profiles[host]
 	if not data then
 		return
 	end
-	data.Vault += math.floor(amount)
-	player:SetAttribute("Vault", data.Vault)
+	data.Vault += amount
+	data.TotalEarned += amount
+	for _, member in self:GetTeam(host) do
+		member:SetAttribute("Vault", data.Vault)
+		member:SetAttribute("TotalEarned", data.TotalEarned)
+	end
+end
+
+-- moves the vault into the wallet (TotalEarned was already counted)
+function DataService:CollectVault(player: Player): number
+	local host = self:GetWalletOwner(player)
+	local data = profiles[host]
+	if not data or data.Vault <= 0 then
+		return 0
+	end
+	local amount = data.Vault
+	data.Vault = 0
+	data.Cash += amount
+	self:Sync(host)
+	return amount
 end
 
 function DataService:AddBoost(player: Player, seconds: number)

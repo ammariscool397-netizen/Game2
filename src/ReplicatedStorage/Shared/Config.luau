@@ -1,7 +1,7 @@
 --[[
 	MEGA TYCOON - Main configuration
-	Everything you might want to tweak lives here: economy, game passes,
-	developer products, admins, music, minigames, codes and daily rewards.
+	Everything you might want to tweak lives here: economy, floors, game passes,
+	developer products, admins, disasters, secrets, music, minigames and codes.
 
 	>>> BEFORE PUBLISHING <<<
 	1. Create your Game Passes / Developer Products on the Creator Dashboard
@@ -10,12 +10,13 @@
 	3. Replace the music IDs with tracks you can use (Creator Store > Audio).
 	4. Game Settings > Security > Enable Studio Access to API Services
 	   (needed for saving in Studio).
+	5. Set the place's Max Players to 8 (one tower per player).
 ]]
 
 local Config = {}
 
 Config.GameName = "MEGA TYCOON"
-Config.Version = "1.0.0"
+Config.Version = "2.0.0"
 
 ---------------------------------------------------------------------------
 -- Data / economy
@@ -25,20 +26,111 @@ Config.AutoSaveInterval = 90 -- seconds
 
 Config.StartingCash = 100
 Config.BaseWalkSpeed = 16
+Config.MaxPlots = 8
+
+Config.Tycoon = {
+	Floors = 8,
+	FloorHeight = 22,
+	DropInterval = 2, -- seconds between drops of a dropper
+	GeneratorCycle = 5, -- generators pay out every N seconds (visual)
+	ConveyorSpeed = 12, -- studs per second (visual drops)
+	-- Pacing: how long (in seconds of income) items cost, from the first item to
+	-- the last one. Bigger = slower game. With the defaults a full 8-floor
+	-- tower takes about 3 hours (much less with rebirths / passes).
+	PaceStartSeconds = 4,
+	PaceEndSeconds = 44,
+	ButtonSlotsPerFloor = 12,
+	MaxBuildPerTick = 30, -- items built per frame when a big tycoon loads
+}
+
+Config.OfflineEarnings = {
+	Enabled = true,
+	Percent = 0.25, -- earn 25% of your income while offline
+	MaxHours = 8,
+}
 
 Config.Rebirth = {
-	BaseCost = 2_500_000,
-	CostGrowth = 2.5, -- cost = BaseCost * CostGrowth ^ rebirths
+	RequiredFloor = 5, -- the first rebirth costs as much as unlocking this floor
+	CostGrowth = 4, -- each rebirth costs 4x more
 	MultiplierPerRebirth = 0.5, -- each rebirth adds +0.5x to all income
 }
 
-function Config.GetRebirthCost(rebirths: number): number
-	return math.floor(Config.Rebirth.BaseCost * (Config.Rebirth.CostGrowth ^ rebirths))
-end
+---------------------------------------------------------------------------
+-- Duo building
+---------------------------------------------------------------------------
+Config.Duo = {
+	Enabled = true,
+	InviteTimeout = 30,
+}
 
-Config.ConveyorSpeed = 9
-Config.DropLifetime = 25
-Config.MaxPlots = 6
+---------------------------------------------------------------------------
+-- Disasters (random server events). Nukes/meteors/tornadoes knock out
+-- tycoon items for a while unless the tower has the Nuke Shield Dome.
+---------------------------------------------------------------------------
+Config.Disasters = {
+	Enabled = true,
+	FirstDelay = 240, -- seconds after the server starts
+	MinInterval = 300,
+	MaxInterval = 480,
+	MainMapMaxY = 400, -- players above this (minigame arena) are not affected
+	Nuke = {
+		Weight = 1,
+		Warning = 30, -- seconds to reach a bunker
+		ShockSpeed = 320, -- studs per second
+		KnockoutFraction = 0.25, -- share of an unshielded tower that gets wrecked
+		KnockoutSeconds = 180,
+	},
+	Meteors = {
+		Weight = 3,
+		Duration = 40,
+		Interval = 0.35,
+		Radius = 12,
+		Damage = 45,
+		KnockoutSeconds = 90,
+		CrystalChance = 0.3,
+		CrystalIncomeSeconds = 20,
+	},
+	Tornado = {
+		Weight = 3,
+		Duration = 45,
+		Radius = 22,
+		Speed = 30,
+		KnockoutSeconds = 60,
+	},
+	UFO = {
+		Weight = 3,
+		Duration = 45,
+		Count = 3,
+		AbductEvery = 6,
+		CashEvery = 1.5,
+		CashIncomeSeconds = 10,
+	},
+}
+
+---------------------------------------------------------------------------
+-- Secrets hidden around the map. Each one gives cash and permanently builds
+-- a secret relic in your tower (+5% income each, kept through rebirths).
+---------------------------------------------------------------------------
+Config.SecretRewards = {
+	IncomeSeconds = 180,
+	MinCash = 5_000,
+	BonusPercent = 5,
+}
+
+Config.Secrets = {
+	{ Id = "Board", Name = "Behind the Scenes", Hint = "Leaders always have something behind them...", Color = Color3.fromRGB(255, 200, 40), BadgeId = 0 },
+	{ Id = "Bunker", Name = "Doomsday Stash", Hint = "Preppers hide snacks where it's safe from the bomb.", Color = Color3.fromRGB(150, 160, 170), BadgeId = 0 },
+	{ Id = "Summit", Name = "Top of the World", Hint = "Climb the snowy mountain all the way up.", Color = Color3.fromRGB(220, 240, 255), BadgeId = 0 },
+	{ Id = "Cave", Name = "Crystal Cave", Hint = "The mountain is hollow. Look for a gap behind the trees.", Color = Color3.fromRGB(150, 80, 255), BadgeId = 0 },
+	{ Id = "LakeFloor", Name = "Sunken Treasure", Hint = "Hold your breath and dive to the bottom of the lake.", Color = Color3.fromRGB(0, 170, 255), BadgeId = 0 },
+	{ Id = "Island", Name = "Castaway", Hint = "A lonely tree on a lonely island is hiding something.", Color = Color3.fromRGB(90, 220, 110), BadgeId = 0 },
+	{ Id = "Obby", Name = "Shortcut Seeker", Hint = "Some obby platforms are almost invisible...", Color = Color3.fromRGB(255, 80, 160), BadgeId = 0 },
+	{ Id = "Cloud", Name = "Head in the Clouds", Hint = "A strange pad in the east forest sends you flying.", Color = Color3.fromRGB(255, 255, 255), BadgeId = 0 },
+	{ Id = "Edge", Name = "End of the World", Hint = "Walk until the world ends. Then check the corner.", Color = Color3.fromRGB(60, 60, 80), BadgeId = 0 },
+	{ Id = "GiantTree", Name = "Tree House", Hint = "The biggest tree in the forest has a door.", Color = Color3.fromRGB(140, 90, 50), BadgeId = 0 },
+	{ Id = "Graveyard", Name = "Spooky Secret", Hint = "Not everyone in the graveyard is resting.", Color = Color3.fromRGB(120, 255, 120), BadgeId = 0 },
+	{ Id = "Waterfall", Name = "Behind the Falls", Hint = "Walk through the waterfall next to the mountain.", Color = Color3.fromRGB(120, 220, 255), BadgeId = 0 },
+}
 
 ---------------------------------------------------------------------------
 -- Monetization
@@ -53,7 +145,7 @@ Config.GamePasses = {
 	DoubleCash = {
 		Id = 0,
 		Name = "2x Cash",
-		Description = "Double ALL income, forever!",
+		Description = "Double ALL income, forever! Works for your duo partner too.",
 		PriceHint = 299,
 		Icon = "💵",
 		Color = Color3.fromRGB(70, 200, 90),
@@ -71,7 +163,7 @@ Config.GamePasses = {
 	FastDroppers = {
 		Id = 0,
 		Name = "Fast Droppers",
-		Description = "All droppers drop 2x faster.",
+		Description = "All droppers drop 2x faster (2x dropper income).",
 		PriceHint = 249,
 		Icon = "⚡",
 		Color = Color3.fromRGB(255, 200, 40),
@@ -89,7 +181,7 @@ Config.GamePasses = {
 	SuperSpeed = {
 		Id = 0,
 		Name = "Super Speed",
-		Description = "Run 2x faster around the map.",
+		Description = "Run 2x faster around the map (great for escaping nukes!).",
 		PriceHint = 99,
 		Icon = "👟",
 		Color = Color3.fromRGB(255, 90, 160),
@@ -97,41 +189,46 @@ Config.GamePasses = {
 	},
 }
 
+-- Cash products pay "Minutes" of your current income (never less than MinCash)
 Config.Products = {
 	CashSmall = {
 		Id = 0,
 		Name = "Pile of Cash",
-		Description = "+$10K (scales with rebirths)",
+		Description = "10 minutes of your income",
 		PriceHint = 25,
 		Icon = "💰",
-		Cash = 10_000,
+		Minutes = 10,
+		MinCash = 10_000,
 		Order = 1,
 	},
 	CashMedium = {
 		Id = 0,
 		Name = "Bag of Cash",
-		Description = "+$100K (scales with rebirths)",
-		PriceHint = 99,
+		Description = "30 minutes of your income",
+		PriceHint = 79,
 		Icon = "💰",
-		Cash = 100_000,
+		Minutes = 30,
+		MinCash = 100_000,
 		Order = 2,
 	},
 	CashLarge = {
 		Id = 0,
 		Name = "Vault of Cash",
-		Description = "+$1M (scales with rebirths)",
-		PriceHint = 299,
+		Description = "2 hours of your income",
+		PriceHint = 249,
 		Icon = "🏦",
-		Cash = 1_000_000,
+		Minutes = 120,
+		MinCash = 1_000_000,
 		Order = 3,
 	},
 	CashHuge = {
 		Id = 0,
 		Name = "Cash Mountain",
-		Description = "+$10M (scales with rebirths)",
-		PriceHint = 799,
+		Description = "8 hours of your income!",
+		PriceHint = 699,
 		Icon = "⛰️",
-		Cash = 10_000_000,
+		Minutes = 480,
+		MinCash = 10_000_000,
 		Order = 4,
 	},
 	Boost = {
@@ -143,6 +240,33 @@ Config.Products = {
 		BoostSeconds = 15 * 60,
 		Order = 5,
 	},
+	InstantRepair = {
+		Id = 0,
+		Name = "Instant Repair",
+		Description = "Fix every wrecked upgrade in your tower right now.",
+		PriceHint = 29,
+		Icon = "🔧",
+		Repair = true,
+		Order = 6,
+	},
+	LaunchNuke = {
+		Id = 0,
+		Name = "Launch a NUKE",
+		Description = "Nuke the whole server! Everyone has 30s to find a bunker.",
+		PriceHint = 199,
+		Icon = "☢️",
+		ServerEvent = "Nuke",
+		Order = 7,
+	},
+	MeteorStorm = {
+		Id = 0,
+		Name = "Meteor Storm",
+		Description = "Rain meteors on the server. They leave cash crystals!",
+		PriceHint = 99,
+		Icon = "☄️",
+		ServerEvent = "Meteors",
+		Order = 8,
+	},
 	CashRain = {
 		Id = 0,
 		Name = "Server Cash Rain",
@@ -150,7 +274,7 @@ Config.Products = {
 		PriceHint = 149,
 		Icon = "🌧️",
 		ServerEvent = "CashRain",
-		Order = 6,
+		Order = 9,
 	},
 }
 
@@ -201,7 +325,8 @@ Config.Music = {
 	Loading = { Id = "rbxassetid://1846368080", Name = "Loading" },
 }
 
--- Built-in engine sounds (always available, no upload needed)
+-- Built-in engine sounds (always available, no upload needed).
+-- Siren: put an audio id here for a real air-raid siren; empty = synthesized.
 Config.Sounds = {
 	Click = "rbxasset://sounds/clickfast.wav",
 	Hover = "rbxasset://sounds/button.wav",
@@ -215,10 +340,11 @@ Config.Sounds = {
 	Whoosh = "rbxasset://sounds/swordslash.wav",
 	Coin = "rbxasset://sounds/electronicpingshort.wav",
 	Boom = "rbxasset://sounds/collide.wav",
+	Siren = "",
 }
 
 ---------------------------------------------------------------------------
--- Minigames
+-- Minigames (rewards are "seconds of your income", with a minimum)
 ---------------------------------------------------------------------------
 Config.Minigames = {
 	Enabled = true,
@@ -231,22 +357,28 @@ Config.Minigames = {
 			DisplayName = "Coin Rush",
 			Description = "Grab as many coins as you can in 45 seconds!",
 			Duration = 45,
-			CoinValue = 250, -- cash per coin (x (1 + rebirths))
-			WinnerBonus = 5000,
+			CoinIncomeSeconds = 3,
+			CoinMin = 250,
+			WinnerIncomeSeconds = 90,
+			WinnerMin = 5000,
 		},
 		FallingTiles = {
 			DisplayName = "Falling Tiles",
 			Description = "Tiles fall after you touch them. Be the last one standing!",
 			Duration = 90,
-			SurviveReward = 3000,
-			WinnerBonus = 10000,
+			SurviveIncomeSeconds = 60,
+			SurviveMin = 3000,
+			WinnerIncomeSeconds = 120,
+			WinnerMin = 10000,
 		},
 		MeteorShower = {
-			DisplayName = "Meteor Shower",
+			DisplayName = "Meteor Dodge",
 			Description = "Dodge the meteors raining from the sky for 60 seconds!",
 			Duration = 60,
-			SurviveReward = 6000,
-			WinnerBonus = 4000,
+			SurviveIncomeSeconds = 90,
+			SurviveMin = 6000,
+			WinnerIncomeSeconds = 60,
+			WinnerMin = 4000,
 		},
 	},
 }
@@ -255,41 +387,58 @@ Config.Minigames = {
 -- Obby
 ---------------------------------------------------------------------------
 Config.Obby = {
-	Reward = 15_000, -- x (1 + rebirths)
+	RewardIncomeSeconds = 300,
+	MinReward = 15_000,
 	Cooldown = 10 * 60, -- seconds between rewarded completions
 }
 
 ---------------------------------------------------------------------------
--- Daily rewards (index = streak day, loops after the last one)
+-- Daily rewards (index = streak day, loops after the last one).
+-- You get the bigger of: the fixed amount, or N minutes of your income.
 ---------------------------------------------------------------------------
 Config.Daily = {
 	Cooldown = 20 * 60 * 60, -- 20 hours
 	StreakResetAfter = 48 * 60 * 60,
 	Rewards = { 1_000, 2_500, 5_000, 10_000, 20_000, 40_000, 100_000 },
+	IncomeMinutes = { 2, 3, 5, 8, 12, 18, 30 },
 }
 
 ---------------------------------------------------------------------------
 -- Codes (case-insensitive). Remove a code or set Expired = true to disable.
 ---------------------------------------------------------------------------
 Config.Codes = {
-	RELEASE = { Cash = 1_000 },
-	MEGATYCOON = { Cash = 5_000 },
+	RELEASE = { Cash = 1_000, IncomeMinutes = 2 },
+	MEGATYCOON = { Cash = 5_000, IncomeMinutes = 5 },
 	BOOST = { BoostSeconds = 10 * 60 },
-	THANKYOU = { Cash = 25_000 },
+	THANKYOU = { Cash = 25_000, IncomeMinutes = 10 },
+	NUKE = { Cash = 10_000, IncomeMinutes = 5 },
+	DUO = { Cash = 10_000, IncomeMinutes = 5 },
+}
+
+---------------------------------------------------------------------------
+-- Day / night cycle
+---------------------------------------------------------------------------
+Config.DayNight = {
+	Enabled = true,
+	MinutesPerDay = 14,
+	StartTime = 13,
 }
 
 ---------------------------------------------------------------------------
 -- Loading screen tips
 ---------------------------------------------------------------------------
 Config.Tips = {
-	"Step on the green buttons in your tycoon to buy upgrades!",
-	"Upgraders multiply the value of every drop that passes through.",
-	"Rebirth to reset your tycoon and earn a permanent cash multiplier.",
+	"Your tower has 8 floors and over 500 upgrades. Can you max it out?",
+	"Use the elevator (or the FLOORS button) to move between floors.",
+	"Invite a friend with the DUO button and build one tower together!",
+	"NUKE INCOMING? Follow the green beam to the nearest bunker!",
+	"The Nuke Shield Dome (floor 2) protects your tower from disasters.",
+	"There are 12 secrets hidden around the map. Each one boosts your income!",
+	"Upgraders multiply the value of every drop on their floor.",
+	"Rebirth to reset your tower and earn a permanent cash multiplier.",
 	"Minigames start every few minutes - join them for big rewards!",
-	"Finish the obby next to the lobby for a huge cash prize.",
-	"Claim your daily reward every day to build your streak.",
+	"You earn cash while offline. Come back to collect it!",
 	"Codes can be redeemed in the Codes menu. Try RELEASE!",
-	"Don't forget to collect your vault!",
 }
 
 return Config

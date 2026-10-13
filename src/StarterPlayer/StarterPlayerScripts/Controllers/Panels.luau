@@ -8,6 +8,7 @@ local Config = require(Shared.Config)
 local Util = require(Shared.Util)
 local UIKit = require(Shared.UIKit)
 local Remotes = require(Shared.Remotes)
+local TycoonItems = require(Shared.TycoonItems)
 
 local player = Players.LocalPlayer
 local Theme = UIKit.Theme
@@ -51,6 +52,10 @@ local function buildRebirth()
 		ZIndex = 7,
 		Parent = content,
 		Callback = function()
+			if player:GetAttribute("DuoHost") then
+				C.Notifications:Toast("Only the tower owner can rebirth. Leave the duo to rebirth your own tower.", "error")
+				return
+			end
 			local cash = player:GetAttribute("Cash") or 0
 			local cost = player:GetAttribute("RebirthCost") or math.huge
 			if cash < cost then
@@ -76,7 +81,7 @@ local function buildRebirth()
 	local function refresh()
 		local rebirths = player:GetAttribute("Rebirths") or 0
 		local per = Config.Rebirth.MultiplierPerRebirth
-		local cost = player:GetAttribute("RebirthCost") or Config.GetRebirthCost(rebirths)
+		local cost = player:GetAttribute("RebirthCost") or TycoonItems.GetRebirthCost(rebirths)
 		local cash = player:GetAttribute("Cash") or 0
 		current.Text = "Rebirths: " .. rebirths
 		arrow.Text = string.format("x%s  ➜  x%s rebirth bonus", tostring(1 + rebirths * per), tostring(1 + (rebirths + 1) * per))
@@ -268,9 +273,64 @@ local function buildSettings()
 	C.UI.Panels.Settings.OnOpen = updateVol
 end
 
+---------------------------------------------------------------------------
+local function buildSecrets()
+	local _, content = C.UI:MakePanel("Secrets", "🕵️ SECRETS", Color3.fromRGB(90, 190, 110), 820, 560)
+	local header = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 30), Font = Theme.BodyFont, ZIndex = 7, Parent = content })
+	local scroll = UIKit.Scroll({ Size = UDim2.new(1, 0, 1, -40), Position = UDim2.fromOffset(0, 40), Parent = content })
+	local grid = UIKit.new("UIGridLayout", { CellSize = UDim2.new(0.31, 0, 0, 120), CellPadding = UDim2.new(0.02, 0, 0, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = scroll })
+	grid.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	local cards = {}
+	for i, secret in Config.Secrets do
+		local card = UIKit.new("Frame", { BackgroundColor3 = Theme.PanelLight, LayoutOrder = i, ZIndex = 7, Parent = scroll })
+		UIKit.Corner(card, 12)
+		local stroke = UIKit.Stroke(card, Theme.Background, 3)
+		local icon = UIKit.Label({ Text = "❔", Size = UDim2.new(1, 0, 0, 40), Position = UDim2.fromOffset(0, 6), ZIndex = 8, Parent = card })
+		local name = UIKit.Label({ Text = "???", Size = UDim2.new(1, -12, 0, 24), Position = UDim2.fromOffset(6, 48), ZIndex = 8, Parent = card })
+		local hint = UIKit.new("TextLabel", {
+			Text = secret.Hint,
+			Size = UDim2.new(1, -12, 0, 40),
+			Position = UDim2.fromOffset(6, 74),
+			BackgroundTransparency = 1,
+			TextWrapped = true,
+			TextSize = 13,
+			Font = Theme.BodyFont,
+			TextColor3 = Theme.SubText,
+			ZIndex = 8,
+			Parent = card,
+		})
+		cards[secret.Id] = { Stroke = stroke, Icon = icon, Name = name, Hint = hint, Secret = secret }
+	end
+	local function refresh()
+		local found = {}
+		for _, id in string.split(player:GetAttribute("SecretsFound") or "", ",") do
+			if id ~= "" then
+				found[id] = true
+			end
+		end
+		local count = 0
+		for id, card in cards do
+			local isFound = found[id] == true
+			if isFound then
+				count += 1
+			end
+			card.Icon.Text = isFound and "💎" or "❔"
+			card.Name.Text = isFound and card.Secret.Name or "???"
+			card.Name.TextColor3 = isFound and card.Secret.Color or Theme.Text
+			card.Stroke.Color = isFound and card.Secret.Color or Theme.Background
+			card.Hint.Text = isFound and "Found! Relic built in your tower." or ("Hint: " .. card.Secret.Hint)
+		end
+		header.Text = string.format("Found %d / %d   •   +%d%% income from secrets", count, #Config.Secrets, count * (Config.SecretRewards.BonusPercent or 5))
+	end
+	player:GetAttributeChangedSignal("SecretsFound"):Connect(refresh)
+	C.UI.Panels.Secrets.OnOpen = refresh
+	refresh()
+end
+
 function Panels:Init(controllers)
 	C = controllers
 	buildRebirth()
+	buildSecrets()
 	buildDaily()
 	buildCodes()
 	buildSettings()

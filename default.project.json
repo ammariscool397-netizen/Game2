@@ -24,7 +24,10 @@
     },
     "Workspace": {
       "$properties": {
-        "Gravity": 196.2
+        "Gravity": 196.2,
+        "StreamingEnabled": true,
+        "StreamingMinRadius": 128,
+        "StreamingTargetRadius": 640
       }
     },
     "Lighting": {},

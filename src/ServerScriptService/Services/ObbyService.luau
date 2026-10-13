@@ -22,7 +22,7 @@ local spinners = {}
 local startTimes: { [Player]: number } = {}
 local finishDebounce: { [Player]: boolean } = {}
 
-local START_X = -215
+local START_X = -420
 local KILL_COLOR = Color3.fromRGB(255, 40, 40)
 
 local folder: Model
@@ -149,7 +149,7 @@ function ObbyService:Init(services)
 		Part({ Name = "Arch", Size = Vector3.new(2, 16, 2), Position = Vector3.new(START_X - 9, 8, z), Color = Color3.fromRGB(40, 40, 55), Material = Enum.Material.Metal, Parent = folder })
 	end
 	local arch = Part({ Name = "ArchTop", Size = Vector3.new(2, 4, 22), Position = Vector3.new(START_X - 9, 17, 0), Color = Color3.fromRGB(255, 80, 160), Material = Enum.Material.Neon, Parent = folder })
-	BuildKit.SurfaceText(arch, Enum.NormalId.Right, "🏃 OBBY - " .. Util.Money(Config.Obby.Reward) .. "+ REWARD", { PixelsPerStud = 18 })
+	BuildKit.SurfaceText(arch, Enum.NormalId.Right, "🏃 OBBY - BIG CASH REWARD", { PixelsPerStud = 18 })
 	local startLine = Part({ Name = "StartLine", Size = Vector3.new(1, 14, 18), Position = Vector3.new(START_X - 9, 7, 0), Transparency = 1, CanCollide = false, Parent = folder })
 	startLine.Touched:Connect(function(hit)
 		local player = BuildKit.PlayerFromHit(hit)
@@ -174,6 +174,9 @@ function ObbyService:Init(services)
 			else
 				stage += 1
 				local thisStage = stage
+				if thisStage == 3 then
+					self:_buildSecretPath(pad.Position)
+				end
 				checkpoints[thisStage] = CFrame.lookAt(pad.Position + Vector3.new(0, 4, 0), pad.Position + Vector3.new(-10, 4, 0))
 				local flag = Part({ Name = "Flag", Size = Vector3.new(0.4, 8, 0.4), Position = pad.Position + Vector3.new(4, 4.5, 4), Color = Color3.fromRGB(230, 230, 230), Parent = folder })
 				local cloth = Part({ Name = "Cloth", Size = Vector3.new(0.2, 2.4, 3.6), Position = flag.Position + Vector3.new(0, 2.6, -1.9), Color = Color3.fromRGB(60, 220, 100), Material = Enum.Material.Fabric, Parent = folder })
@@ -206,6 +209,32 @@ function ObbyService:Init(services)
 		startTimes[player] = nil
 		finishDebounce[player] = nil
 	end)
+end
+
+-- barely-visible platforms branching off checkpoint 3 lead to a secret
+function ObbyService:_buildSecretPath(origin: Vector3)
+	for k = 1, 5 do
+		local ghost = Part({
+			Name = "Ghost",
+			Size = Vector3.new(5, 1, 5),
+			Position = origin + Vector3.new(rng:NextNumber(-2, 2), k * 1.4, 8 + k * 7.5),
+			Color = Color3.fromRGB(200, 220, 255),
+			Material = Enum.Material.Glass,
+			Transparency = 0.93,
+			Parent = folder,
+		})
+		ghost.Name = "Ghost" .. k
+	end
+	local hideout = Part({
+		Name = "Hideout",
+		Size = Vector3.new(9, 1, 9),
+		Position = origin + Vector3.new(0, 8.4, 54),
+		Color = Color3.fromRGB(255, 80, 160),
+		Material = Enum.Material.Neon,
+		Transparency = 0.6,
+		Parent = folder,
+	})
+	ObbyService.SecretSpot = hideout.Position + Vector3.new(0, 3, 0)
 end
 
 function ObbyService:_buildFinish(pad: BasePart)
@@ -256,7 +285,7 @@ function ObbyService:_finish(player: Player)
 	local now = os.time()
 	if now - data.LastObbyReward >= Config.Obby.Cooldown then
 		data.LastObbyReward = now
-		local reward = Config.Obby.Reward * (1 + data.Rebirths)
+		local reward = math.max(Config.Obby.MinReward * (1 + data.Rebirths), S.TycoonService:GetIncome(player) * Config.Obby.RewardIncomeSeconds)
 		S.DataService:AddCash(player, reward, false)
 		Remotes.Notify:FireClient(player, { Text = "Obby complete! +" .. Util.Money(reward), Type = "success", Duration = 6 })
 		Remotes.VFX:FireClient(player, "CashBurst", { Amount = reward })

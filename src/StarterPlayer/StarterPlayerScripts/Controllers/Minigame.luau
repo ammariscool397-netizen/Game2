@@ -89,7 +89,7 @@ local function buildUI()
 	-- in-game bar (top)
 	playBar = UIKit.new("Frame", {
 		Size = UDim2.fromOffset(420, 40),
-		Position = UDim2.new(0.5, 0, 0, 150),
+		Position = UDim2.new(0.5, 0, 0, 166),
 		AnchorPoint = Vector2.new(0.5, 0),
 		BackgroundColor3 = Theme.Panel,
 		BackgroundTransparency = 0.1,

@@ -110,6 +110,9 @@ function MonetizationService:RevokePass(player: Player, key: string)
 	end
 	player:SetAttribute("Pass_" .. key, nil)
 	S.DataService:RefreshMultiplier(player)
+	if S.TycoonService then
+		S.TycoonService:RefreshPlayer(player)
+	end
 end
 
 function MonetizationService:_applyPass(player: Player, key: string, announce: boolean)
@@ -118,9 +121,11 @@ function MonetizationService:_applyPass(player: Player, key: string, announce: b
 	end
 	player:SetAttribute("Pass_" .. key, true)
 	S.DataService:RefreshMultiplier(player)
-	if key == "AutoCollect" and S.TycoonService then
-		S.TycoonService:CollectVault(player)
-		S.TycoonService:RefreshVaultLabel(player)
+	if S.TycoonService then
+		if key == "AutoCollect" then
+			S.TycoonService:CollectVault(player)
+		end
+		S.TycoonService:RefreshPlayer(player)
 	end
 	if player.Character then
 		self:_applyCharacterPerks(player, player.Character)
@@ -224,11 +229,15 @@ function MonetizationService:_grantProduct(player: Player, key: string): boolean
 	if not product or not data then
 		return false
 	end
-	if product.Cash then
-		local amount = product.Cash * (1 + data.Rebirths)
+	if product.Minutes then
+		local amount = math.max(product.MinCash * (1 + data.Rebirths), S.TycoonService:GetIncome(player) * product.Minutes * 60)
 		S.DataService:AddCash(player, amount, false)
 		Remotes.Notify:FireClient(player, { Text = "+" .. Util.Money(amount) .. " added! Thank you! 💰", Type = "success", Duration = 6 })
 		Remotes.VFX:FireClient(player, "CashBurst", { Amount = amount })
+	end
+	if product.Repair then
+		local count = S.TycoonService:RepairAll(player)
+		Remotes.Notify:FireClient(player, { Text = count > 0 and ("🔧 Repaired " .. count .. " upgrades!") or "🔧 Nothing was broken - your tower is fine!", Type = "success", Duration = 6 })
 	end
 	if product.BoostSeconds then
 		S.DataService:AddBoost(player, product.BoostSeconds)
@@ -236,6 +245,9 @@ function MonetizationService:_grantProduct(player: Player, key: string): boolean
 	end
 	if product.ServerEvent == "CashRain" then
 		self:CashRain(player.DisplayName)
+	elseif product.ServerEvent and S.DisasterService then
+		local message = S.DisasterService:Trigger(product.ServerEvent, player.DisplayName)
+		Remotes.Notify:FireClient(player, { Text = message, Type = "info" })
 	end
 	Remotes.VFX:FireClient(player, "Confetti", {})
 	return true
@@ -252,7 +264,7 @@ function MonetizationService:CashRain(byName: string)
 	for _, p in Players:GetPlayers() do
 		local data = S.DataService:Get(p)
 		if data then
-			local amount = 5_000 * (1 + data.Rebirths)
+			local amount = math.max(5_000 * (1 + data.Rebirths), S.TycoonService:GetIncome(p) * 120)
 			S.DataService:AddCash(p, amount, false)
 			Remotes.Notify:FireClient(p, { Text = "Cash Rain: +" .. Util.Money(amount), Type = "success" })
 		end
