@@ -88,6 +88,63 @@ local function retry<T>(fn: () -> T, attempts: number?): (boolean, T | string)
 	return false, tostring(lastErr)
 end
 
+--[[ Session locks: a save says which server is using it ({ Job, Time }).
+	A player who hops servers quickly would otherwise get their new progress
+	overwritten by the old server's late save. The new server waits for the
+	old one to release the lock (its leave-save does), and steals it if the
+	lock is stale (that server crashed) or never released. A server that
+	lost its lock never writes again. ]]
+local SESSION_STALE = 150 -- seconds without a save = that server is gone
+local SESSION_WAIT = 15 -- seconds we wait for another server to let go
+local SESSION_RETRY = 3
+
+local function jobId(): string
+	return game.JobId ~= "" and game.JobId or "studio"
+end
+
+local function lockedByOther(old, now: number): boolean
+	if type(old) ~= "table" or type(old.Session) ~= "table" then
+		return false
+	end
+	local session = old.Session
+	return session.Job ~= jobId() and type(session.Time) == "number" and now - session.Time < SESSION_STALE
+end
+
+-- loads the save and takes its lock. Returns (ok, data | error, waited)
+local function loadAndLock(key: string)
+	local started = os.time()
+	while true do
+		local blocked = false
+		local steal = os.time() - started >= SESSION_WAIT
+		local ok, result = retry(function()
+			return (store :: DataStore):UpdateAsync(key, function(old)
+				local now = os.time()
+				blocked = false -- (Roblox may run this more than once)
+				if not steal and lockedByOther(old, now) then
+					blocked = true
+					return nil -- leave it alone for now
+				end
+				if old ~= nil and type(old) ~= "table" then
+					old = nil -- garbage: start fresh (Reconcile fills it)
+				end
+				old = old or {}
+				old.Session = { Job = jobId(), Time = now }
+				return old
+			end)
+		end)
+		if not ok then
+			return false, result
+		end
+		if not blocked then
+			if steal then
+				warn("[DataService] Took over a session lock that was never released (" .. key .. ")")
+			end
+			return true, result
+		end
+		task.wait(SESSION_RETRY)
+	end
+end
+
 -- Leaderboard values are stored as log10 so huge numbers still sort correctly
 function DataService.EncodeEarned(n: number): number
 	return math.floor(math.log10(math.max(n, 0) + 1) * 1e13)
@@ -119,7 +176,7 @@ function DataService:Start()
 		local threads = {}
 		for _, player in Players:GetPlayers() do
 			table.insert(threads, task.spawn(function()
-				self:Save(player)
+				self:Save(player, true)
 			end))
 		end
 		local start = os.clock()
@@ -190,9 +247,7 @@ function DataService:_onJoin(player: Player)
 
 	local data
 	if store then
-		local ok, result = retry(function()
-			return (store :: DataStore):GetAsync(keyFor(player))
-		end)
+		local ok, result = loadAndLock(keyFor(player))
 		if ok then
 			canSave[player] = true
 			data = result
@@ -253,14 +308,15 @@ end
 
 function DataService:_onLeave(player: Player)
 	if profiles[player] then
-		self:Save(player)
+		self:Save(player, true)
 	end
 	profiles[player] = nil
 	canSave[player] = nil
 	joinTime[player] = nil
 end
 
-function DataService:Save(player: Player)
+-- release = this is the last save (player leaving / server closing): unlock it
+function DataService:Save(player: Player, release: boolean?)
 	local data = profiles[player]
 	if not data or not canSave[player] or not store then
 		return false
@@ -276,11 +332,24 @@ function DataService:Save(player: Player)
 	if fixed > 0 then
 		warn("[DataService] Repaired " .. fixed .. " invalid numbers before saving " .. player.Name)
 	end
+	local releasing = release == true
+	local lost = false
 	local ok, err = retry(function()
-		(store :: DataStore):UpdateAsync(keyFor(player), function()
+		(store :: DataStore):UpdateAsync(keyFor(player), function(old)
+			lost = false
+			if type(old) == "table" and type(old.Session) == "table" and old.Session.Job ~= jobId() then
+				lost = true
+				return nil -- another server took this player over: never overwrite it
+			end
+			data.Session = (not releasing) and { Job = jobId(), Time = os.time() } or nil
 			return data
 		end)
 	end)
+	if lost then
+		canSave[player] = false
+		warn("[DataService] " .. player.Name .. "'s data is open in another server; this server stopped saving it")
+		return false
+	end
 	if not ok then
 		warn("[DataService] Save failed for " .. player.Name .. ": " .. tostring(err))
 	end

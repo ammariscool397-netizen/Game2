@@ -2158,4 +2158,72 @@ add({
 	end,
 })
 
+---------------------------------------------------------------------------
+-- Session locks: hopping servers never loses or rolls back progress
+---------------------------------------------------------------------------
+add({
+	Name = "session_lock",
+	AllowedWarnings = { "Took over a session lock", "open in another server" },
+	Run = function(T, place)
+		local game = T.Boot(place, { Client = false })
+		local Config = T.Shared("Config")
+		local DataService = T.Service("DataService")
+		local db = T.Engine.DataStores[Config.DataStoreName]
+		local function now()
+			return math.floor(T.Engine.EpochBase + T.Engine.Now)
+		end
+
+		-- 1) another server still has the player: wait until it lets go
+		db.Player_9001 = { Cash = 777, Purchased = { F1_1 = true }, Session = { Job = "other-server", Time = now() } }
+		local hopper = T.AddPlayer("Hopper", { UserId = 9001 })
+		T.Wait(2)
+		T.Check(not hopper:GetAttribute("DataLoaded"), "waits while another server holds the save")
+		-- the old server finishes its leave-save (newer progress) and releases the lock
+		db.Player_9001 = { Cash = 888, Purchased = { F1_1 = true } }
+		T.WaitFor(function()
+			return hopper:GetAttribute("DataLoaded")
+		end, 10, "load after the other server released")
+		T.Check(DataService:Get(hopper).Cash == 888, "got the old server's final save (no rollback)")
+		T.Check(db.Player_9001.Session and db.Player_9001.Session.Job == "sim-job", "this server holds the lock now")
+
+		-- 2) a stale lock (that server crashed) is taken over right away
+		db.Player_9002 = { Cash = 55, Purchased = { F1_1 = true }, Session = { Job = "dead-server", Time = now() - 3600 } }
+		local crashed = T.AddPlayer("Crashed", { UserId = 9002 })
+		T.Wait(2)
+		T.Check(crashed:GetAttribute("DataLoaded") and DataService:Get(crashed).Cash == 55, "stale lock taken over immediately")
+
+		-- 3) a lock that's never released: taken over after a while
+		db.Player_9003 = { Cash = 66, Purchased = { F1_1 = true }, Session = { Job = "stuck-server", Time = now() } }
+		local stuck = T.AddPlayer("Stuck", { UserId = 9003 })
+		T.WaitFor(function()
+			return stuck:GetAttribute("DataLoaded")
+		end, 30, "stuck lock takeover")
+		T.Check(T.Warned("Took over a session lock"), "takeover is logged")
+
+		-- 4) another server takes OUR player: stop saving, never overwrite
+		db.Player_9001.Session = { Job = "new-server", Time = now() }
+		db.Player_9001.Cash = 999
+		DataService:AddCash(hopper, 5, false)
+		T.Server(function()
+			DataService:Save(hopper)
+		end)
+		T.Check(db.Player_9001.Cash == 999, "lost lock: the other server's data is kept")
+		T.Check(T.Warned("open in another server"), "lost lock is logged")
+		T.Engine.RemovePlayer(hopper)
+		T.Wait(1)
+		T.Check(db.Player_9001.Cash == 999 and db.Player_9001.Session.Job == "new-server", "leaving doesn't overwrite it either")
+
+		-- 5) a normal leave releases the lock (and saves)
+		DataService:AddCash(crashed, 45, false)
+		T.Engine.RemovePlayer(crashed)
+		T.Wait(1)
+		T.Check(db.Player_9002.Session == nil, "leaving releases the lock")
+		T.Check(db.Player_9002.Cash == 100, "and saves the latest data")
+		-- autosave keeps the lock fresh
+		T.SetDt(1)
+		T.Wait(100)
+		T.Check(db.Player_9003.Session and now() - db.Player_9003.Session.Time < 100, "autosave refreshes the lock")
+	end,
+})
+
 return Scenarios
