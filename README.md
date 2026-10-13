@@ -22,7 +22,7 @@ All settings live in `src/ReplicatedStorage/Shared/Config.luau`.
 | What | Where in Config | Notes |
 |---|---|---|
 | **Server size** | Place settings | Set **Max Players = 8** (one tower per player; duos free up towers) |
-| Game Pass IDs | `Config.GamePasses.*.Id` | Create passes on the Creator Dashboard. `0` = not configured |
+| Game Pass IDs | `Config.GamePasses.*.Id` | Create passes on the Creator Dashboard (2x Cash, Auto Collect, Fast Droppers, VIP, Super Speed, Auto Builder). `0` = not configured |
 | Developer Product IDs | `Config.Products.*.Id` | Cash packs, 2x boost, instant repair, launch nuke, meteor storm, cash rain |
 | Admins | `Config.Admin.Admins` | `[UserId] = rank` (1 Mod, 2 Admin, 3 Head Admin, 4 Owner). The place creator is always Owner |
 | Music | `Config.Music` | Replace the IDs with audio you're allowed to use. Broken IDs are skipped automatically |
@@ -30,6 +30,8 @@ All settings live in `src/ReplicatedStorage/Shared/Config.luau`.
 | Pace / economy | `Config.Tycoon`, `Config.Rebirth` | `PaceStartSeconds`/`PaceEndSeconds` rescale every price at once |
 | Disasters | `Config.Disasters` | Frequency, weights, damage, wreck time |
 | Secrets | `Config.Secrets` | Names, hints, optional `BadgeId` |
+| Quests / gifts | `Config.Quests`, `Config.Gifts` | Quest types, targets and rewards; playtime gift times |
+| Free bonuses | `Config.Bonuses` | Premium and friends-in-server income bonus |
 
 Also: **Game Settings → Security → Enable Studio Access to API Services**
 (needed for saving data / leaderboards in Studio).
@@ -48,6 +50,8 @@ place with Rojo and uploads it straight into your Roblox place with **Open Cloud
    - *Variable* `ROBLOX_UNIVERSE_ID` = your Universe ID (Creator Dashboard → your experience → ⋯ → Copy Universe ID)
    - *Variable* `ROBLOX_PLACE_ID` = the number in your place's URL
 
+Every push first runs the **type checker** and the **gameplay simulation tests**
+(see below); nothing is uploaded unless they all pass.
 Pushes upload a **Saved** version (not live yet: open the place in Studio to see it).
 Run the workflow manually (**Actions → Build & publish to Roblox → Run workflow → Published**)
 to make it live for players. Until the secret is set, the workflow just builds the file.
@@ -58,7 +62,7 @@ MCP server (Studio → Assistant → ⋯ → MCP Servers → Quick connect → C
 
 ### Working on the code with Rojo (optional)
 ```bash
-aftman install          # or: rokit install  (installs Rojo 7.4.4)
+aftman install          # or: rokit install  (installs Rojo 7.4.4 + Lune 0.8.9)
 rojo serve              # then connect from the Rojo Studio plugin
 rojo build -o MegaTycoon.rbxlx   # rebuild the place file
 ```
@@ -77,7 +81,20 @@ rojo build -o MegaTycoon.rbxlx   # rebuild the place file
 - Buy on the physical buttons **or** in the **🏗️ BUILD** menu (B key), with **⚡ BUY ALL**
 - **Elevators** on every floor + **🛗 FLOORS** menu to jump between floors
 - Vault pads on every floor (or skip them with Auto Collect), **offline earnings**
-- Rebirths for a permanent multiplier, DataStore saving, global leaderboard
+- Rebirths for a permanent multiplier, global leaderboard
+- **Safe saving**: session-locked DataStore saves (hopping servers can't lose or
+  duplicate progress), corrupted values are repaired, nothing invalid is ever saved
+
+**🧭 Guide beam** — new players get a glowing beam to the cheapest button they can
+afford (or to the vault when collecting would pay for it). Toggle in Settings.
+
+**📜 Quests** — 3 quests at a time (buy upgrades, earn, collect, unlock the next floor,
+find a secret, beat the obby, play a minigame, survive a disaster); rewards scale with
+your income. Claim them from the tracker in the bottom-right corner. Saved.
+
+**🎁 Playtime gifts** — 6 gifts unlock during your first hour in a server.
+
+**⭐ Free bonuses** — +10% income for Roblox Premium, +10% per friend in the server.
 
 **👥 Duo building** — invite anyone in the server; you build **one tower** together with
 **one shared wallet** (saved to the owner). Game passes help the whole duo. Leave any
@@ -103,7 +120,8 @@ Each gives cash, **+5% income forever** and a glowing relic in your tower's fron
 graveyard, waterfall cliff, ring road, day/night cycle, public nuke bunker.
 
 **Robux shop (🛒 SHOP / G key)**
-- Passes: 2x Cash, Auto Collect, Fast Droppers, VIP, Super Speed
+- Passes: 2x Cash, Auto Collect, Fast Droppers, VIP, Super Speed, **Auto Builder**
+  (your tower buys its best affordable upgrade by itself)
 - Products: 4 cash packs (paid in minutes of income), 2x Boost, Instant Repair,
   **Launch a Nuke**, **Meteor Storm**, Server Cash Rain
 - Secure `ProcessReceipt` with purchase history (no double grants)
@@ -145,6 +163,8 @@ src/
       TycoonService        towers, buttons, income, elevators, wreck + repair
       TycoonBuilder        procedural models for every item
       DuoService           duo invites
+      QuestService         quests (3 at a time, saved)
+      GiftService          playtime gifts
       DisasterService      nuke / meteors / tornado / UFO
       SecretService        12 map secrets
       MonetizationService  passes, products, receipts
@@ -157,10 +177,33 @@ src/
       BuildKit             geometry helpers
   StarterPlayer/StarterPlayerScripts/
     Client.client.luau     boots every controller
-    Controllers/           UI, HUD, Build, Shop, Panels, Duo, Disasters, DropVisuals,
-                           Admin, Minigame, Music, VFX, Animator, Notifications, ChatTags
-.github/workflows/publish-roblox.yml   build + auto-publish to Roblox
+    Controllers/           UI, HUD, Build, Shop, Panels, Duo, Disasters, Quests, Gifts,
+                           Guide, DropVisuals, Admin, Minigame, Music, VFX, Animator,
+                           Notifications, ChatTags
+tests/sim/                 headless gameplay tests (Engine, Harness, Scenarios, run)
+.github/workflows/publish-roblox.yml   type check + tests + build + auto-publish to Roblox
 ```
+
+## 🧪 Automated tests (`tests/sim`)
+
+The game is tested by **playing it headless**: `tests/sim` loads the built place file
+and runs the real server *and* client scripts against a simulated Roblox engine on
+[Lune](https://lune-org.github.io) (virtual clock, remotes, players and characters,
+DataStores, purchases, tweens, CollectionService...). 30 scenarios cover a full
+502-upgrade playthrough, every disaster, duos, secrets, every admin command and rank,
+Studio + real Robux purchases (no double grants), saving/loading/offline earnings,
+session locks, the obby, all minigames, quests, gifts, the guide beam, clicking every
+UI button, every client effect, and an exploiter firing garbage at every remote.
+
+```bash
+rojo build -o MegaTycoon.rbxlx
+lune run tests/sim/run.luau -- MegaTycoon.rbxlx            # all scenarios
+lune run tests/sim/run.luau -- MegaTycoon.rbxlx nuke       # one scenario
+SIM_SIGNAL_ORDER=reverse SIM_SEED=7 lune run tests/sim/run.luau -- MegaTycoon.rbxlx
+```
+Any script error, failed check or unexpected warning fails the run. CI also runs the
+suite with event handlers in reverse order (Roblox doesn't promise an order) and the
+`luau-lsp` type checker.
 
 ## 🛠️ How the economy works
 `TycoonItems.luau` walks all items in order and prices each one at "N seconds of the

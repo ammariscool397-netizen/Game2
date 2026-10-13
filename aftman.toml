@@ -1,3 +1,4 @@
 # Tool versions (install with https://github.com/LPGhatguy/aftman or rokit)
 [tools]
 rojo = "rojo-rbx/rojo@7.4.4"
+lune = "lune-org/lune@0.8.9"
