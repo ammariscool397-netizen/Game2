@@ -27,7 +27,37 @@ on:
         options: [Saved, Published]
 
 jobs:
+  # Plays the game headless (tests/sim): a full playthrough, every disaster,
+  # duos, admin commands, purchases, saving... Nothing is published unless
+  # every scenario passes, with event handlers fired in both orders.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rojo + Lune
+        run: |
+          mkdir -p "$HOME/bin"
+          curl -sSL -o rojo.zip https://github.com/rojo-rbx/rojo/releases/download/v7.4.4/rojo-7.4.4-linux-x86_64.zip
+          curl -sSL -o lune.zip https://github.com/lune-org/lune/releases/download/v0.8.9/lune-0.8.9-linux-x86_64.zip
+          unzip -o rojo.zip -d "$HOME/bin"
+          unzip -o lune.zip -d "$HOME/bin"
+          chmod +x "$HOME/bin/rojo" "$HOME/bin/lune"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Build place file
+        run: rojo build default.project.json -o MegaTycoon.rbxlx
+
+      - name: Gameplay simulation tests
+        run: lune run tests/sim/run.luau -- MegaTycoon.rbxlx
+
+      - name: Gameplay simulation tests (reversed event order)
+        env:
+          SIM_SIGNAL_ORDER: reverse
+        run: lune run tests/sim/run.luau -- MegaTycoon.rbxlx
+
   build-and-publish:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
