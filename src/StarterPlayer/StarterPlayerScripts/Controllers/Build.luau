@@ -424,8 +424,7 @@ function Build:Start()
 	task.wait(1)
 	self:Refetch()
 	-- countdown timers on wrecked items
-	while true do
-		task.wait(1)
+	local function tick()
 		if C.UI.Current == "Build" and next(self.State.Disabled) then
 			updateRows()
 		end
@@ -435,6 +434,10 @@ function Build:Start()
 				self.State.Disabled[id] = nil
 			end
 		end
+	end
+	while true do
+		task.wait(1)
+		Util.Try("Build", tick)
 	end
 end
 

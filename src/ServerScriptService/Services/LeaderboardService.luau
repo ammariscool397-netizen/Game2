@@ -3,6 +3,9 @@
 	(OrderedDataStore, refreshes every 2 minutes).
 ]]
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Util = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Util"))
 
 local LeaderboardService = {}
 local S
@@ -20,7 +23,7 @@ local function nameFor(userId: number): string
 end
 
 local function abbreviate(n: number): string
-	return require(game:GetService("ReplicatedStorage").Shared.Util).Money(n)
+	return Util.Money(n)
 end
 
 function LeaderboardService:Init(services)
@@ -108,7 +111,7 @@ end
 function LeaderboardService:Start()
 	task.wait(5)
 	while true do
-		self:Refresh()
+		Util.Try("Leaderboard", self.Refresh, self)
 		task.wait(REFRESH)
 	end
 end

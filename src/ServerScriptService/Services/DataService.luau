@@ -149,23 +149,28 @@ function DataService:Start()
 	task.spawn(function()
 		while true do
 			task.wait(1)
-			local ends = workspace:GetAttribute("EventEnds") or 0
-			if (workspace:GetAttribute("EventMultiplier") or 1) ~= 1 and os.time() >= ends then
-				workspace:SetAttribute("EventMultiplier", 1)
-				Remotes.Announce:FireAllClients({ Title = "EVENT OVER", Text = "The cash multiplier event has ended.", Color = Color3.fromRGB(200, 200, 200) })
-				for _, p in Players:GetPlayers() do
-					self:RefreshMultiplier(p)
-				end
-			end
-			for player, data in profiles do
-				if data.BoostEnd > 0 and os.time() >= data.BoostEnd then
-					data.BoostEnd = 0
-					self:Sync(player)
-					Remotes.Notify:FireClient(player, { Text = "Your 2x Boost has ended.", Type = "info" })
-				end
-			end
+			Util.Try("Boost expiry", self._expireBoosts, self)
 		end
 	end)
+end
+
+function DataService:_expireBoosts()
+	local ends = workspace:GetAttribute("EventEnds")
+	local mult = workspace:GetAttribute("EventMultiplier") or 1
+	if mult ~= 1 and (not Util.IsFinite(ends) or os.time() >= ends) then
+		workspace:SetAttribute("EventMultiplier", 1)
+		Remotes.Announce:FireAllClients({ Title = "EVENT OVER", Text = "The cash multiplier event has ended.", Color = Color3.fromRGB(200, 200, 200) })
+		for _, p in Players:GetPlayers() do
+			self:RefreshMultiplier(p)
+		end
+	end
+	for player, data in profiles do
+		if data.BoostEnd > 0 and os.time() >= data.BoostEnd then
+			data.BoostEnd = 0
+			self:Sync(player)
+			Remotes.Notify:FireClient(player, { Text = "Your 2x Boost has ended.", Type = "info" })
+		end
+	end
 end
 
 function DataService:_onJoin(player: Player)

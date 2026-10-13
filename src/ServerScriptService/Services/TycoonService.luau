@@ -178,41 +178,49 @@ function TycoonService:Start()
 		end
 	end)
 
-	-- income tick + repairs
+	-- income tick + repairs (each tower protected on its own: one bug must
+	-- never stop everybody's income)
 	task.spawn(function()
 		while true do
 			task.wait(1)
 			local now = os.time()
 			for _, plot in plots do
-				local owner = plot.Owner
-				if owner and S.DataService:IsLoaded(owner) then
-					-- repair wrecked items whose timer ran out
-					local repaired = false
-					for id, untilTime in plot.Disabled do
-						if now >= untilTime then
-							self:_repair(plot, id)
-							repaired = true
-						end
-					end
-					if repaired then
-						self:_recompute(plot)
-					end
-					local mult = S.DataService:GetMultiplier(owner)
-					local amount = plot.Income * mult
-					if amount > 0 then
-						if S.DataService:TeamHasPass(owner, "AutoCollect") then
-							S.DataService:AddCash(owner, amount)
-						else
-							S.DataService:AddVault(owner, amount)
-						end
-					end
-					for _, member in members(plot) do
-						member:SetAttribute("Income", amount)
-					end
-				end
+				Util.Try("Tycoon income", self._tick, self, plot, now)
 			end
 		end
 	end)
+end
+
+function TycoonService:_tick(plot, now: number)
+	local owner = plot.Owner
+	if not owner or not S.DataService:IsLoaded(owner) then
+		return
+	end
+	-- repair wrecked items whose timer ran out
+	local due = {}
+	for id, untilTime in plot.Disabled do
+		if now >= untilTime then
+			table.insert(due, id)
+		end
+	end
+	for _, id in due do
+		self:_repair(plot, id)
+	end
+	if #due > 0 then
+		self:_recompute(plot)
+	end
+	local mult = S.DataService:GetMultiplier(owner)
+	local amount = plot.Income * mult
+	if amount > 0 then
+		if S.DataService:TeamHasPass(owner, "AutoCollect") then
+			S.DataService:AddCash(owner, amount)
+		else
+			S.DataService:AddVault(owner, amount)
+		end
+	end
+	for _, member in members(plot) do
+		member:SetAttribute("Income", amount)
+	end
 end
 
 ---------------------------------------------------------------------------

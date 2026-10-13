@@ -306,10 +306,10 @@ function HUD:Start()
 			self:Refresh()
 		end)
 	end
-	self:Refresh()
+	Util.Try("HUD", self.Refresh, self)
 	while true do
 		task.wait(0.5)
-		self:Refresh()
+		Util.Try("HUD", self.Refresh, self)
 	end
 end
 

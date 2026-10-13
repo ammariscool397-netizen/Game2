@@ -17,6 +17,7 @@ local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
+local Util = require(Shared.Util)
 local UIKit = require(Shared.UIKit)
 local Remotes = require(Shared.Remotes)
 
@@ -852,19 +853,23 @@ function Disasters:Init(controllers)
 	end)
 end
 
+local function updateStatus()
+	if nukeActive and statusChip.Visible then
+		local root = getRoot()
+		if root then
+			local safe = isSheltered(root.Position)
+			statusChip.Text = safe and "✅ YOU ARE SAFE" or "⚠️ EXPOSED - GET TO A BUNKER!"
+			statusChip.TextColor3 = safe and Color3.fromRGB(120, 255, 140) or Color3.fromRGB(255, 110, 80)
+			updateBeam()
+		end
+	end
+end
+
 function Disasters:Start()
 	-- live shelter status + beam while a nuke is coming
 	while true do
 		task.wait(0.25)
-		if nukeActive and statusChip.Visible then
-			local root = getRoot()
-			if root then
-				local safe = isSheltered(root.Position)
-				statusChip.Text = safe and "✅ YOU ARE SAFE" or "⚠️ EXPOSED - GET TO A BUNKER!"
-				statusChip.TextColor3 = safe and Color3.fromRGB(120, 255, 140) or Color3.fromRGB(255, 110, 80)
-				updateBeam()
-			end
-		end
+		Util.Try("Disasters", updateStatus)
 	end
 end
 

@@ -1685,4 +1685,139 @@ add({
 	end,
 })
 
+---------------------------------------------------------------------------
+-- Elevators + FLOORS menu
+---------------------------------------------------------------------------
+add({
+	Name = "floors",
+	Run = function(T, place)
+		local game, me = T.Boot(place)
+		local neighbour = T.AddPlayer("Neighbour")
+		T.Wait(6)
+		local TycoonService = T.Service("TycoonService")
+		local TycoonBuilder = T.Service("TycoonBuilder")
+		local Config = T.Shared("Config")
+		local plot = TycoonService:GetPlot(me)
+		local UI = T.Controller("UI")
+		-- locked floors can't be visited
+		T.Client(function()
+			T.Remote("TeleportFloor"):FireServer(plot.Index, 3)
+		end)
+		T.Wait(0.5)
+		T.Check(T.Noticed(me, "isn't built"), "locked floor refused")
+		T.Admin(me, ";unlockfloor me 9")
+		waitBuilt(T, plot)
+		-- the elevator prompt on floor 1 opens the FLOORS menu
+		local prompt
+		for _, d in plot.Built.F1_1:GetDescendants() do
+			if d:IsA("ProximityPrompt") then
+				prompt = d
+			end
+		end
+		T.Check(prompt ~= nil, "floor 1 elevator has a prompt")
+		T.Engine.TriggerPrompt(prompt, me)
+		T.Wait(0.5)
+		T.Check(UI.Current == "Floors", "elevator opens the FLOORS menu")
+		for floor = 1, Config.Tycoon.Floors + 1 do
+			T.Client(function()
+				T.Controller("Build"):OpenFloors(nil)
+			end)
+			T.Wait(0.5)
+			local button
+			for _, d in me.PlayerGui:GetDescendants() do
+				if d.Name == "Floor" .. floor and d:IsA("TextButton") then
+					button = d
+				end
+			end
+			T.Check(button ~= nil and not button.Text:find("🔒"), "floor " .. floor .. " button unlocked")
+			if button then
+				T.Client(function()
+					T.Engine.Click(button)
+				end)
+				T.Wait(0.5)
+				local y = T.Root(me).Position.Y
+				local floorY = TycoonBuilder.FloorCF(plot, floor).Position.Y
+				T.Check(math.abs(y - floorY - 4) < 1, ("teleported to floor %d (y=%.1f, floor at %.1f)"):format(floor, y, floorY))
+			end
+		end
+		-- visiting a neighbour's tower: only built floors work
+		T.Client(function()
+			T.Remote("TeleportFloor"):FireServer(TycoonService:GetPlot(neighbour).Index, 1)
+		end)
+		T.Wait(0.5)
+		local npos = TycoonService:GetPlot(neighbour).TowerCF.Position
+		T.Check((T.Root(me).Position - npos).Magnitude < 70, "can visit a neighbour's floor 1")
+		T.Client(function()
+			T.Remote("TeleportFloor"):FireServer(TycoonService:GetPlot(neighbour).Index, 5)
+		end)
+		T.Wait(0.5)
+		T.Check(T.Noticed(me, "isn't built"), "can't visit a neighbour's unbuilt floor")
+		-- HOME button
+		T.Client(function()
+			T.Remote("GoHome"):FireServer()
+		end)
+		T.Wait(0.5)
+		T.Check((T.Root(me).Position - plot.SpawnCFrame.Position).Magnitude < 1, "HOME teleports to the tower gate")
+	end,
+})
+
+---------------------------------------------------------------------------
+-- A full 8-player server with maxed towers: performance + nuke on everyone
+---------------------------------------------------------------------------
+add({
+	Name = "full_server",
+	MaxSeconds = 1200,
+	Run = function(T, place)
+		local clock = os.clock()
+		local game, me = T.Boot(place)
+		local players = { me }
+		for i = 1, 7 do
+			table.insert(players, T.AddPlayer("Player" .. i))
+		end
+		T.Wait(6)
+		local TycoonService = T.Service("TycoonService")
+		local TycoonItems = T.Shared("TycoonItems")
+		for _, p in players do
+			T.Check(p:GetAttribute("Plot") ~= nil, p.Name .. " has a tower")
+			TycoonService:UnlockAll(p)
+		end
+		local buildStart = T.Engine.Now
+		for _, p in players do
+			waitBuilt(T, TycoonService:GetPlot(p))
+		end
+		local buildTime = T.Engine.Now - buildStart
+		T.Check(buildTime < 15, ("8 maxed towers build in %.1fs of game time"):format(buildTime))
+		local ws = game:GetService("Workspace")
+		local towerParts = #ws:FindFirstChild("Tycoons"):GetDescendants()
+		print(("    8 maxed towers: %d instances, built in %.1fs"):format(towerParts, buildTime))
+		T.Check(towerParts < 120000, "instance count is sane (" .. towerParts .. ")")
+		for _, p in players do
+			T.Check(count(TycoonService:GetPlot(p).Built) >= TycoonItems.BuyableCount, p.Name .. " tower complete")
+		end
+		-- client: drops stay bounded on a full tower
+		T.Admin(me, ";floor 1")
+		local maxDrops = 0
+		for _ = 1, 60 do
+			T.Wait(0.5)
+			maxDrops = math.max(maxDrops, #ws:FindFirstChild("LocalDrops"):GetChildren())
+		end
+		print("    max client drops alive: " .. maxDrops)
+		T.Check(maxDrops > 5, "drops render on the client")
+		T.Check(maxDrops <= 200, "client drops are capped")
+		-- a nuke over 8 maxed towers
+		local stepClock = os.clock()
+		T.Admin(me, ";nuke")
+		T.WaitFor(function()
+			return ws:GetAttribute("Disaster") == nil and T.Engine.Now > buildStart + 60
+		end, 120, "nuke over the full server")
+		local wrecked = 0
+		for _, p in players do
+			wrecked += TycoonService:WreckedCount(TycoonService:GetPlot(p))
+		end
+		print(("    nuke wrecked %d items on 8 towers in %.1fs real time"):format(wrecked, os.clock() - stepClock))
+		T.Check(wrecked == 0, "maxed towers own the Nuke Shield (no damage)")
+		T.Check(os.clock() - clock < 120, ("whole scenario runs fast (%.1fs)"):format(os.clock() - clock))
+	end,
+})
+
 return Scenarios

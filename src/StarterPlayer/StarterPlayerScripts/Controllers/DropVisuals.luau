@@ -197,68 +197,72 @@ function DropVisuals:Init(controllers)
 	end
 end
 
+local lastPop = 0
+local function step()
+	local now = os.clock()
+	local focus = focusPosition()
+	local lowGraphics = C.Animator and C.Animator.IsLowGraphics and C.Animator:IsLowGraphics()
+	if enabled and not lowGraphics then
+		for model, info in droppers do
+			if not model.Parent then
+				droppers[model] = nil
+			elseif now >= info.Next then
+				local interval = model:GetAttribute("Interval") or 2
+				info.Next = now + interval
+				local spout = model:GetAttribute("Spout")
+				if typeof(spout) == "Vector3" and live < MAX_DROPS then
+					local d = spout - focus
+					if Vector3.new(d.X, 0, d.Z).Magnitude < VIEW_RANGE and math.abs(d.Y - 3.5) < FLOOR_RANGE then
+						spawnDrop(model)
+					end
+				end
+			end
+		end
+	end
+	-- "+$" pops at collectors (batched)
+	if now - lastPop >= 0.8 then
+		lastPop = now
+		for key, entry in popTotals do
+			if entry.Amount > 0 and C.VFX then
+				C.VFX:FloatText(entry.Position, "+" .. Util.Money(entry.Amount), Color3.fromRGB(120, 255, 140), 0.8)
+			end
+			popTotals[key] = nil
+		end
+		-- generators
+		local shown = 0
+		for model, info in generators do
+			if not model.Parent then
+				generators[model] = nil
+			elseif now >= info.Next then
+				info.Next = now + (model:GetAttribute("Cycle") or 5)
+				local pos = model:GetAttribute("PopPos")
+				if typeof(pos) == "Vector3" and shown < 6 and C.VFX then
+					local d = pos - focus
+					if Vector3.new(d.X, 0, d.Z).Magnitude < 70 and math.abs(d.Y - 9) < FLOOR_RANGE then
+						shown += 1
+						C.VFX:FloatText(pos, "+" .. Util.Money(model:GetAttribute("Worth") or 0), Color3.fromRGB(255, 220, 90), 0.7)
+					end
+				end
+			end
+		end
+	end
+	for model, info in fireworks do
+		if not model.Parent then
+			fireworks[model] = nil
+		elseif now >= info.Next then
+			info.Next = now + math.random(4, 8)
+			local pos = model:GetAttribute("LaunchPos")
+			if typeof(pos) == "Vector3" and (pos - workspace.CurrentCamera.CFrame.Position).Magnitude < 500 then
+				launchFirework(model)
+			end
+		end
+	end
+end
+
 function DropVisuals:Start()
-	local lastPop = 0
 	while true do
 		task.wait(0.1)
-		local now = os.clock()
-		local focus = focusPosition()
-		local lowGraphics = C.Animator and C.Animator.IsLowGraphics and C.Animator:IsLowGraphics()
-		if enabled and not lowGraphics then
-			for model, info in droppers do
-				if not model.Parent then
-					droppers[model] = nil
-				elseif now >= info.Next then
-					local interval = model:GetAttribute("Interval") or 2
-					info.Next = now + interval
-					local spout = model:GetAttribute("Spout")
-					if typeof(spout) == "Vector3" and live < MAX_DROPS then
-						local d = spout - focus
-						if Vector3.new(d.X, 0, d.Z).Magnitude < VIEW_RANGE and math.abs(d.Y - 3.5) < FLOOR_RANGE then
-							spawnDrop(model)
-						end
-					end
-				end
-			end
-		end
-		-- "+$" pops at collectors (batched)
-		if now - lastPop >= 0.8 then
-			lastPop = now
-			for key, entry in popTotals do
-				if entry.Amount > 0 and C.VFX then
-					C.VFX:FloatText(entry.Position, "+" .. Util.Money(entry.Amount), Color3.fromRGB(120, 255, 140), 0.8)
-				end
-				popTotals[key] = nil
-			end
-			-- generators
-			local shown = 0
-			for model, info in generators do
-				if not model.Parent then
-					generators[model] = nil
-				elseif now >= info.Next then
-					info.Next = now + (model:GetAttribute("Cycle") or 5)
-					local pos = model:GetAttribute("PopPos")
-					if typeof(pos) == "Vector3" and shown < 6 and C.VFX then
-						local d = pos - focus
-						if Vector3.new(d.X, 0, d.Z).Magnitude < 70 and math.abs(d.Y - 9) < FLOOR_RANGE then
-							shown += 1
-							C.VFX:FloatText(pos, "+" .. Util.Money(model:GetAttribute("Worth") or 0), Color3.fromRGB(255, 220, 90), 0.7)
-						end
-					end
-				end
-			end
-		end
-		for model, info in fireworks do
-			if not model.Parent then
-				fireworks[model] = nil
-			elseif now >= info.Next then
-				info.Next = now + math.random(4, 8)
-				local pos = model:GetAttribute("LaunchPos")
-				if typeof(pos) == "Vector3" and (pos - workspace.CurrentCamera.CFrame.Position).Magnitude < 500 then
-					launchFirework(model)
-				end
-			end
-		end
+		Util.Try("DropVisuals", step)
 	end
 end
 

@@ -100,6 +100,21 @@ function Util.Clock(seconds: number): string
 	return string.format("%d:%02d", seconds // 60, seconds % 60)
 end
 
+-- Runs fn(...) protected, so one bug can't kill a loop that keeps the game
+-- running. Logs the first few failures per label (no output spam).
+local failures: { [string]: number } = {}
+function Util.Try(label: string, fn: (...any) -> ...any, ...): boolean
+	local ok, err = pcall(fn, ...)
+	if not ok then
+		local n = (failures[label] or 0) + 1
+		failures[label] = n
+		if n <= 3 then
+			warn(("[%s] %s"):format(label, tostring(err)))
+		end
+	end
+	return ok
+end
+
 function Util.DeepCopy<T>(t: T): T
 	if type(t) ~= "table" then
 		return t
