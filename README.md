@@ -31,6 +31,7 @@ All settings live in `src/ReplicatedStorage/Shared/Config.luau`.
 | Disasters | `Config.Disasters` | Frequency, weights, damage, wreck time |
 | Secrets | `Config.Secrets` | Names, hints, optional `BadgeId` |
 | Quests / gifts / wheel | `Config.Quests`, `Config.Gifts`, `Config.Wheel` | Quest types, targets and rewards; playtime gift times |
+| Anti-cheat | `Config.AntiCheat` | Strikes needed to ban, speed/fly/teleport limits, who is exempt |
 | Free bonuses | `Config.Bonuses` | Premium and friends-in-server income bonus |
 
 Also: **Game Settings → Security → Enable Studio Access to API Services**
@@ -82,6 +83,7 @@ rojo build -o MegaTycoon.rbxlx   # rebuild the place file
 - **Elevators** on every floor + **🛗 FLOORS** menu to jump between floors
 - Vault pads on every floor (or skip them with Auto Collect), **offline earnings**
 - Rebirths for a permanent multiplier, global leaderboard
+- **Anti-cheat**: catches speed hacks, flying, teleporting, grabbing things from far away, remote spam and admin-remote abuse. Every detection kicks the player and saves the proof (what was seen, with numbers); the 5th strike bans. Strikes are shared across servers. Head Admins see bans, strikes and the evidence in the admin panel's **Anti-Cheat** tab and can **UNBAN** or **CLEAR** there (or `;unban <name or id>`, `;strikes`, `;clearstrikes`). Head Admins and Owners are never checked; strikes expire after 30 days
 - **Lucky Wheel**: a free reel spin every 30 minutes (cash or 2x boosts, rare jackpot). Prizes and odds are in `Config.Wheel`
 - **10 rebirth ranks** (Reborn → Mythic): each rank gives a permanent perk (starting cash, walk speed, offline earnings, quest/gift bonuses, extra income) and a rank tag over your head. Edit them in `Config.Rebirth.Ranks`
 - **Safe saving**: session-locked DataStore saves (hopping servers can't lose or
@@ -147,7 +149,7 @@ Open the **Admin Panel** with the 🛡️ button or **F2**.
 |---|---|
 | **Mod (1)** | `cmds` `logs` `tp` `bring` `to` `home` `floor` `speed` `jump` `heal` `god` `ungod` `ff` `unff` `kill` `freeze` `thaw` `sparkles` `fire` `smoke` `unfx` `invisible` `visible` `respawn` `jail` `unjail` `fly` `unfly` `noclip` `clip` `view` `unview` `m` `h` |
 | **Admin (2)** | `kick` `givecash` `takecash` `setcash` `giverebirth` `rebirth` `unlockall` `unlockfloor` `explode` `giant` `tiny` `normal` `confetti` `cashrain` `doublecash` `music` `stopmusic` `minigame` `time` `nuke` `meteors` `tornado` `ufo` `earthquake` `stopdisaster` `repair` `wreck` `givesecrets` `duo` `unduo` |
-| **Head Admin (3)** | `ban` `unban` `resetdata` `resetsecrets` `givepass` `removepass` |
+| **Head Admin (3)** | `ban` `unban` `strikes` `clearstrikes` `resetdata` `resetsecrets` `givepass` `removepass` |
 | **Owner (4)** | `admin` `unadmin` `shutdown` |
 
 ## 📁 Project structure

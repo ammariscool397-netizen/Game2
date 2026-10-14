@@ -2943,4 +2943,220 @@ add({
 	end,
 })
 
+---------------------------------------------------------------------------
+-- Anti-cheat
+---------------------------------------------------------------------------
+add({
+	Name = "anticheat",
+	MaxSeconds = 900,
+	Run = function(T, place)
+		T.Engine.Studio = false -- a live server: only the creator is an admin
+		T.Engine.CreatorId = 7000
+		local game, boss = T.Boot(place, { Name = "Boss", UserId = 7000, AntiCheat = true })
+		local Config = T.Shared("Config")
+		local AC = Config.AntiCheat
+		Config.Admin.Admins[7005] = 1 -- a Mod
+		local AntiCheat = T.Service("AntiCheatService")
+		local BuildKit = T.Service("BuildKit")
+		T.Wait(6)
+
+		local function kicked(name)
+			for i = #T.Engine.Kicks, 1, -1 do
+				if T.Engine.Kicks[i].Player == name then
+					return T.Engine.Kicks[i].Message
+				end
+			end
+			return ""
+		end
+		local function registry()
+			local saved = T.Engine.DataStores[AC.DataStore]
+			return saved and saved.Registry or { Strikes = {}, Bans = {} }
+		end
+		-- moves `studs` every 0.25 s (studs x 4 = studs per second)
+		local function run(player, studs, seconds)
+			for _ = 1, math.floor(seconds / 0.25) do
+				if player.Parent == nil then
+					return
+				end
+				T.MoveTo(player, CFrame.new(T.Root(player).Position + Vector3.new(studs, 0, 0)))
+				T.Wait(0.25)
+			end
+		end
+		T.Check(AC.StrikesToBan == 5, "5 strikes ban")
+
+		-- normal play isn't flagged
+		local walker = T.AddPlayer("Walker", { UserId = 7002 })
+		T.Wait(4)
+		run(walker, 4, 12) -- 16 studs/s
+		T.Check(walker.Parent ~= nil, "walking at normal speed is fine")
+		T.Humanoid(walker).FloorMaterial = Enum.Material.Air
+		T.Wait(1.5)
+		T.Humanoid(walker).FloorMaterial = Enum.Material.Plastic
+		T.Wait(1)
+		T.Check(walker.Parent ~= nil, "a jump isn't flying")
+		T.Humanoid(walker).FloorMaterial = Enum.Material.Air
+		for _ = 1, 48 do -- a long fall (24 studs/s down)
+			T.MoveTo(walker, CFrame.new(T.Root(walker).Position + Vector3.new(0, -6, 0)))
+			T.Wait(0.25)
+		end
+		T.Humanoid(walker).FloorMaterial = Enum.Material.Plastic
+		T.Wait(1)
+		T.Check(walker.Parent ~= nil and kicked("Walker") == "", "falling isn't flying")
+
+		-- the owner is never checked
+		run(boss, 40, 5)
+		T.Check(boss.Parent ~= nil and kicked("Boss") == "", "staff of the exempt rank aren't checked")
+
+		-- speed hacking: strikes 1-4 kick
+		local USER = 7001
+		for strike = 1, 4 do
+			local cheater = T.AddPlayer("Speedy", { UserId = USER })
+			T.Wait(4)
+			run(cheater, 40, 3) -- 160 studs/s
+			T.Wait(2)
+			local message = kicked("Speedy")
+			T.Check(cheater.Parent == nil, "strike " .. strike .. " kicks")
+			T.Check(message:find("Speed hacking", 1, true) ~= nil and message:find("strike " .. strike .. "/5", 1, true) ~= nil, "kick message says why (" .. message .. ")")
+			local record = registry().Strikes[tostring(USER)]
+			T.Check(record ~= nil and record.Count == strike and #record.Evidence == strike, "strike " .. strike .. " saved with its proof")
+		end
+		T.Check(kicked("Speedy"):find("permanent ban", 1, true) ~= nil, "the 4th kick warns about the ban")
+		-- the 5th strike bans
+		local fifth = T.AddPlayer("Speedy", { UserId = USER })
+		T.Wait(4)
+		run(fifth, 40, 3)
+		T.Wait(2)
+		T.Check(fifth.Parent == nil and kicked("Speedy"):find("banned for cheating", 1, true) ~= nil, "the 5th strike bans")
+		local ban = registry().Bans[tostring(USER)]
+		T.Check(ban ~= nil and ban.Strikes == 5 and #ban.Evidence == 5 and ban.By == "Anti-Cheat", "the ban keeps 5 pieces of evidence")
+		T.Check(ban ~= nil and ban.Evidence[1].Detail:find("studs/s", 1, true) ~= nil and ban.Reason:find("Speed hacking x5", 1, true) ~= nil, "the proof says what was seen (" .. tostring(ban and ban.Reason) .. ")")
+		T.Check(registry().Strikes[tostring(USER)] == nil, "strikes become the ban")
+		T.Check(T.Engine.DataStores[Config.Admin.BanDataStore][tostring(USER)] ~= nil, "also in the main ban list")
+		local again = T.AddPlayer("Speedy", { UserId = USER })
+		T.Wait(3)
+		T.Check(again.Parent == nil and kicked("Speedy"):find("banned from this game", 1, true) ~= nil, "a banned player is kicked on join")
+
+		-- flying
+		local flyer = T.AddPlayer("Flyer", { UserId = 7003 })
+		T.Wait(4)
+		T.Humanoid(flyer).FloorMaterial = Enum.Material.Air
+		T.Wait(AC.Fly.Seconds + 3)
+		T.Check(flyer.Parent == nil and kicked("Flyer"):find("Flying", 1, true) ~= nil, "hovering in the air is flying")
+
+		-- teleporting
+		local tp = T.AddPlayer("Teleporter", { UserId = 7004 })
+		T.Wait(4)
+		T.MoveTo(tp, CFrame.new(T.Root(tp).Position + Vector3.new(300, 0, 0)))
+		T.Wait(1)
+		T.Check(tp.Parent ~= nil, "a single teleport is fine")
+		for i = 1, 16 do
+			if tp.Parent == nil then
+				break -- already caught
+			end
+			T.MoveTo(tp, CFrame.new(T.Root(tp).Position + Vector3.new(i % 2 == 0 and 300 or -300, 0, 0)))
+			T.Wait(0.5)
+		end
+		T.Wait(2)
+		T.Check(tp.Parent == nil and kicked("Teleporter"):find("Teleporting", 1, true) ~= nil, "constant teleporting is caught")
+
+		-- grabbing things from far away
+		local reacher = T.AddPlayer("Reacher", { UserId = 7006 })
+		T.Wait(4)
+		local pad = game:GetService("Workspace"):FindFirstChild("LaunchPad", true)
+		T.Check(pad ~= nil, "found a part to reach for")
+		T.MoveTo(reacher, CFrame.new(pad.Position + Vector3.new(500, 0, 0)))
+		T.Wait(1)
+		T.Server(function()
+			for _ = 1, 4 do
+				BuildKit.IsNear(reacher, pad)
+			end
+		end)
+		T.Wait(2)
+		T.Check(reacher.Parent ~= nil, "4 far touches aren't enough")
+		T.Server(function()
+			BuildKit.IsNear(reacher, pad)
+		end)
+		T.Wait(2)
+		T.Check(reacher.Parent == nil and kicked("Reacher"):find("far away", 1, true) ~= nil, "5 far touches in a row are caught")
+
+		-- remote spam
+		local spammer = T.AddPlayer("Spammer", { UserId = 7007 })
+		T.Wait(4)
+		for _ = 1, 5 do
+			for _ = 1, 100 do
+				T.Engine.FireServerAs(spammer, T.Remote("RequestRebirth"))
+			end
+			T.Wait(1)
+		end
+		T.Wait(1)
+		T.Check(spammer.Parent == nil and kicked("Spammer"):find("Spamming", 1, true) ~= nil, "remote spam is caught")
+
+		-- admin remotes without a rank
+		local snoop = T.AddPlayer("Snoop", { UserId = 7008 })
+		local mod = T.AddPlayer("Mod", { UserId = 7005 })
+		T.Wait(4)
+		T.Engine.InvokeServerAs(mod, T.Remote("AdminCommand"), "m hello")
+		T.Engine.InvokeServerAs(snoop, T.Remote("AdminCommand"), "m hello")
+		T.Wait(2)
+		T.Check(snoop.Parent == nil and kicked("Snoop"):find("admin commands", 1, true) ~= nil, "using the admin remote without a rank is caught")
+		T.Check(mod.Parent ~= nil, "real admins are fine")
+
+		-- the admin panel: bans, strikes, proof
+		local report = T.Engine.InvokeServerAs(boss, T.Remote("AdminData"), "anticheat")
+		local listed
+		for _, entry in report.Bans do
+			if entry.UserId == USER then
+				listed = entry
+			end
+		end
+		T.Check(listed ~= nil and #listed.Evidence == 5, "the report lists the ban with its proof")
+		T.Check(#report.Strikes >= 5, "and the players with strikes (" .. #report.Strikes .. ")")
+		T.Check(T.Engine.InvokeServerAs(mod, T.Remote("AdminData"), "anticheat") == nil, "only Head Admins see the evidence")
+		T.Client(function()
+			T.Controller("UI"):Open("Admin")
+		end)
+		T.Wait(1)
+		local tab = T.FindButton(boss.PlayerGui, "ANTI%-CHEAT")
+		T.Check(tab ~= nil, "the panel has an Anti-Cheat tab")
+		T.Client(function()
+			T.Engine.Click(tab)
+		end)
+		T.Wait(2)
+		T.Check(T.FindText(boss.PlayerGui, "studs/s") ~= nil, "the tab shows the proof")
+		T.Check(T.FindText(boss.PlayerGui, "Speedy") ~= nil, "and who was banned")
+		local unban = T.FindButton(boss.PlayerGui, "^UNBAN$")
+		T.Check(unban ~= nil, "with an UNBAN button")
+		T.Client(function()
+			T.Engine.Click(unban)
+		end)
+		T.Wait(2)
+		T.Check(registry().Bans[tostring(USER)] == nil, "UNBAN removes the ban")
+		T.Check(T.Engine.DataStores[Config.Admin.BanDataStore][tostring(USER)] == nil, "from the main ban list too")
+		T.Check(AntiCheat:GetStrikes(USER) == 0, "and the strikes start over")
+		local back = T.AddPlayer("Speedy", { UserId = USER })
+		T.Wait(4)
+		T.Check(back.Parent ~= nil, "an unbanned player can join again")
+
+		-- commands
+		local _, text = T.Admin(boss, ";strikes 7003")
+		T.Check(tostring(text):find("1/5", 1, true) ~= nil, ";strikes shows the count (" .. tostring(text) .. ")")
+		T.Admin(boss, ";clearstrikes 7003")
+		T.Check(AntiCheat:GetStrikes(7003) == 0, ";clearstrikes")
+		local victim = T.AddPlayer("Victim", { UserId = 7010 })
+		T.Wait(3)
+		T.Admin(boss, ";ban Victim griefing")
+		T.Wait(1)
+		report = T.Engine.InvokeServerAs(boss, T.Remote("AdminData"), "anticheat")
+		local manual
+		for _, entry in report.Bans do
+			if entry.UserId == 7010 then
+				manual = entry
+			end
+		end
+		T.Check(manual ~= nil and manual.By == "Boss" and manual.Reason:find("griefing", 1, true) ~= nil, "manual bans are in the panel too")
+		T.Admin(boss, ";unban 7010")
+		T.Check(registry().Bans["7010"] == nil and T.Engine.DataStores[Config.Admin.BanDataStore]["7010"] == nil, ";unban works with a user id")
+	end,
+})
+
 return Scenarios

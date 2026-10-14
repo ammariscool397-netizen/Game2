@@ -20,6 +20,7 @@ local ORDER = {
 	"WheelService",
 	"DisasterService",
 	"AdminService",
+	"AntiCheatService",
 	"MinigameService",
 	"RewardService",
 	"LeaderboardService",

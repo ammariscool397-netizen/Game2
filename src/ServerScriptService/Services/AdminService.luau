@@ -176,6 +176,29 @@ local function restText(args: { string }, from: number): string
 	return table.concat(parts, " ")
 end
 
+-- a UserId from "12345", a username in this server, or any username
+local function resolveUserId(input: any): (number?, string?)
+	if type(input) ~= "string" or input == "" then
+		return nil, nil
+	end
+	local text = input :: string
+	local id = tonumber(text)
+	if id and id > 0 and id == math.floor(id) then
+		return id, text
+	end
+	local wanted = text:lower()
+	for _, p in Players:GetPlayers() do
+		if p.Name:lower() == wanted then
+			return p.UserId, p.Name
+		end
+	end
+	local ok, userId = pcall(Players.GetUserIdFromNameAsync, Players, text)
+	if ok and userId then
+		return userId, text
+	end
+	return nil, nil
+end
+
 ---------------------------------------------------------------------------
 -- Command registry
 ---------------------------------------------------------------------------
@@ -870,6 +893,9 @@ local function buildCommands()
 				local ok, userId = pcall(Players.GetUserIdFromNameAsync, Players, args[1])
 				if ok and userId then
 					AdminService:Ban(userId, reason, executor.Name)
+					if S.AntiCheatService then
+						S.AntiCheatService:RecordBan(userId, args[1], reason, executor.Name)
+					end
 					return "Banned offline user " .. args[1]
 				end
 				return "User not found"
@@ -878,6 +904,9 @@ local function buildCommands()
 				local myRank = AdminService:GetRank(executor)
 				if target ~= executor and (myRank >= 4 or AdminService:GetRank(target) < myRank) then
 					AdminService:Ban(target.UserId, reason, executor.Name)
+					if S.AntiCheatService then
+						S.AntiCheatService:RecordBan(target.UserId, target.Name, reason, executor.Name)
+					end
 					target:Kick("You are banned: " .. reason)
 					table.insert(banned, target)
 				end
@@ -889,14 +918,14 @@ local function buildCommands()
 		Name = "unban",
 		Aliases = {},
 		Rank = 3,
-		Args = "<username>",
-		Desc = "Unban a user by username",
+		Args = "<username or id>",
+		Desc = "Unban a user (also clears their anti-cheat strikes)",
 		Run = function(_, args)
 			if not args[1] then
-				return "Usage: unban <username>"
+				return "Usage: unban <username or id>"
 			end
-			local ok, userId = pcall(Players.GetUserIdFromNameAsync, Players, args[1])
-			if not ok or not userId then
+			local userId = resolveUserId(args[1])
+			if not userId then
 				return "User not found"
 			end
 			if banStore then
@@ -904,7 +933,40 @@ local function buildCommands()
 					(banStore :: DataStore):RemoveAsync(tostring(userId))
 				end)
 			end
+			if S.AntiCheatService then
+				S.AntiCheatService:Unban(userId)
+			end
 			return "Unbanned " .. args[1]
+		end,
+	})
+	register({
+		Name = "strikes",
+		Aliases = {},
+		Rank = 3,
+		Args = "<username or id>",
+		Desc = "Show a user's anti-cheat strikes",
+		Run = function(_, args)
+			local userId, name = resolveUserId(args[1])
+			if not userId or not S.AntiCheatService then
+				return "User not found"
+			end
+			local count, banned = S.AntiCheatService:GetStrikes(userId)
+			return ("%s: %d/%d anti-cheat strikes%s"):format(name or args[1], count, Config.AntiCheat.StrikesToBan, banned and " (BANNED)" or "")
+		end,
+	})
+	register({
+		Name = "clearstrikes",
+		Aliases = {},
+		Rank = 3,
+		Args = "<username or id>",
+		Desc = "Forget a user's anti-cheat strikes",
+		Run = function(_, args)
+			local userId = resolveUserId(args[1])
+			if not userId or not S.AntiCheatService then
+				return "User not found"
+			end
+			S.AntiCheatService:ClearStrikes(userId)
+			return "Cleared the strikes of " .. args[1]
 		end,
 	})
 	register({
@@ -1135,6 +1197,9 @@ function AdminService:Init(services)
 
 	Remotes.AdminCommand.OnServerInvoke = function(player, text)
 		if self:GetRank(player) <= 0 then
+			if S.AntiCheatService then
+				S.AntiCheatService:Flag(player, "AdminRemote", "Called the AdminCommand remote without an admin rank")
+			end
 			return false, "You are not an admin"
 		end
 		return self:Execute(player, text)
@@ -1143,9 +1208,15 @@ function AdminService:Init(services)
 	Remotes.AdminData.OnServerInvoke = function(player, what)
 		local rank = self:GetRank(player)
 		if rank <= 0 then
+			if S.AntiCheatService then
+				S.AntiCheatService:Flag(player, "AdminRemote", "Called the AdminData remote without an admin rank")
+			end
 			return nil
 		end
-		if what == "commands" then
+		if what == "anticheat" then
+			-- the evidence is for Head Admins (they can unban)
+			return rank >= 3 and S.AntiCheatService and S.AntiCheatService:GetReport() or nil
+		elseif what == "commands" then
 			local list = {}
 			for _, c in commands do
 				table.insert(list, { Name = c.Name, Aliases = c.Aliases, Rank = c.Rank, Args = c.Args, Desc = c.Desc, Allowed = rank >= c.Rank })

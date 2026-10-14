@@ -353,6 +353,38 @@ Config.Admin = {
 	BanDataStore = "MegaTycoon_Bans_v1",
 }
 
+---------------------------------------------------------------------------
+-- Anti-cheat (server side). Every detection is a STRIKE: the player is kicked
+-- and the evidence is saved. Strikes are shared between servers; the
+-- StrikesToBan-th strike bans. Head Admins review the evidence and unban in
+-- the admin panel (Anti-Cheat tab) or with ;unban. Staff of ExemptRank or
+-- higher (Head Admin, Owner - everyone in Studio) are never checked.
+---------------------------------------------------------------------------
+Config.AntiCheat = {
+	Enabled = true,
+	StrikesToBan = 5,
+	ExemptRank = 3,
+	DataStore = "MegaTycoon_AntiCheat_v1",
+	MaxEvidence = 10, -- evidence entries kept per player
+	StrikeExpireDays = 30, -- a player's strikes are forgotten after this long without a new one
+	RefreshSeconds = 60, -- how often a server re-reads the shared ban list
+	-- running: Samples checks in a row (every Interval s) on the ground faster than
+	-- WalkSpeed x Tolerance + Slack. Big jumps (> TeleportDistance) are teleports.
+	Speed = { Interval = 0.25, Samples = 6, Tolerance = 1.6, Slack = 6, TeleportDistance = 80 },
+	Fly = { Seconds = 10, MinFallSpeed = 15 }, -- in the air this long without falling
+	Reach = { Margin = 20 }, -- studs beyond a touch's allowed distance that count as "far away"
+	RemoteSpam = { PerSecond = 80, Seconds = 3 }, -- remote events per second, for this many seconds
+	-- Threshold = score needed within Window seconds (each sign adds 1)
+	Kinds = {
+		Speed = { Title = "Speed hacking", Threshold = 1, Window = 1 },
+		Fly = { Title = "Flying", Threshold = 1, Window = 1 },
+		Teleport = { Title = "Teleporting", Threshold = 12, Window = 20 },
+		Reach = { Title = "Grabbing things from far away", Threshold = 5, Window = 30 },
+		RemoteSpam = { Title = "Spamming the server", Threshold = 1, Window = 1 },
+		AdminRemote = { Title = "Using admin commands without permission", Threshold = 1, Window = 1 },
+	},
+}
+
 Config.RankNames = {
 	[0] = "Player",
 	[1] = "Mod",

@@ -115,13 +115,19 @@ end
 
 -- Is the player really at `part`? Exploits can fake touches with parts
 -- anywhere on the map, so every rewarding touch checks the distance too.
+BuildKit.OnFarTouch = nil :: ((player: Player, part: BasePart, distance: number, allowed: number) -> ())? -- set by the anti-cheat
 function BuildKit.IsNear(player: Player, part: BasePart, slack: number?): boolean
 	local character = player.Character
 	local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	if not root then
 		return false
 	end
-	return (root.Position - part.Position).Magnitude <= part.Size.Magnitude / 2 + (slack or 12)
+	local distance = (root.Position - part.Position).Magnitude
+	local allowed = part.Size.Magnitude / 2 + (slack or 12)
+	if distance > allowed and BuildKit.OnFarTouch then
+		BuildKit.OnFarTouch(player, part, distance, allowed)
+	end
+	return distance <= allowed
 end
 
 -- Is `hit` part of a character? Returns (player, humanoid)

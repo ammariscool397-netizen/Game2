@@ -318,6 +318,83 @@ local function fillLogs()
 	end
 end
 
+-- Anti-Cheat tab: bans and strikes with the proof, and the unban button
+local function fillAntiCheat()
+	local page = pages["Anti-Cheat"]
+	clear(page)
+	local report = Remotes.AdminData:InvokeServer("anticheat")
+	if not report then
+		UIKit.Label({ Text = "Head Admins and Owners only.", Size = UDim2.new(1, -10, 0, 30), Font = Theme.BodyFont, ZIndex = 8, Parent = page })
+		return
+	end
+	local order = 0
+	local function header(text: string)
+		order += 1
+		UIKit.Label({ Text = text, Size = UDim2.new(1, -10, 0, 28), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = Theme.Accent, LayoutOrder = order, ZIndex = 8, Parent = page })
+	end
+	local function entryRow(entry, subtitle: string, buttonText: string, buttonColor: Color3, command: string)
+		order += 1
+		local evidence = entry.Evidence or {}
+		local frame = rowFrame(page, order, 62 + 34 * #evidence)
+		UIKit.Label({
+			Text = entry.Name .. "  (id " .. tostring(entry.UserId) .. ")",
+			Size = UDim2.new(1, -120, 0, 24),
+			Position = UDim2.fromOffset(10, 4),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			ZIndex = 8,
+			Parent = frame,
+		})
+		UIKit.new("TextLabel", {
+			Text = subtitle,
+			Size = UDim2.new(1, -120, 0, 30),
+			Position = UDim2.fromOffset(10, 28),
+			BackgroundTransparency = 1,
+			TextWrapped = true,
+			TextSize = 13,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			Font = Theme.BodyFont,
+			TextColor3 = Theme.SubText,
+			ZIndex = 8,
+			Parent = frame,
+		})
+		for j, item in evidence do
+			UIKit.new("TextLabel", {
+				Name = "Evidence" .. j,
+				Text = "📸 " .. os.date("%Y-%m-%d %H:%M", item.Time) .. "  " .. tostring(item.Kind) .. ": " .. tostring(item.Detail),
+				Size = UDim2.new(1, -20, 0, 32),
+				Position = UDim2.fromOffset(10, 62 + (j - 1) * 34),
+				BackgroundTransparency = 1,
+				TextWrapped = true,
+				TextSize = 12,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				TextYAlignment = Enum.TextYAlignment.Top,
+				Font = Theme.BodyFont,
+				TextColor3 = Color3.fromRGB(255, 190, 150),
+				ZIndex = 8,
+				Parent = frame,
+			})
+		end
+		smallButton(frame, buttonText, buttonColor, -102, 94, function()
+			run(command)
+			task.wait(0.6)
+			fillAntiCheat()
+		end).AnchorPoint = Vector2.new(0, 0)
+	end
+	header("🔨 BANNED (" .. #report.Bans .. ")")
+	if #report.Bans == 0 then
+		UIKit.Label({ Text = "Nobody is banned.", Size = UDim2.new(1, -10, 0, 26), Font = Theme.BodyFont, TextColor3 = Theme.SubText, LayoutOrder = order + 1, ZIndex = 8, Parent = page })
+		order += 1
+	end
+	for _, ban in report.Bans do
+		entryRow(ban, os.date("%Y-%m-%d %H:%M", ban.Time) .. " • by " .. tostring(ban.By) .. " • " .. tostring(ban.Reason), "UNBAN", Theme.Green, "unban " .. tostring(ban.UserId))
+	end
+	header("⚠️ STRIKES (" .. #report.Strikes .. ")  -  " .. report.StrikesToBan .. " = ban")
+	for _, record in report.Strikes do
+		entryRow(record, record.Count .. "/" .. report.StrikesToBan .. " strikes", "CLEAR", Theme.Accent2, "clearstrikes " .. tostring(record.UserId))
+	end
+end
+
 local function buildServerPage()
 	local page = pages.Server
 	local order = 0
@@ -417,6 +494,8 @@ local function selectTab(name: string)
 		task.spawn(fillPlayers)
 	elseif name == "Logs" then
 		task.spawn(fillLogs)
+	elseif name == "Anti-Cheat" then
+		task.spawn(fillAntiCheat)
 	end
 end
 
@@ -441,8 +520,8 @@ local function buildPanel()
 	-- tabs
 	local tabs = UIKit.new("Frame", { Size = UDim2.new(1, 0, 0, 40), Position = UDim2.fromOffset(0, 74), BackgroundTransparency = 1, ZIndex = 6, Parent = content })
 	UIKit.List(tabs, 8, Enum.FillDirection.Horizontal, Enum.HorizontalAlignment.Left)
-	for i, name in { "Commands", "Players", "Server", "Logs" } do
-		tabButtons[name] = UIKit.Button({ Text = name:upper(), Color = Theme.PanelLight, Size = UDim2.fromOffset(140, 38), LayoutOrder = i, ZIndex = 7, Parent = tabs, Callback = function()
+	for i, name in { "Commands", "Players", "Server", "Logs", "Anti-Cheat" } do
+		tabButtons[name] = UIKit.Button({ Text = name:upper(), Color = Theme.PanelLight, Size = UDim2.fromOffset(i == 5 and 160 or 130, 38), LayoutOrder = i, ZIndex = 7, Parent = tabs, Callback = function()
 			selectTab(name)
 		end })
 		local page = UIKit.Scroll({ Size = UDim2.new(1, 0, 1, -124), Position = UDim2.fromOffset(0, 122), Parent = content })

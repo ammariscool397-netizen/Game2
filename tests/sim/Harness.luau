@@ -110,6 +110,9 @@ function Harness.Boot(placePath: string, opts)
 	opts = opts or {}
 	game = Engine.Load(placePath)
 	Harness.Game = game
+	-- the anti-cheat only runs in scenarios that ask for it (opts.AntiCheat): other
+	-- scenarios teleport characters around instantly, which it would rightly flag
+	Harness.Shared("Config").AntiCheat.Enabled = opts.AntiCheat == true
 	if opts.Setup then
 		-- runs before any game script: tweak Config (server copy) etc.
 		local previous = Engine.Context

@@ -444,7 +444,7 @@ end
 -- properties Lune can't read on fresh instances ("missing default value" /
 -- "malformed property info"): the value a fresh Roblox instance would have
 local DEFAULTS: { [string]: { [string]: any } } = {
-	Humanoid = { PlatformStand = false, Sit = false, FloorMaterial = Enum.Material.Air, Jump = false },
+	Humanoid = { PlatformStand = false, Sit = false, FloorMaterial = Enum.Material.Plastic, Jump = false },
 	Player = {
 		AccountAge = 365,
 		MembershipType = Enum.MembershipType.None,
