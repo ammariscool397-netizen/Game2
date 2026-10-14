@@ -250,13 +250,25 @@ function QuestService:Refresh(player: Player)
 	self:_send(player)
 end
 
-function QuestService:Claim(player: Player, slot: any): (boolean, string)
+-- `which` is the quest's type (a player never has two of a type) or its slot
+function QuestService:Claim(player: Player, which: any): (boolean, string)
 	local data = S.DataService:Get(player)
 	if not data then
 		return false, "Data still loading..."
 	end
-	slot = Util.Number(slot)
-	local quest = slot and data.Quests.List[slot]
+	local list = data.Quests.List
+	local slot
+	if type(which) == "string" then
+		for i, quest in list do
+			if quest.Type == which then
+				slot = i
+				break
+			end
+		end
+	else
+		slot = Util.Number(which)
+	end
+	local quest = slot and list[slot]
 	if not quest then
 		return false, "That quest doesn't exist."
 	end
@@ -264,7 +276,7 @@ function QuestService:Claim(player: Player, slot: any): (boolean, string)
 		return false, "Finish the quest first!"
 	end
 	local cash, boost = self:_reward(player, quest)
-	table.remove(data.Quests.List, slot)
+	table.remove(list, slot)
 	data.Quests.Claimed += 1
 	S.DataService:AddCash(player, cash, false)
 	local text = "+" .. Util.Money(cash)
@@ -274,7 +286,11 @@ function QuestService:Claim(player: Player, slot: any): (boolean, string)
 	end
 	Remotes.VFX:FireClient(player, "CashBurst", { Amount = cash })
 	Remotes.VFX:FireClient(player, "Confetti", {})
+	local kept = #list
 	self:_fill(player)
+	if #list == kept + 1 and slot <= kept then
+		table.insert(list, slot, table.remove(list)) -- the new quest takes the claimed one's place
+	end
 	self:_send(player)
 	return true, "Quest reward: " .. text .. "!"
 end

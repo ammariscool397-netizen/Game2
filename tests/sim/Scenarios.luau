@@ -2060,6 +2060,26 @@ add({
 			T.Check(q.Type ~= "Floor" or q.Target == 2, "floor quest re-targeted after rebirth")
 		end
 		T.Check(#data.Quests.List == 3, "still 3 quests after rebirth")
+		-- two claims sent before the first update arrives both pay (claims go by type)
+		data.Quests.List = {
+			{ Type = "Obby", Target = 1, Progress = 1 },
+			{ Type = "Minigame", Target = 1, Progress = 1 },
+			{ Type = "Buy", Target = 5, Progress = 0 },
+		}
+		QuestService:Refresh(me)
+		T.Wait(1.5)
+		claimed = data.Quests.Claimed
+		local both = T.Client(function()
+			local first = T.Remote("ClaimQuest"):InvokeServer("Obby")
+			local second = T.Remote("ClaimQuest"):InvokeServer("Minigame")
+			return first and second
+		end)
+		T.Check(both == true and data.Quests.Claimed == claimed + 2, "back-to-back claims both pay")
+		T.Check(#data.Quests.List == 3 and data.Quests.List[3].Type == "Buy", "unclaimed quests keep their place")
+		local missing = T.Client(function()
+			return T.Remote("ClaimQuest"):InvokeServer("Nope")
+		end)
+		T.Check(missing == false, "claiming a quest you don't have fails")
 	end,
 })
 

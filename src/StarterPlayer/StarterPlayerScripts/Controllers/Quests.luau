@@ -27,10 +27,17 @@ local title: TextLabel
 local rowsFrame: Frame
 local collapsed = false
 
-local function claim(slot: number, button: TextButton)
+local function claim(quest, button: TextButton)
+	if button.Text == "..." then
+		return -- already claiming
+	end
 	button.Text = "..."
-	local ok, message = Remotes.ClaimQuest:InvokeServer(slot)
+	-- by type, not slot: slots shift when another quest is claimed first
+	local ok, message = Remotes.ClaimQuest:InvokeServer(quest.Type)
 	C.Notifications:Toast(tostring(message), ok and "success" or "error")
+	if not ok then
+		button.Text = "CLAIM"
+	end
 end
 
 local function render()
@@ -76,7 +83,7 @@ local function render()
 				Position = UDim2.new(1, -90, 0, 9),
 				Parent = row,
 				Callback = function()
-					claim(quest.Slot, row:FindFirstChild("Claim") :: TextButton)
+					claim(quest, row:FindFirstChild("Claim") :: TextButton)
 				end,
 			})
 			UIKit.Label({ Text = rewardText, Size = UDim2.new(1, -132, 0, 18), Position = UDim2.fromOffset(40, 32), Font = Theme.BodyFont, TextColor3 = Color3.fromRGB(150, 255, 160), TextXAlignment = Enum.TextXAlignment.Left, Stroke = false, Parent = row })

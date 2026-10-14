@@ -41,7 +41,7 @@ if not only then
 		if verbose then
 			table.insert(runArgs, "--verbose")
 		end
-		local result = process.spawn(process.args and "lune" or "lune", runArgs, { stdio = "inherit" })
+		local result = process.spawn("lune", runArgs, { stdio = "inherit" })
 		if not result.ok then
 			failed += 1
 		end

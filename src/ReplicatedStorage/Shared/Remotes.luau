@@ -37,7 +37,7 @@ local FUNCTIONS = {
 	"AdminData", -- (what) -> data
 	"BuyItem", -- (itemId) -> ok, message
 	"GetTycoonState", -- () -> state
-	"ClaimQuest", -- (slot) -> ok, message
+	"ClaimQuest", -- (quest type or slot) -> ok, message
 	"ClaimGift", -- () -> ok, message
 }
 
