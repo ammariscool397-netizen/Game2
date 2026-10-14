@@ -192,11 +192,14 @@ tests/sim/                 headless gameplay tests (Engine, Harness, Scenarios, 
 The game is tested by **playing it headless**: `tests/sim` loads the built place file
 and runs the real server *and* client scripts against a simulated Roblox engine on
 [Lune](https://lune-org.github.io) (virtual clock, remotes, players and characters,
-DataStores, purchases, tweens, CollectionService...). 30 scenarios cover a full
-502-upgrade playthrough, every disaster, duos, secrets, every admin command and rank,
-Studio + real Robux purchases (no double grants), saving/loading/offline earnings,
-session locks, the obby, all minigames, quests, gifts, the guide beam, clicking every
-UI button, every client effect, and an exploiter firing garbage at every remote.
+DataStores, purchases, tweens, CollectionService...). 39 scenarios cover a full
+502-upgrade playthrough, all 5 disasters (and that their effects clean up), duos,
+secrets, every admin command and rank, Studio + real Robux purchases (no double
+grants), saving/loading/offline earnings, session locks, the obby, all 4 minigames,
+quests, gifts, the guide beam, auto events, clicking every UI button, every client
+effect, a wrong device clock, faked touches from across the map, and an exploiter
+firing garbage at every remote. Slow extras (`SIM_SLOW=1`): a 5-hour soak with bots
+coming and going, and leak probes for the world and the client UI.
 
 ```bash
 rojo build -o MegaTycoon.rbxlx
