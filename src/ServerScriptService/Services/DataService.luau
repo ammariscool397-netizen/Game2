@@ -48,6 +48,8 @@ local TEMPLATE = {
 	LastIncome = 0,
 	Quests = { List = {}, Claimed = 0 },
 	Wheel = { Last = 0, Spins = 0 },
+	Gifts = { Day = 0, Index = 1, Played = 0 }, -- playtime gifts (see GiftService)
+	Shield = { Start = 0 }, -- when the personal shield was last activated
 	Settings = { MusicVolume = Config.Music.DefaultVolume, SFX = true, LowGraphics = false, Guide = true, AutoBuild = true },
 }
 

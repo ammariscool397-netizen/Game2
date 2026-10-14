@@ -92,6 +92,11 @@ function DisasterService:IsSheltered(position: Vector3): boolean
 	return false
 end
 
+-- sheltered (bunker, dome, roof) or wearing a personal shield
+function DisasterService:IsProtected(player: Player, position: Vector3): boolean
+	return self:IsSheltered(position) or (S.ShieldService ~= nil and S.ShieldService:IsShielded(player))
+end
+
 function DisasterService:GetShelterInfo()
 	local boxes, spheres, doors = S.TycoonService:GetShelters()
 	local public = S.WorldBuilder.Shelter
@@ -200,8 +205,8 @@ function handlers.Nuke(by: string?)
 			local player = info.Player
 			if not hitPlayers[player] and (info.Root.Position - target).Magnitude <= radius then
 				hitPlayers[player] = true
-				if DisasterService:IsSheltered(info.Root.Position) then
-					Remotes.Notify:FireClient(player, { Text = "🛡️ You survived the nuke! Smart move.", Type = "success" })
+				if DisasterService:IsProtected(info.Player, info.Root.Position) then
+					Remotes.Notify:FireClient(player, { Text = DisasterService:IsSheltered(info.Root.Position) and "🛡️ You survived the nuke! Smart move." or "🛡️ Your shield absorbed the nuke!", Type = "success" })
 				else
 					local away = info.Root.Position - target
 					local dir = away.Magnitude > 1 and away.Unit or Vector3.new(0, 0, 1)
@@ -280,7 +285,7 @@ local function meteorImpact(target: Vector3, cfg)
 		end
 		for _, info in mainMapPlayers() do
 			local d = (info.Root.Position - impact).Magnitude
-			if d <= cfg.Radius and not DisasterService:IsSheltered(info.Root.Position) then
+			if d <= cfg.Radius and not DisasterService:IsProtected(info.Player, info.Root.Position) then
 				info.Humanoid:TakeDamage(cfg.Damage)
 				local away = info.Root.Position - impact
 				fling(info.Player, (away.Magnitude > 0.1 and away.Unit or Vector3.yAxis) * 60 + Vector3.new(0, 50, 0))
@@ -386,7 +391,7 @@ function handlers.Tornado(by: string?)
 			lastEffect = now
 			for _, info in mainMapPlayers() do
 				local flat = (info.Root.Position - pos) * Vector3.new(1, 0, 1)
-				if flat.Magnitude <= cfg.Radius and info.Root.Position.Y < 220 and not DisasterService:IsSheltered(info.Root.Position) then
+				if flat.Magnitude <= cfg.Radius and info.Root.Position.Y < 220 and not DisasterService:IsProtected(info.Player, info.Root.Position) then
 					Remotes.ClientCommand:FireClient(info.Player, "tornado", pos)
 					info.Humanoid:TakeDamage(3)
 				end
@@ -456,7 +461,7 @@ function handlers.UFO(by: string?)
 					local best, bestD = nil, 180
 					for _, info in players do
 						local flat = (info.Root.Position - ufo.Pos) * Vector3.new(1, 0, 1)
-						if flat.Magnitude < bestD and not DisasterService:IsSheltered(info.Root.Position) then
+						if flat.Magnitude < bestD and not DisasterService:IsProtected(info.Player, info.Root.Position) then
 							best, bestD = info, flat.Magnitude
 						end
 					end
@@ -543,7 +548,7 @@ function handlers.Earthquake(by: string?)
 			nextShock = now + cfg.WaveEvery
 			broadcast({ Phase = "Shock", Kind = "Earthquake", Intensity = rng:NextNumber(0.6, 1) })
 			for _, info in mainMapPlayers() do
-				if not DisasterService:IsSheltered(info.Root.Position) then
+				if not DisasterService:IsProtected(info.Player, info.Root.Position) then
 					info.Humanoid:TakeDamage(cfg.Damage)
 					fling(info.Player, Vector3.new(rng:NextNumber(-12, 12), 28, rng:NextNumber(-12, 12)))
 				end

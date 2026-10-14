@@ -679,7 +679,7 @@ add({
 		run(";ff me")
 		T.Check(me.Character:FindFirstChildOfClass("ForceField") ~= nil, ";ff")
 		run(";unff me")
-		T.Check(me.Character:FindFirstChildOfClass("ForceField") == nil, ";unff")
+		T.Check(me.Character:FindFirstChild("ShieldBubble") == nil, ";unff")
 		run(";heal me")
 		run(";freeze target")
 		T.Check(T.Root(target).Anchored, ";freeze anchors")
@@ -2090,7 +2090,7 @@ add({
 	Name = "gifts",
 	MaxSeconds = 2 * 3600,
 	Run = function(T, place)
-		local game, me = T.Boot(place)
+		local game, me = T.Boot(place, { Name = "Gifter", UserId = 6300 })
 		T.Wait(6)
 		local Config = T.Shared("Config")
 		local data = T.Service("DataService"):Get(me)
@@ -2123,8 +2123,24 @@ add({
 		local okMore = T.Client(function()
 			return T.Remote("ClaimGift"):InvokeServer()
 		end)
-		T.Check(okMore == false, "no more gifts this session")
+		T.Check(okMore == false, "no more gifts today")
 		T.Check(T.Engine.Now < 70 * 60 + 60, "all gifts within ~an hour")
+
+		-- leaving and rejoining doesn't restart the gifts
+		T.LeaveClient()
+		T.Wait(1)
+		me = T.StartClient("Gifter", { UserId = 6300 })
+		T.Wait(8)
+		local DataService = T.Service("DataService")
+		local GiftService = T.Service("GiftService")
+		data = DataService:Get(me)
+		T.Check(data.Gifts.Index == total + 1 and GiftService:GetState(me).ReadyIn == -1, "rejoining keeps the opened gifts")
+		T.Check(not T.IsShown(me.PlayerGui:FindFirstChild("GiftButton", true)), "and no gift button")
+		-- a new day starts over
+		data.Gifts.Day -= 1
+		T.Wait(35)
+		T.Check(data.Gifts.Index == 1 and GiftService:GetState(me).ReadyIn > 0, "a new day starts the gifts over")
+		T.Check(T.Controller("Gifts").State and T.Controller("Gifts").State.Index == 1, "and the client is told")
 	end,
 })
 
@@ -3156,6 +3172,94 @@ add({
 		T.Check(manual ~= nil and manual.By == "Boss" and manual.Reason:find("griefing", 1, true) ~= nil, "manual bans are in the panel too")
 		T.Admin(boss, ";unban 7010")
 		T.Check(registry().Bans["7010"] == nil and T.Engine.DataStores[Config.Admin.BanDataStore]["7010"] == nil, ";unban works with a user id")
+	end,
+})
+
+---------------------------------------------------------------------------
+-- Personal shield
+---------------------------------------------------------------------------
+add({
+	Name = "shield",
+	MaxSeconds = 900,
+	Run = function(T, place)
+		local game, me = T.Boot(place, { Name = "Shielded", UserId = 6400 })
+		T.Wait(6)
+		local Config = T.Shared("Config")
+		local SC = Config.Shield
+		local DataService = T.Service("DataService")
+		local ShieldService = T.Service("ShieldService")
+		local DisasterService = T.Service("DisasterService")
+		local Shield = T.Controller("Shield")
+		local data = DataService:Get(me)
+		local position = T.Root(me).Position
+		T.Check(Shield:GetState() == "ready" and not ShieldService:IsShielded(me), "a new player's shield is ready")
+		T.Check(not DisasterService:IsProtected(me, position), "not protected without a shield")
+
+		-- activate from the panel
+		T.Client(function()
+			T.Controller("UI"):Open("Shield")
+		end)
+		T.Wait(1)
+		local button = T.FindButton(me.PlayerGui, "ACTIVATE")
+		T.Check(button ~= nil, "ACTIVATE button")
+		T.Client(function()
+			T.Engine.Click(button)
+		end)
+		T.Wait(1)
+		T.Check(ShieldService:IsShielded(me) and data.Shield.Start > 0, "shield on (and saved)")
+		T.Check(me.Character:FindFirstChild("ShieldBubble") ~= nil, "force-field bubble")
+		T.Check(DisasterService:IsProtected(me, position), "protected from disasters")
+		T.Check(Shield:GetState() == "active", "client shows it active")
+		T.Check(T.FindText(me.PlayerGui, "SHIELD ACTIVE") ~= nil, "the panel says so")
+
+		-- a nuke can't hurt a shielded player
+		T.Admin(me, ";nuke")
+		T.Wait(45)
+		T.Check(T.Humanoid(me).Health > 0, "the shield saved the player from a nuke")
+		T.Check(T.Noticed(me, "shield absorbed"), "and says so")
+
+		-- rejoining: the shield and its recharge carry on
+		T.LeaveClient()
+		T.Wait(1)
+		me = T.StartClient("Shielded", { UserId = 6400 })
+		T.Wait(8)
+		data = DataService:Get(me)
+		Shield = T.Controller("Shield") -- (a new client)
+		T.Check(ShieldService:IsShielded(me), "still shielded after rejoining")
+		T.Check(me.Character:FindFirstChild("ShieldBubble") ~= nil, "bubble comes back")
+		local early = T.Client(function()
+			return { T.Remote("ActivateShield"):InvokeServer() }
+		end)
+		T.Check(early[1] == false and tostring(early[2]):find("recharging"), "can't activate again yet")
+
+		-- it runs out, then the cooldown
+		T.SetDt(1)
+		T.WaitFor(function()
+			return not ShieldService:IsShielded(me)
+		end, SC.Seconds + 5, "shield to run out")
+		T.Wait(2)
+		T.Check(me.Character:FindFirstChild("ShieldBubble") == nil, "bubble is gone")
+		T.Check(not DisasterService:IsProtected(me, T.Root(me).Position), "not protected any more")
+		T.Check(Shield:GetState() == "recharging", "client shows recharging")
+		-- leaving and coming back doesn't reset the cooldown
+		T.LeaveClient()
+		T.Wait(1)
+		me = T.StartClient("Shielded", { UserId = 6400 })
+		T.Wait(8)
+		local again = T.Client(function()
+			return { T.Remote("ActivateShield"):InvokeServer() }
+		end)
+		T.Check(again[1] == false, "rejoining doesn't reset the cooldown")
+		-- after the full cooldown it works again
+		DataService:Get(me).Shield.Start -= SC.Cooldown
+		T.Server(function()
+			ShieldService:_apply(me)
+		end)
+		T.Wait(2)
+		local ready = T.Client(function()
+			return { T.Remote("ActivateShield"):InvokeServer() }
+		end)
+		T.Check(ready[1] == true, "ready again after the cooldown")
 	end,
 })
 

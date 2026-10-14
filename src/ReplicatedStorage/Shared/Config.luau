@@ -528,10 +528,21 @@ Config.Quests = {
 ---------------------------------------------------------------------------
 Config.Gifts = {
 	Enabled = true,
-	Minutes = { 5, 10, 20, 30, 45, 60 }, -- minutes after joining
+	Minutes = { 5, 10, 20, 30, 45, 60 }, -- minutes PLAYED today (saved; rejoining doesn't restart it)
 	IncomeMinutes = { 1, 2, 3, 5, 8, 12 },
 	MinCash = { 500, 1_000, 2_000, 4_000, 8_000, 15_000 },
 	FinalBoostSeconds = 10 * 60, -- the last gift also gives a 2x boost
+}
+
+---------------------------------------------------------------------------
+-- Personal shield: for Seconds you take no damage from disasters (like being
+-- in a bunker, anywhere). After using it you wait Cooldown seconds (counted
+-- from the moment you activated it). Both are saved, so rejoining doesn't help.
+---------------------------------------------------------------------------
+Config.Shield = {
+	Enabled = true,
+	Seconds = 90,
+	Cooldown = 15 * 60,
 }
 
 ---------------------------------------------------------------------------

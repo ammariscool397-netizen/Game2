@@ -942,10 +942,21 @@ Config.Quests = {
 ---------------------------------------------------------------------------
 Config.Gifts = {
 	Enabled = true,
-	Minutes = { 5, 10, 20, 30, 45, 60 }, -- minutes after joining
+	Minutes = { 5, 10, 20, 30, 45, 60 }, -- minutes PLAYED today (saved; rejoining doesn't restart it)
 	IncomeMinutes = { 1, 2, 3, 5, 8, 12 },
 	MinCash = { 500, 1_000, 2_000, 4_000, 8_000, 15_000 },
 	FinalBoostSeconds = 10 * 60, -- the last gift also gives a 2x boost
+}
+
+---------------------------------------------------------------------------
+-- Personal shield: for Seconds you take no damage from disasters (like being
+-- in a bunker, anywhere). After using it you wait Cooldown seconds (counted
+-- from the moment you activated it). Both are saved, so rejoining doesn't help.
+---------------------------------------------------------------------------
+Config.Shield = {
+	Enabled = true,
+	Seconds = 90,
+	Cooldown = 15 * 60,
 }
 
 ---------------------------------------------------------------------------
@@ -1083,6 +1094,7 @@ local FUNCTIONS = {
 	"ClaimQuest", -- (quest type or slot) -> ok, message
 	"ClaimGift", -- () -> ok, message
 	"SpinWheel", -- () -> ok, segment index (0 if none), message
+	"ActivateShield", -- () -> ok, message
 }
 
 local folder: Folder
@@ -2267,6 +2279,7 @@ local ORDER = {
 	"QuestService",
 	"GiftService",
 	"WheelService",
+	"ShieldService",
 	"DisasterService",
 	"AdminService",
 	"AntiCheatService",
@@ -4213,6 +4226,8 @@ local TEMPLATE = {
 	LastIncome = 0,
 	Quests = { List = {}, Claimed = 0 },
 	Wheel = { Last = 0, Spins = 0 },
+	Gifts = { Day = 0, Index = 1, Played = 0 }, -- playtime gifts (see GiftService)
+	Shield = { Start = 0 }, -- when the personal shield was last activated
 	Settings = { MusicVolume = Config.Music.DefaultVolume, SFX = true, LowGraphics = false, Guide = true, AutoBuild = true },
 }
 
@@ -4994,6 +5009,11 @@ function DisasterService:IsSheltered(position: Vector3): boolean
 	return false
 end
 
+-- sheltered (bunker, dome, roof) or wearing a personal shield
+function DisasterService:IsProtected(player: Player, position: Vector3): boolean
+	return self:IsSheltered(position) or (S.ShieldService ~= nil and S.ShieldService:IsShielded(player))
+end
+
 function DisasterService:GetShelterInfo()
 	local boxes, spheres, doors = S.TycoonService:GetShelters()
 	local public = S.WorldBuilder.Shelter
@@ -5102,8 +5122,8 @@ function handlers.Nuke(by: string?)
 			local player = info.Player
 			if not hitPlayers[player] and (info.Root.Position - target).Magnitude <= radius then
 				hitPlayers[player] = true
-				if DisasterService:IsSheltered(info.Root.Position) then
-					Remotes.Notify:FireClient(player, { Text = "🛡️ You survived the nuke! Smart move.", Type = "success" })
+				if DisasterService:IsProtected(info.Player, info.Root.Position) then
+					Remotes.Notify:FireClient(player, { Text = DisasterService:IsSheltered(info.Root.Position) and "🛡️ You survived the nuke! Smart move." or "🛡️ Your shield absorbed the nuke!", Type = "success" })
 				else
 					local away = info.Root.Position - target
 					local dir = away.Magnitude > 1 and away.Unit or Vector3.new(0, 0, 1)
@@ -5182,7 +5202,7 @@ local function meteorImpact(target: Vector3, cfg)
 		end
 		for _, info in mainMapPlayers() do
 			local d = (info.Root.Position - impact).Magnitude
-			if d <= cfg.Radius and not DisasterService:IsSheltered(info.Root.Position) then
+			if d <= cfg.Radius and not DisasterService:IsProtected(info.Player, info.Root.Position) then
 				info.Humanoid:TakeDamage(cfg.Damage)
 				local away = info.Root.Position - impact
 				fling(info.Player, (away.Magnitude > 0.1 and away.Unit or Vector3.yAxis) * 60 + Vector3.new(0, 50, 0))
@@ -5288,7 +5308,7 @@ function handlers.Tornado(by: string?)
 			lastEffect = now
 			for _, info in mainMapPlayers() do
 				local flat = (info.Root.Position - pos) * Vector3.new(1, 0, 1)
-				if flat.Magnitude <= cfg.Radius and info.Root.Position.Y < 220 and not DisasterService:IsSheltered(info.Root.Position) then
+				if flat.Magnitude <= cfg.Radius and info.Root.Position.Y < 220 and not DisasterService:IsProtected(info.Player, info.Root.Position) then
 					Remotes.ClientCommand:FireClient(info.Player, "tornado", pos)
 					info.Humanoid:TakeDamage(3)
 				end
@@ -5358,7 +5378,7 @@ function handlers.UFO(by: string?)
 					local best, bestD = nil, 180
 					for _, info in players do
 						local flat = (info.Root.Position - ufo.Pos) * Vector3.new(1, 0, 1)
-						if flat.Magnitude < bestD and not DisasterService:IsSheltered(info.Root.Position) then
+						if flat.Magnitude < bestD and not DisasterService:IsProtected(info.Player, info.Root.Position) then
 							best, bestD = info, flat.Magnitude
 						end
 					end
@@ -5445,7 +5465,7 @@ function handlers.Earthquake(by: string?)
 			nextShock = now + cfg.WaveEvery
 			broadcast({ Phase = "Shock", Kind = "Earthquake", Intensity = rng:NextNumber(0.6, 1) })
 			for _, info in mainMapPlayers() do
-				if not DisasterService:IsSheltered(info.Root.Position) then
+				if not DisasterService:IsProtected(info.Player, info.Root.Position) then
 					info.Humanoid:TakeDamage(cfg.Damage)
 					fling(info.Player, Vector3.new(rng:NextNumber(-12, 12), 28, rng:NextNumber(-12, 12)))
 				end
@@ -5721,9 +5741,10 @@ return DuoService
         <Properties>
           <string name="Name">GiftService</string>
           <string name="Source"><![CDATA[--[[
-	GiftService - playtime gifts (see Config.Gifts). The longer you stay in
-	the server, the more gifts unlock; each pays minutes of your income and
-	the last one also gives a 2x boost. Counts per session (not saved).
+	GiftService - playtime gifts (see Config.Gifts). The longer you play today,
+	the more gifts unlock; each pays minutes of your income and the last one
+	also gives a 2x boost. Time played and the gifts opened are SAVED, so
+	leaving and rejoining doesn't restart the wait. A new UTC day starts over.
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -5738,19 +5759,43 @@ local GC = Config.Gifts
 local GiftService = {}
 local S
 
-local sessions: { [Player]: { Start: number, Index: number } } = {}
+-- when this visit's playtime was last added to the saved total
+local sessions: { [Player]: { Start: number } } = {}
+
+local function today(): number
+	return os.time() // 86400
+end
+
+-- adds the time played since the last call to the saved total (and starts a new day over)
+function GiftService:_bank(player: Player)
+	local session = sessions[player]
+	local data = S.DataService:Get(player)
+	if not session or not data then
+		return
+	end
+	local gifts = data.Gifts
+	local now = os.time()
+	if gifts.Day ~= today() then
+		gifts.Day, gifts.Index, gifts.Played = today(), 1, 0
+		session.Start = now
+		return
+	end
+	gifts.Played += math.max(0, now - session.Start)
+	session.Start = now
+end
 
 function GiftService:GetState(player: Player)
-	local session = sessions[player]
-	if not session then
+	local data = S.DataService:Get(player)
+	if not data or not sessions[player] then
 		return nil
 	end
+	self:_bank(player)
+	local gifts = data.Gifts
 	local total = #GC.Minutes
-	if session.Index > total then
-		return { Index = session.Index, Total = total, ReadyIn = -1 }
+	if gifts.Index > total then
+		return { Index = gifts.Index, Total = total, ReadyIn = -1 }
 	end
-	local readyAt = session.Start + GC.Minutes[session.Index] * 60
-	return { Index = session.Index, Total = total, ReadyIn = math.max(0, readyAt - os.time()) }
+	return { Index = gifts.Index, Total = total, ReadyIn = math.max(0, GC.Minutes[gifts.Index] * 60 - gifts.Played) }
 end
 
 function GiftService:_send(player: Player)
@@ -5768,19 +5813,19 @@ function GiftService:GetReward(player: Player, index: number): number
 end
 
 function GiftService:Claim(player: Player): (boolean, string)
-	local session = sessions[player]
-	if not session or not S.DataService:IsLoaded(player) then
+	local state = self:GetState(player)
+	if not state then
 		return false, "Data still loading..."
 	end
-	local index = session.Index
-	if index > #GC.Minutes then
-		return false, "You opened every gift this session!"
+	local data = S.DataService:Get(player)
+	if state.ReadyIn < 0 then
+		return false, "You opened every gift today! Come back tomorrow."
 	end
-	local readyAt = session.Start + GC.Minutes[index] * 60
-	if os.time() < readyAt then
-		return false, "Your next gift opens in " .. Util.FormatTime(readyAt - os.time())
+	if state.ReadyIn > 0 then
+		return false, "Your next gift opens in " .. Util.FormatTime(state.ReadyIn)
 	end
-	session.Index += 1
+	local index = state.Index
+	data.Gifts.Index += 1
 	local cash = self:GetReward(player, index)
 	S.DataService:AddCash(player, cash, false)
 	local text = "🎁 Gift " .. index .. "/" .. #GC.Minutes .. ": +" .. Util.Money(cash)
@@ -5803,12 +5848,33 @@ function GiftService:Init(services)
 		return self:Claim(player)
 	end
 	S.DataService.PlayerLoaded:Connect(function(player)
-		sessions[player] = { Start = os.time(), Index = 1 }
+		sessions[player] = { Start = os.time() }
+		self:_bank(player) -- (starts a new day over)
 		self:_send(player)
+	end)
+	-- the time played so far is saved with the rest of the data
+	S.DataService.BeforeSave:Connect(function(player)
+		self:_bank(player)
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		sessions[player] = nil
 	end)
+end
+
+-- a new day while someone is playing: their gifts start over
+function GiftService:Start()
+	if not GC.Enabled then
+		return
+	end
+	while true do
+		task.wait(30)
+		for player in sessions do
+			local data = S.DataService:Get(player)
+			if data and data.Gifts.Day ~= today() then
+				Util.Try("Gifts", self._send, self, player)
+			end
+		end
+	end
 end
 
 return GiftService
@@ -7996,6 +8062,116 @@ return SecretService
       </Item>
       <Item class="ModuleScript" referent="28">
         <Properties>
+          <string name="Name">ShieldService</string>
+          <string name="Source"><![CDATA[--[[
+	ShieldService - the personal shield (see Config.Shield). While it's on you
+	are protected from disaster damage (DisasterService:IsProtected) and wear a
+	force-field bubble. The activation time is saved, so the cooldown can't be
+	skipped by rejoining and an active shield survives a rejoin.
+]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local Remotes = require(Shared.Remotes)
+
+local SC = Config.Shield
+
+local ShieldService = {}
+local S
+
+function ShieldService:_times(player: Player): (number, number)
+	local data = S.DataService:Get(player)
+	local start = data and data.Shield.Start or 0
+	return start + SC.Seconds, start + SC.Cooldown -- (shield ends, ready again)
+end
+
+function ShieldService:IsShielded(player: Player): boolean
+	local untilTime = self:_times(player)
+	return SC.Enabled and os.time() < untilTime
+end
+
+-- the bubble and the attributes the client shows
+function ShieldService:_apply(player: Player)
+	local untilTime, readyAt = self:_times(player)
+	player:SetAttribute("ShieldEnd", untilTime)
+	player:SetAttribute("ShieldReadyAt", readyAt)
+	local character = player.Character
+	if not character then
+		return
+	end
+	local field = character:FindFirstChild("ShieldBubble") -- (other force-fields, like the admin ;ff, are left alone)
+	if self:IsShielded(player) then
+		if not field then
+			field = Instance.new("ForceField")
+			field.Name = "ShieldBubble"
+			field.Visible = true
+			field.Parent = character
+		end
+	elseif field then
+		field:Destroy()
+	end
+end
+
+function ShieldService:Activate(player: Player): (boolean, string)
+	local data = S.DataService:Get(player)
+	if not data then
+		return false, "Data still loading..."
+	end
+	local _, readyAt = self:_times(player)
+	if os.time() < readyAt then
+		return false, "Your shield is recharging: " .. Util.FormatTime(readyAt - os.time())
+	end
+	data.Shield.Start = os.time()
+	self:_apply(player)
+	Remotes.VFX:FireAllClients("ShieldHit", { Center = player.Character and player.Character:GetPivot().Position or Vector3.zero, Radius = 8 })
+	return true, "🛡️ Shield on for " .. Util.FormatTime(SC.Seconds) .. " - disasters can't hurt you!"
+end
+
+function ShieldService:Init(services)
+	S = services
+	Remotes.ActivateShield.OnServerInvoke = function(player)
+		if not SC.Enabled then
+			return false, "Shields are turned off."
+		end
+		return self:Activate(player)
+	end
+	S.DataService.PlayerLoaded:Connect(function(player)
+		self:_apply(player)
+	end)
+	local function watch(player: Player)
+		player.CharacterAdded:Connect(function()
+			task.defer(function()
+				self:_apply(player)
+			end)
+		end)
+	end
+	Players.PlayerAdded:Connect(watch)
+	for _, player in Players:GetPlayers() do
+		watch(player)
+	end
+end
+
+-- the bubble goes away when the time is up
+function ShieldService:Start()
+	while true do
+		task.wait(1)
+		for _, player in Players:GetPlayers() do
+			if S.DataService:Get(player) then
+				Util.Try("Shield", self._apply, self, player)
+			end
+		end
+	end
+end
+
+return ShieldService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="29">
+        <Properties>
           <string name="Name">TycoonBuilder</string>
           <string name="Source"><![CDATA[--[[
 	TycoonBuilder - procedural geometry for plots, 8-floor towers, buttons,
@@ -8819,7 +8995,7 @@ return TycoonBuilder
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">TycoonService</string>
           <string name="Source"><![CDATA[--[[
@@ -10047,7 +10223,7 @@ return TycoonService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">WheelService</string>
           <string name="Source"><![CDATA[--[[
@@ -10164,7 +10340,7 @@ return WheelService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">WorldBuilder</string>
           <string name="Source"><![CDATA[--[[
@@ -10944,22 +11120,22 @@ return WorldBuilder
       </Item>
     </Item>
   </Item>
-  <Item class="SoundService" referent="32">
+  <Item class="SoundService" referent="33">
     <Properties>
       <string name="Name">SoundService</string>
     </Properties>
   </Item>
-  <Item class="StarterPlayer" referent="33">
+  <Item class="StarterPlayer" referent="34">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <float name="CharacterJumpPower">50</float>
       <float name="CharacterWalkSpeed">16</float>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="34">
+    <Item class="StarterPlayerScripts" referent="35">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="35">
+      <Item class="LocalScript" referent="36">
         <Properties>
           <string name="Name">Client</string>
           <string name="Source"><![CDATA[--[[
@@ -10983,6 +11159,7 @@ local ORDER = {
 	"Quests",
 	"Gifts",
 	"Wheel",
+	"Shield",
 	"Guide",
 	"DropVisuals",
 	"Admin",
@@ -11027,11 +11204,11 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="36">
+      <Item class="Folder" referent="37">
         <Properties>
           <string name="Name">Controllers</string>
         </Properties>
-        <Item class="ModuleScript" referent="37">
+        <Item class="ModuleScript" referent="38">
           <Properties>
             <string name="Name">Admin</string>
             <string name="Source"><![CDATA[--[[
@@ -11630,7 +11807,7 @@ return Admin
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="38">
+        <Item class="ModuleScript" referent="39">
           <Properties>
             <string name="Name">Animator</string>
             <string name="Source"><![CDATA[--[[
@@ -11837,7 +12014,7 @@ return Animator
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="39">
+        <Item class="ModuleScript" referent="40">
           <Properties>
             <string name="Name">Build</string>
             <string name="Source"><![CDATA[--[[
@@ -12291,7 +12468,7 @@ return Build
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="40">
+        <Item class="ModuleScript" referent="41">
           <Properties>
             <string name="Name">ChatTags</string>
             <string name="Source"><![CDATA[--[[ ChatTags - [Owner] / [Admin] / [VIP] / rebirth tags in the chat ]]
@@ -12351,7 +12528,7 @@ return ChatTags
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="41">
+        <Item class="ModuleScript" referent="42">
           <Properties>
             <string name="Name">Disasters</string>
             <string name="Source"><![CDATA[--[[
@@ -13248,7 +13425,7 @@ return Disasters
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="42">
+        <Item class="ModuleScript" referent="43">
           <Properties>
             <string name="Name">DropVisuals</string>
             <string name="Source"><![CDATA[--[[
@@ -13523,7 +13700,7 @@ return DropVisuals
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="43">
+        <Item class="ModuleScript" referent="44">
           <Properties>
             <string name="Name">Duo</string>
             <string name="Source"><![CDATA[--[[ Duo (client) - invite players to build one tower together + invite popups ]]
@@ -13722,7 +13899,7 @@ return Duo
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="44">
+        <Item class="ModuleScript" referent="45">
           <Properties>
             <string name="Name">Gifts</string>
             <string name="Source"><![CDATA[--[[ Gifts (client) - the playtime gift button (bottom right) ]]
@@ -13821,7 +13998,7 @@ return Gifts
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="45">
+        <Item class="ModuleScript" referent="46">
           <Properties>
             <string name="Name">Guide</string>
             <string name="Source"><![CDATA[--[[
@@ -14002,7 +14179,7 @@ return Guide
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="46">
+        <Item class="ModuleScript" referent="47">
           <Properties>
             <string name="Name">HUD</string>
             <string name="Source"><![CDATA[--[[ HUD - cash counter, income, multiplier/boost info, floor indicator,
@@ -14197,6 +14374,7 @@ function HUD:Init(controllers)
 		{ "Secrets", "🕵️", "SECRETS", Color3.fromRGB(120, 200, 120) },
 		{ "Daily", "🎁", "DAILY", Color3.fromRGB(255, 90, 120) },
 		{ "Wheel", "🎰", "WHEEL", Color3.fromRGB(255, 120, 60) },
+		{ "Shield", "🛡️", "SHIELD", Color3.fromRGB(70, 170, 255) },
 		{ "Codes", "🎟️", "CODES", Color3.fromRGB(0, 200, 160) },
 		{ "Home", "🏠", "HOME", Color3.fromRGB(70, 200, 100) },
 		{ "Settings", "⚙️", "SETTINGS", Color3.fromRGB(130, 140, 160) },
@@ -14331,7 +14509,7 @@ return HUD
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">Minigame</string>
             <string name="Source"><![CDATA[--[[ Minigame (client) - join popup, countdown, in-game HUD and results ]]
@@ -14566,7 +14744,7 @@ return Minigame
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="49">
           <Properties>
             <string name="Name">Music</string>
             <string name="Source"><![CDATA[--[[
@@ -14786,7 +14964,7 @@ return Music
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">Notifications</string>
             <string name="Source"><![CDATA[--[[ Notifications - toast messages (top right) + big announcement banners ]]
@@ -14976,7 +15154,7 @@ return Notifications
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">Panels</string>
             <string name="Source"><![CDATA[--[[ Panels - Rebirth, Daily Rewards, Codes and Settings menus ]]
@@ -15398,7 +15576,7 @@ return Panels
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">Quests</string>
             <string name="Source"><![CDATA[--[[ Quests (client) - the quest tracker in the bottom-right corner ]]
@@ -15574,7 +15752,123 @@ return Quests
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="53">
+          <Properties>
+            <string name="Name">Shield</string>
+            <string name="Source"><![CDATA[--[[
+	Shield (client) - the personal shield panel: activate it, see how long it
+	lasts and when it can be used again. Times come from the server's saved
+	values, so rejoining doesn't change them.
+]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local UIKit = require(Shared.UIKit)
+local Remotes = require(Shared.Remotes)
+
+local player = Players.LocalPlayer
+local Theme = UIKit.Theme
+local SC = Config.Shield
+
+local Shield = {}
+local C
+
+local statusLabel: TextLabel
+local activateButton: TextButton
+local busy = false
+
+-- "active" (seconds left), "recharging" (seconds left) or "ready"
+function Shield:GetState(): (string, number)
+	local now = Util.ServerNow()
+	local untilTime = player:GetAttribute("ShieldEnd") or 0
+	local readyAt = player:GetAttribute("ShieldReadyAt") or 0
+	if now < untilTime then
+		return "active", untilTime - now
+	elseif now < readyAt then
+		return "recharging", readyAt - now
+	end
+	return "ready", 0
+end
+
+local function refresh()
+	local state, left = Shield:GetState()
+	if state == "active" then
+		statusLabel.Text = "🛡️ SHIELD ACTIVE - " .. Util.Clock(left) .. " left"
+		statusLabel.TextColor3 = Theme.Accent2
+		activateButton.Text = "ACTIVE"
+		activateButton.BackgroundColor3 = Theme.PanelLight
+	elseif state == "recharging" then
+		statusLabel.Text = "Recharging: " .. Util.Clock(left)
+		statusLabel.TextColor3 = Theme.SubText
+		activateButton.Text = "RECHARGING"
+		activateButton.BackgroundColor3 = Theme.PanelLight
+	else
+		statusLabel.Text = "Your shield is ready!"
+		statusLabel.TextColor3 = Theme.Green
+		activateButton.Text = "🛡️ ACTIVATE"
+		activateButton.BackgroundColor3 = Theme.Green
+	end
+	if C.HUD and C.HUD.SetBadge then
+		C.HUD:SetBadge("Shield", state == "ready")
+	end
+end
+
+function Shield:Init(controllers)
+	C = controllers
+	local _, content = C.UI:MakePanel("Shield", "🛡️ SHIELD", Theme.Accent2, 520, 340)
+	UIKit.List(content, 14)
+	UIKit.new("TextLabel", {
+		Text = "A shield protects you from every disaster for " .. Util.FormatTime(SC.Seconds) .. ", wherever you are. It recharges for " .. Util.FormatTime(SC.Cooldown) .. " after you use it - leaving and rejoining doesn't reset that.",
+		Size = UDim2.new(1, -20, 0, 90),
+		BackgroundTransparency = 1,
+		TextWrapped = true,
+		TextSize = 18,
+		Font = Theme.BodyFont,
+		TextColor3 = Theme.SubText,
+		LayoutOrder = 1,
+		ZIndex = 7,
+		Parent = content,
+	})
+	statusLabel = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 40), LayoutOrder = 2, ZIndex = 7, Parent = content })
+	activateButton = UIKit.Button({
+		Name = "ActivateShield",
+		Text = "...",
+		Color = Theme.Green,
+		Size = UDim2.fromOffset(280, 56),
+		LayoutOrder = 3,
+		ZIndex = 7,
+		Parent = content,
+		Callback = function()
+			if busy or Shield:GetState() ~= "ready" then
+				return
+			end
+			busy = true
+			local ok, message = Remotes.ActivateShield:InvokeServer()
+			busy = false
+			C.Notifications:Toast(tostring(message), ok and "success" or "error")
+			refresh()
+		end,
+	})
+	player:GetAttributeChangedSignal("ShieldEnd"):Connect(refresh)
+	player:GetAttributeChangedSignal("ShieldReadyAt"):Connect(refresh)
+	refresh()
+end
+
+function Shield:Start()
+	while true do
+		task.wait(1)
+		Util.Try("Shield", refresh)
+	end
+end
+
+return Shield
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">Shop</string>
             <string name="Source"><![CDATA[--[[ Shop - Robux panel with Game Passes and Developer Products ]]
@@ -15741,7 +16035,7 @@ return Shop
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">UI</string>
             <string name="Source"><![CDATA[--[[ UI - owns the main ScreenGui and the "one panel at a time" manager ]]
@@ -15880,7 +16174,7 @@ return UI
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">VFX</string>
             <string name="Source"><![CDATA[--[[
@@ -16423,7 +16717,7 @@ return VFX
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">Wheel</string>
             <string name="Source"><![CDATA[--[[
@@ -16606,13 +16900,13 @@ return Wheel
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="56">
+  <Item class="TextChatService" referent="58">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="57">
+  <Item class="Workspace" referent="59">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="Gravity">196.2</float>

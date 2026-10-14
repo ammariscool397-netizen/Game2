@@ -40,6 +40,7 @@ local FUNCTIONS = {
 	"ClaimQuest", -- (quest type or slot) -> ok, message
 	"ClaimGift", -- () -> ok, message
 	"SpinWheel", -- () -> ok, segment index (0 if none), message
+	"ActivateShield", -- () -> ok, message
 }
 
 local folder: Folder

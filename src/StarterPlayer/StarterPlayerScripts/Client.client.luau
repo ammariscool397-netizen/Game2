@@ -19,6 +19,7 @@ local ORDER = {
 	"Quests",
 	"Gifts",
 	"Wheel",
+	"Shield",
 	"Guide",
 	"DropVisuals",
 	"Admin",

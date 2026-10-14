@@ -190,6 +190,7 @@ function HUD:Init(controllers)
 		{ "Secrets", "🕵️", "SECRETS", Color3.fromRGB(120, 200, 120) },
 		{ "Daily", "🎁", "DAILY", Color3.fromRGB(255, 90, 120) },
 		{ "Wheel", "🎰", "WHEEL", Color3.fromRGB(255, 120, 60) },
+		{ "Shield", "🛡️", "SHIELD", Color3.fromRGB(70, 170, 255) },
 		{ "Codes", "🎟️", "CODES", Color3.fromRGB(0, 200, 160) },
 		{ "Home", "🏠", "HOME", Color3.fromRGB(70, 200, 100) },
 		{ "Settings", "⚙️", "SETTINGS", Color3.fromRGB(130, 140, 160) },

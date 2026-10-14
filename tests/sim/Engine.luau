@@ -730,14 +730,40 @@ method("Instance", "WaitForChild", function(self, name: string, timeout: number?
 	return coroutine.yield()
 end)
 
+-- Lune keeps attribute numbers as float32 (os.time() would lose up to 64 s); Roblox keeps
+-- doubles, so the exact numbers are remembered here
+local exactAttributes = setmetatable({}, { __mode = "k" })
+method("Instance", "GetAttribute", function(self, name: string)
+	local native = unwrap(self)
+	local exact = exactAttributes[native]
+	local value = exact and exact[name]
+	if value ~= nil and native:GetAttribute(name) ~= nil then
+		return value
+	end
+	return native:GetAttribute(name)
+end)
+
 method("Instance", "SetAttribute", function(self, name: string, value)
 	assert(type(name) == "string", "SetAttribute expects a string name")
 	local native = unwrap(self)
 	if isInstance(value) then
 		error("Instances can't be stored as attributes", 2)
 	end
-	local old = native:GetAttribute(name)
+	local exact = exactAttributes[native]
+	local old = exact and exact[name]
+	if old == nil then
+		old = native:GetAttribute(name)
+	end
 	native:SetAttribute(name, value)
+	if type(value) == "number" then
+		if not exact then
+			exact = {}
+			exactAttributes[native] = exact
+		end
+		exact[name] = value
+	elseif exact then
+		exact[name] = nil
+	end
 	if old ~= value then
 		fireIfExists(native, "Attr:" .. name)
 		fireIfExists(native, "AttributeChanged", name)

@@ -1,7 +1,8 @@
 --[[
-	GiftService - playtime gifts (see Config.Gifts). The longer you stay in
-	the server, the more gifts unlock; each pays minutes of your income and
-	the last one also gives a 2x boost. Counts per session (not saved).
+	GiftService - playtime gifts (see Config.Gifts). The longer you play today,
+	the more gifts unlock; each pays minutes of your income and the last one
+	also gives a 2x boost. Time played and the gifts opened are SAVED, so
+	leaving and rejoining doesn't restart the wait. A new UTC day starts over.
 ]]
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -16,19 +17,43 @@ local GC = Config.Gifts
 local GiftService = {}
 local S
 
-local sessions: { [Player]: { Start: number, Index: number } } = {}
+-- when this visit's playtime was last added to the saved total
+local sessions: { [Player]: { Start: number } } = {}
+
+local function today(): number
+	return os.time() // 86400
+end
+
+-- adds the time played since the last call to the saved total (and starts a new day over)
+function GiftService:_bank(player: Player)
+	local session = sessions[player]
+	local data = S.DataService:Get(player)
+	if not session or not data then
+		return
+	end
+	local gifts = data.Gifts
+	local now = os.time()
+	if gifts.Day ~= today() then
+		gifts.Day, gifts.Index, gifts.Played = today(), 1, 0
+		session.Start = now
+		return
+	end
+	gifts.Played += math.max(0, now - session.Start)
+	session.Start = now
+end
 
 function GiftService:GetState(player: Player)
-	local session = sessions[player]
-	if not session then
+	local data = S.DataService:Get(player)
+	if not data or not sessions[player] then
 		return nil
 	end
+	self:_bank(player)
+	local gifts = data.Gifts
 	local total = #GC.Minutes
-	if session.Index > total then
-		return { Index = session.Index, Total = total, ReadyIn = -1 }
+	if gifts.Index > total then
+		return { Index = gifts.Index, Total = total, ReadyIn = -1 }
 	end
-	local readyAt = session.Start + GC.Minutes[session.Index] * 60
-	return { Index = session.Index, Total = total, ReadyIn = math.max(0, readyAt - os.time()) }
+	return { Index = gifts.Index, Total = total, ReadyIn = math.max(0, GC.Minutes[gifts.Index] * 60 - gifts.Played) }
 end
 
 function GiftService:_send(player: Player)
@@ -46,19 +71,19 @@ function GiftService:GetReward(player: Player, index: number): number
 end
 
 function GiftService:Claim(player: Player): (boolean, string)
-	local session = sessions[player]
-	if not session or not S.DataService:IsLoaded(player) then
+	local state = self:GetState(player)
+	if not state then
 		return false, "Data still loading..."
 	end
-	local index = session.Index
-	if index > #GC.Minutes then
-		return false, "You opened every gift this session!"
+	local data = S.DataService:Get(player)
+	if state.ReadyIn < 0 then
+		return false, "You opened every gift today! Come back tomorrow."
 	end
-	local readyAt = session.Start + GC.Minutes[index] * 60
-	if os.time() < readyAt then
-		return false, "Your next gift opens in " .. Util.FormatTime(readyAt - os.time())
+	if state.ReadyIn > 0 then
+		return false, "Your next gift opens in " .. Util.FormatTime(state.ReadyIn)
 	end
-	session.Index += 1
+	local index = state.Index
+	data.Gifts.Index += 1
 	local cash = self:GetReward(player, index)
 	S.DataService:AddCash(player, cash, false)
 	local text = "🎁 Gift " .. index .. "/" .. #GC.Minutes .. ": +" .. Util.Money(cash)
@@ -81,12 +106,33 @@ function GiftService:Init(services)
 		return self:Claim(player)
 	end
 	S.DataService.PlayerLoaded:Connect(function(player)
-		sessions[player] = { Start = os.time(), Index = 1 }
+		sessions[player] = { Start = os.time() }
+		self:_bank(player) -- (starts a new day over)
 		self:_send(player)
+	end)
+	-- the time played so far is saved with the rest of the data
+	S.DataService.BeforeSave:Connect(function(player)
+		self:_bank(player)
 	end)
 	Players.PlayerRemoving:Connect(function(player)
 		sessions[player] = nil
 	end)
+end
+
+-- a new day while someone is playing: their gifts start over
+function GiftService:Start()
+	if not GC.Enabled then
+		return
+	end
+	while true do
+		task.wait(30)
+		for player in sessions do
+			local data = S.DataService:Get(player)
+			if data and data.Gifts.Day ~= today() then
+				Util.Try("Gifts", self._send, self, player)
+			end
+		end
+	end
 end
 
 return GiftService
