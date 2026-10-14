@@ -55,6 +55,7 @@ function MonetizationService:Init(services)
 			end
 		end
 		S.DataService:RefreshMultiplier(player)
+		self:RefreshCharacter(player) -- rebirth rank speed and tag (the character may have spawned first)
 	end)
 
 	Players.PlayerAdded:Connect(function(player)
@@ -91,7 +92,52 @@ function MonetizationService:HasPass(player: Player, key: string): boolean
 end
 
 function MonetizationService:GetBaseSpeed(player: Player): number
-	return self:HasPass(player, "SuperSpeed") and Config.BaseWalkSpeed * 2 or Config.BaseWalkSpeed
+	local data = S.DataService:Get(player)
+	local perk = data and Config.RebirthPerk(data.Rebirths, "Speed") or 0
+	return (self:HasPass(player, "SuperSpeed") and Config.BaseWalkSpeed * 2 or Config.BaseWalkSpeed) + perk
+end
+
+-- the rebirth rank tag above a character's head
+function MonetizationService:_applyRankTag(player: Player, character: Model)
+	local head = character:FindFirstChild("Head")
+	local data = S.DataService:Get(player)
+	local _, rank = Config.RebirthRank(data and data.Rebirths or 0)
+	local tag = head and head:FindFirstChild("RankTag") :: BillboardGui?
+	if not head or not rank then
+		return
+	end
+	if not tag then
+		tag = Instance.new("BillboardGui")
+		assert(tag)
+		tag.Name = "RankTag"
+		tag.Size = UDim2.fromOffset(120, 24)
+		tag.StudsOffset = Vector3.new(0, self:HasPass(player, "VIP") and 3.6 or 2.6, 0)
+		tag.MaxDistance = 80
+		local label = Instance.new("TextLabel")
+		label.Name = "Label"
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundTransparency = 1
+		label.TextScaled = true
+		label.Font = Enum.Font.FredokaOne
+		label.TextColor3 = Color3.fromRGB(220, 170, 255)
+		local stroke = Instance.new("UIStroke")
+		stroke.Thickness = 2
+		stroke.Parent = label
+		label.Parent = tag
+		tag.Parent = head
+	end
+	local label = tag:FindFirstChild("Label") :: TextLabel?
+	if label then
+		label.Text = rank.Icon .. " " .. rank.Name
+	end
+end
+
+-- re-apply speed and the rank tag to the current character (after a rebirth)
+function MonetizationService:RefreshCharacter(player: Player)
+	local character = player.Character
+	if character then
+		task.spawn(self._applyCharacterPerks, self, player, character)
+	end
 end
 
 -- grant = also store in data (admin / simulated purchases)
@@ -144,6 +190,7 @@ function MonetizationService:_applyCharacterPerks(player: Player, character: Mod
 		return
 	end
 	humanoid.WalkSpeed = self:GetBaseSpeed(player)
+	self:_applyRankTag(player, character)
 	if self:HasPass(player, "VIP") then
 		local root = character:WaitForChild("HumanoidRootPart", 10)
 		if root and not root:FindFirstChild("VIPAura") then

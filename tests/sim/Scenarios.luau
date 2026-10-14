@@ -2767,4 +2767,85 @@ add({
 	end,
 })
 
+---------------------------------------------------------------------------
+-- Rebirth ranks
+---------------------------------------------------------------------------
+add({
+	Name = "rebirth_ranks",
+	Run = function(T, place)
+		local game, me = T.Boot(place, { Name = "Reborn", UserId = 6100 })
+		T.Wait(6)
+		local Config = T.Shared("Config")
+		local DataService = T.Service("DataService")
+		local TycoonService = T.Service("TycoonService")
+		local QuestService = T.Service("QuestService")
+		local GiftService = T.Service("GiftService")
+		local data = DataService:Get(me)
+		T.Check(#Config.Rebirth.Ranks == 10, "10 rebirth ranks")
+		for i = 2, #Config.Rebirth.Ranks do
+			T.Check(Config.Rebirth.Ranks[i].Rebirths > Config.Rebirth.Ranks[i - 1].Rebirths, "ranks are in order")
+		end
+		T.Check(Config.RebirthRank(0) == nil, "no rank before the first rebirth")
+		T.Check(Config.RebirthPerk(0, "Income") == 0 and Config.RebirthPerk(99, "Speed") == 4, "perks add up over ranks")
+		local head = me.Character:FindFirstChild("Head")
+		T.Check(head and not head:FindFirstChild("RankTag"), "no rank tag before the first rebirth")
+		local baseQuest = QuestService:_reward(me, { Type = "Collect", Progress = 0, Target = 1 })
+		T.Check(T.Humanoid(me).WalkSpeed == Config.BaseWalkSpeed, "normal walk speed")
+
+		-- rebirth 1: starting cash + the first rank
+		T.Server(function()
+			TycoonService:Rebirth(me, true)
+		end)
+		T.Wait(2)
+		T.Check(data.Rebirths == 1, "rebirthed once")
+		T.Check(data.Cash >= Config.StartingCash + 500, "Reborn rank: bonus starting cash (" .. tostring(data.Cash) .. ")")
+		T.Check(T.Noticed(me, "New rank: Reborn"), "rank-up message")
+		local tag = me.Character.Head:FindFirstChild("RankTag")
+		T.Check(tag and tag.Label.Text:find("Reborn") ~= nil, "rank tag above the head")
+
+		-- rebirth 2..10: every rank is earned in turn
+		for n = 2, 10 do
+			T.Server(function()
+				TycoonService:Rebirth(me, true)
+			end)
+			T.Wait(2)
+			local _, rank = Config.RebirthRank(n)
+			T.Check(data.Rebirths == n and rank.Rebirths == n, "rebirth " .. n .. " reaches " .. rank.Name)
+			T.Check(me.Character.Head.RankTag.Label.Text:find(rank.Name, 1, true) ~= nil, "rank tag shows " .. rank.Name)
+		end
+		T.Check(T.Humanoid(me).WalkSpeed == Config.BaseWalkSpeed + 4, "Hustler + Sprinter speed (" .. tostring(T.Humanoid(me).WalkSpeed) .. ")")
+		local mult = DataService:GetMultiplier(me, true)
+		T.Check(mult == 1 + 10 * 0.5 + 1.5, "income perks: 6.5 + 1.5 = 8x (got " .. tostring(mult) .. ")")
+		T.Check(QuestService:_reward(me, { Type = "Collect", Progress = 0, Target = 1 }) > baseQuest, "quest rewards grow with rebirths")
+		local giftBonus = Config.RebirthPerk(10, "Gift")
+		T.Check(math.abs(giftBonus - 0.25) < 1e-9, "gift perk 25% (got " .. tostring(giftBonus) .. ")")
+		T.Check(GiftService:GetReward(me, 1) >= Config.Gifts.MinCash[1] * 11, "gift reward includes the bonus")
+
+		-- the panel lists every rank, earned ones ticked
+		T.Client(function()
+			T.Controller("UI"):Open("Rebirth")
+		end)
+		T.Wait(1)
+		local rows = 0
+		local earned = 0
+		for _, d in me.PlayerGui:GetDescendants() do
+			if d:IsA("TextLabel") and d.Name:match("^Rank%d+$") then
+				rows += 1
+				if d.Text:find("✅", 1, true) then
+					earned += 1
+				end
+			end
+		end
+		T.Check(rows == 10 and earned == 10, "panel shows 10 ranks, all earned (" .. rows .. "/" .. earned .. ")")
+
+		-- rank and speed survive a respawn
+		T.Server(function()
+			me:LoadCharacter()
+		end)
+		T.Wait(3)
+		T.Check(T.Humanoid(me).WalkSpeed == Config.BaseWalkSpeed + 4, "speed after respawn")
+		T.Check(me.Character.Head:FindFirstChild("RankTag") ~= nil, "rank tag after respawn")
+	end,
+})
+
 return Scenarios

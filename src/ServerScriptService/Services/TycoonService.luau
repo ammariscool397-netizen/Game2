@@ -419,7 +419,7 @@ function TycoonService:_afterBulkBuild(plot)
 			plot.OfflinePaid = true
 			local away = math.min(os.time() - data.LastOnline, oe.MaxHours * 3600)
 			if away > 60 then
-				local amount = data.LastIncome * away * oe.Percent
+				local amount = data.LastIncome * away * (oe.Percent + Config.RebirthPerk(data.Rebirths, "Offline"))
 				S.DataService:AddVault(owner, amount)
 				Remotes.Notify:FireClient(owner, { Text = "💤 While you were away (" .. Util.FormatTime(away) .. ") your tower made " .. Util.Money(amount) .. "! Collect it at the vault.", Type = "success", Duration = 10 })
 			end
@@ -922,8 +922,9 @@ function TycoonService:Rebirth(player: Player, free: boolean?)
 		Remotes.Notify:FireClient(player, { Text = "You need " .. Util.Money(cost) .. " to rebirth!", Type = "error" })
 		return
 	end
+	local rankBefore = Config.RebirthRank(data.Rebirths)
 	data.Rebirths += 1
-	data.Cash = Config.StartingCash
+	data.Cash = Config.StartingCash + Config.RebirthPerk(data.Rebirths, "Start")
 	data.Vault = 0
 	data.Purchased = { F1_1 = true }
 	S.DataService:Sync(player)
@@ -935,6 +936,13 @@ function TycoonService:Rebirth(player: Player, free: boolean?)
 		end
 	end
 
+	if S.MonetizationService then
+		S.MonetizationService:RefreshCharacter(player) -- new rank tag and speed
+	end
+	local rankIndex, rank = Config.RebirthRank(data.Rebirths)
+	if rank and rankIndex ~= rankBefore then
+		Remotes.Notify:FireClient(player, { Text = rank.Icon .. " New rank: " .. rank.Name .. "! " .. rank.Text, Type = "success", Duration = 8 })
+	end
 	Remotes.VFX:FireClient(player, "Rebirth", { Rebirths = data.Rebirths })
 	if plot then
 		Remotes.VFX:FireAllClients("Shockwave", { Position = plot.TowerCF.Position + Vector3.new(0, 2, 0), Color = Color3.fromRGB(255, 200, 40), Size = 160 })

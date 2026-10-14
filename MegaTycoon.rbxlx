@@ -467,6 +467,22 @@ Config.Rebirth = {
 	RequiredFloor = 5, -- the first rebirth costs as much as unlocking this floor
 	CostGrowth = 4, -- each rebirth costs 4x more
 	MultiplierPerRebirth = 0.5, -- each rebirth adds +0.5x to all income
+	-- Rebirth ranks: reaching rebirth N earns that rank and its perk, forever.
+	-- Perk kinds: Income (+x to the income multiplier), Start (extra cash after a
+	-- rebirth), Offline (+% offline earnings, 0.05 = +5%), Quest / Gift (+% rewards),
+	-- Speed (+walk speed). Perks of every rank earned so far add up.
+	Ranks = {
+		{ Rebirths = 1, Name = "Reborn", Icon = "🌱", Perks = { Start = 500 }, Text = "+500 starting cash after each rebirth" },
+		{ Rebirths = 2, Name = "Hustler", Icon = "💼", Perks = { Speed = 2 }, Text = "+2 walk speed" },
+		{ Rebirths = 3, Name = "Saver", Icon = "💤", Perks = { Offline = 0.05 }, Text = "+5% offline earnings" },
+		{ Rebirths = 4, Name = "Quest Hunter", Icon = "📜", Perks = { Quest = 0.1 }, Text = "+10% quest rewards" },
+		{ Rebirths = 5, Name = "Gift Magnet", Icon = "🎁", Perks = { Gift = 0.1 }, Text = "+10% playtime gifts" },
+		{ Rebirths = 6, Name = "Mogul", Icon = "🏢", Perks = { Income = 0.5 }, Text = "+0.5x income" },
+		{ Rebirths = 7, Name = "Sprinter", Icon = "👟", Perks = { Speed = 2 }, Text = "+2 more walk speed" },
+		{ Rebirths = 8, Name = "Banker", Icon = "🏦", Perks = { Start = 5000, Offline = 0.05 }, Text = "+5,000 starting cash, +5% offline" },
+		{ Rebirths = 9, Name = "Legend", Icon = "🏆", Perks = { Quest = 0.15, Gift = 0.15 }, Text = "+15% quest rewards and gifts" },
+		{ Rebirths = 10, Name = "Mythic", Icon = "👑", Perks = { Income = 1, Offline = 0.1 }, Text = "+1x income, +10% offline" },
+	},
 }
 
 ---------------------------------------------------------------------------
@@ -943,6 +959,28 @@ Config.Tips = {
 	"Every 45 minutes there's a 2x CASH HOUR for everyone.",
 	"Earthquakes dig up cash geodes - grab them before they vanish!",
 }
+
+-- the highest rebirth rank reached with `rebirths` rebirths: index, rank (nil before the first)
+function Config.RebirthRank(rebirths: number): (number?, any?)
+	local index
+	for i, rank in Config.Rebirth.Ranks do
+		if rebirths >= rank.Rebirths then
+			index = i
+		end
+	end
+	return index, index and Config.Rebirth.Ranks[index]
+end
+
+-- total of one perk kind over every rank earned with `rebirths` rebirths
+function Config.RebirthPerk(rebirths: number, kind: string): number
+	local total = 0
+	for _, rank in Config.Rebirth.Ranks do
+		if rebirths >= rank.Rebirths then
+			total += rank.Perks[kind] or 0
+		end
+	end
+	return total
+end
 
 return Config
 ]]></string>
@@ -4035,7 +4073,7 @@ function DataService:GetMultiplier(player: Player, permanentOnly: boolean?): num
 		if not own then
 			return 1
 		end
-		local mult = 1 + own.Rebirths * Config.Rebirth.MultiplierPerRebirth
+		local mult = 1 + own.Rebirths * Config.Rebirth.MultiplierPerRebirth + Config.RebirthPerk(own.Rebirths, "Income")
 		local monetization = S and S.MonetizationService
 		if monetization and monetization:HasPass(player, "DoubleCash") then
 			mult *= 2
@@ -4050,7 +4088,7 @@ function DataService:GetMultiplier(player: Player, permanentOnly: boolean?): num
 	if not data then
 		return 1
 	end
-	local mult = 1 + data.Rebirths * Config.Rebirth.MultiplierPerRebirth
+	local mult = 1 + data.Rebirths * Config.Rebirth.MultiplierPerRebirth + Config.RebirthPerk(data.Rebirths, "Income")
 	if self:TeamHasPass(host, "DoubleCash") then
 		mult *= 2
 	end
@@ -5154,7 +5192,8 @@ end
 function GiftService:GetReward(player: Player, index: number): number
 	local wallet = S.DataService:GetWallet(player)
 	local rebirths = wallet and wallet.Rebirths or 0
-	return math.floor(math.max(GC.MinCash[index] * (1 + rebirths), S.TycoonService:GetIncome(player) * GC.IncomeMinutes[index] * 60))
+	local cash = math.max(GC.MinCash[index] * (1 + rebirths), S.TycoonService:GetIncome(player) * GC.IncomeMinutes[index] * 60)
+	return math.floor(cash * (1 + Config.RebirthPerk(rebirths, "Gift")))
 end
 
 function GiftService:Claim(player: Player): (boolean, string)
@@ -6131,6 +6170,7 @@ function MonetizationService:Init(services)
 			end
 		end
 		S.DataService:RefreshMultiplier(player)
+		self:RefreshCharacter(player) -- rebirth rank speed and tag (the character may have spawned first)
 	end)
 
 	Players.PlayerAdded:Connect(function(player)
@@ -6167,7 +6207,52 @@ function MonetizationService:HasPass(player: Player, key: string): boolean
 end
 
 function MonetizationService:GetBaseSpeed(player: Player): number
-	return self:HasPass(player, "SuperSpeed") and Config.BaseWalkSpeed * 2 or Config.BaseWalkSpeed
+	local data = S.DataService:Get(player)
+	local perk = data and Config.RebirthPerk(data.Rebirths, "Speed") or 0
+	return (self:HasPass(player, "SuperSpeed") and Config.BaseWalkSpeed * 2 or Config.BaseWalkSpeed) + perk
+end
+
+-- the rebirth rank tag above a character's head
+function MonetizationService:_applyRankTag(player: Player, character: Model)
+	local head = character:FindFirstChild("Head")
+	local data = S.DataService:Get(player)
+	local _, rank = Config.RebirthRank(data and data.Rebirths or 0)
+	local tag = head and head:FindFirstChild("RankTag") :: BillboardGui?
+	if not head or not rank then
+		return
+	end
+	if not tag then
+		tag = Instance.new("BillboardGui")
+		assert(tag)
+		tag.Name = "RankTag"
+		tag.Size = UDim2.fromOffset(120, 24)
+		tag.StudsOffset = Vector3.new(0, self:HasPass(player, "VIP") and 3.6 or 2.6, 0)
+		tag.MaxDistance = 80
+		local label = Instance.new("TextLabel")
+		label.Name = "Label"
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundTransparency = 1
+		label.TextScaled = true
+		label.Font = Enum.Font.FredokaOne
+		label.TextColor3 = Color3.fromRGB(220, 170, 255)
+		local stroke = Instance.new("UIStroke")
+		stroke.Thickness = 2
+		stroke.Parent = label
+		label.Parent = tag
+		tag.Parent = head
+	end
+	local label = tag:FindFirstChild("Label") :: TextLabel?
+	if label then
+		label.Text = rank.Icon .. " " .. rank.Name
+	end
+end
+
+-- re-apply speed and the rank tag to the current character (after a rebirth)
+function MonetizationService:RefreshCharacter(player: Player)
+	local character = player.Character
+	if character then
+		task.spawn(self._applyCharacterPerks, self, player, character)
+	end
 end
 
 -- grant = also store in data (admin / simulated purchases)
@@ -6220,6 +6305,7 @@ function MonetizationService:_applyCharacterPerks(player: Player, character: Mod
 		return
 	end
 	humanoid.WalkSpeed = self:GetBaseSpeed(player)
+	self:_applyRankTag(player, character)
 	if self:HasPass(player, "VIP") then
 		local root = character:WaitForChild("HumanoidRootPart", 10)
 		if root and not root:FindFirstChild("VIPAura") then
@@ -6872,7 +6958,7 @@ function QuestService:_reward(player: Player, quest)
 	local wallet = self:_towerData(player)
 	local rebirths = wallet and wallet.Rebirths or 0
 	local cash = math.max(def.MinCash * (1 + rebirths), S.TycoonService:GetIncome(player) * def.RewardSeconds)
-	return math.floor(cash), def.BoostSeconds
+	return math.floor(cash * (1 + Config.RebirthPerk(rebirths, "Quest"))), def.BoostSeconds
 end
 
 function QuestService:_text(quest): string
@@ -8586,7 +8672,7 @@ function TycoonService:_afterBulkBuild(plot)
 			plot.OfflinePaid = true
 			local away = math.min(os.time() - data.LastOnline, oe.MaxHours * 3600)
 			if away > 60 then
-				local amount = data.LastIncome * away * oe.Percent
+				local amount = data.LastIncome * away * (oe.Percent + Config.RebirthPerk(data.Rebirths, "Offline"))
 				S.DataService:AddVault(owner, amount)
 				Remotes.Notify:FireClient(owner, { Text = "💤 While you were away (" .. Util.FormatTime(away) .. ") your tower made " .. Util.Money(amount) .. "! Collect it at the vault.", Type = "success", Duration = 10 })
 			end
@@ -9089,8 +9175,9 @@ function TycoonService:Rebirth(player: Player, free: boolean?)
 		Remotes.Notify:FireClient(player, { Text = "You need " .. Util.Money(cost) .. " to rebirth!", Type = "error" })
 		return
 	end
+	local rankBefore = Config.RebirthRank(data.Rebirths)
 	data.Rebirths += 1
-	data.Cash = Config.StartingCash
+	data.Cash = Config.StartingCash + Config.RebirthPerk(data.Rebirths, "Start")
 	data.Vault = 0
 	data.Purchased = { F1_1 = true }
 	S.DataService:Sync(player)
@@ -9102,6 +9189,13 @@ function TycoonService:Rebirth(player: Player, free: boolean?)
 		end
 	end
 
+	if S.MonetizationService then
+		S.MonetizationService:RefreshCharacter(player) -- new rank tag and speed
+	end
+	local rankIndex, rank = Config.RebirthRank(data.Rebirths)
+	if rank and rankIndex ~= rankBefore then
+		Remotes.Notify:FireClient(player, { Text = rank.Icon .. " New rank: " .. rank.Name .. "! " .. rank.Text, Type = "success", Duration = 8 })
+	end
 	Remotes.VFX:FireClient(player, "Rebirth", { Rebirths = data.Rebirths })
 	if plot then
 		Remotes.VFX:FireAllClients("Shockwave", { Position = plot.TowerCF.Position + Vector3.new(0, 2, 0), Color = Color3.fromRGB(255, 200, 40), Size = 160 })
@@ -14136,7 +14230,8 @@ local C
 
 ---------------------------------------------------------------------------
 local function buildRebirth()
-	local _, content = C.UI:MakePanel("Rebirth", "🔄 REBIRTH", Theme.Purple, 560, 440)
+	local _, panel = C.UI:MakePanel("Rebirth", "🔄 REBIRTH", Theme.Purple, 560, 520)
+	local content = UIKit.Scroll({ Parent = panel })
 	UIKit.List(content, 12)
 	local current = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 40), LayoutOrder = 1, ZIndex = 7, Parent = content })
 	local arrow = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 34), LayoutOrder = 2, TextColor3 = Color3.fromRGB(120, 255, 150), ZIndex = 7, Parent = content })
@@ -14196,13 +14291,37 @@ local function buildRebirth()
 		end,
 	})
 
+	-- the rebirth ranks and their perks
+	local ranksFrame = UIKit.new("Frame", { Name = "Ranks", Size = UDim2.new(1, -10, 0, #Config.Rebirth.Ranks * 28), BackgroundTransparency = 1, LayoutOrder = 6, ZIndex = 7, Parent = content })
+	UIKit.List(ranksFrame, 4)
+	local rankLabels = {}
+	for i, rank in Config.Rebirth.Ranks do
+		rankLabels[i] = UIKit.Label({
+			Name = "Rank" .. i,
+			Text = "",
+			Size = UDim2.new(1, 0, 0, 24),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Font = Theme.BodyFont,
+			LayoutOrder = i,
+			ZIndex = 7,
+			Parent = ranksFrame,
+		})
+	end
+
 	local function refresh()
 		local rebirths = player:GetAttribute("Rebirths") or 0
 		local per = Config.Rebirth.MultiplierPerRebirth
+		for i, rank in Config.Rebirth.Ranks do
+			local label = rankLabels[i]
+			local earned = rebirths >= rank.Rebirths
+			label.Text = (earned and "✅ " or "🔒 ") .. rank.Rebirths .. " · " .. rank.Icon .. " " .. rank.Name .. " - " .. rank.Text
+			label.TextColor3 = earned and Color3.fromRGB(150, 255, 160) or Theme.SubText
+		end
 		local cost = player:GetAttribute("RebirthCost") or TycoonItems.GetRebirthCost(rebirths)
 		local cash = player:GetAttribute("Cash") or 0
-		current.Text = "Rebirths: " .. rebirths
-		arrow.Text = string.format("x%s  ➜  x%s rebirth bonus", tostring(1 + rebirths * per), tostring(1 + (rebirths + 1) * per))
+		local _, rank = Config.RebirthRank(rebirths)
+		current.Text = "Rebirths: " .. rebirths .. (rank and ("  ·  " .. rank.Icon .. " " .. rank.Name) or "")
+		arrow.Text = string.format("x%s  ➜  x%s rebirth bonus", tostring(1 + rebirths * per + Config.RebirthPerk(rebirths, "Income")), tostring(1 + (rebirths + 1) * per + Config.RebirthPerk(rebirths + 1, "Income")))
 		local alpha = math.clamp(cash / cost, 0, 1)
 		TweenService:Create(barFill, TweenInfo.new(0.3), { Size = UDim2.fromScale(alpha, 1) }):Play()
 		barText.Text = Util.Money(cash) .. " / " .. Util.Money(cost)

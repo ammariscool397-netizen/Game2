@@ -150,7 +150,7 @@ function QuestService:_reward(player: Player, quest)
 	local wallet = self:_towerData(player)
 	local rebirths = wallet and wallet.Rebirths or 0
 	local cash = math.max(def.MinCash * (1 + rebirths), S.TycoonService:GetIncome(player) * def.RewardSeconds)
-	return math.floor(cash), def.BoostSeconds
+	return math.floor(cash * (1 + Config.RebirthPerk(rebirths, "Quest"))), def.BoostSeconds
 end
 
 function QuestService:_text(quest): string

@@ -82,6 +82,7 @@ rojo build -o MegaTycoon.rbxlx   # rebuild the place file
 - **Elevators** on every floor + **🛗 FLOORS** menu to jump between floors
 - Vault pads on every floor (or skip them with Auto Collect), **offline earnings**
 - Rebirths for a permanent multiplier, global leaderboard
+- **10 rebirth ranks** (Reborn → Mythic): each rank gives a permanent perk (starting cash, walk speed, offline earnings, quest/gift bonuses, extra income) and a rank tag over your head. Edit them in `Config.Rebirth.Ranks`
 - **Safe saving**: session-locked DataStore saves (hopping servers can't lose or
   duplicate progress), corrupted values are repaired, nothing invalid is ever saved
 

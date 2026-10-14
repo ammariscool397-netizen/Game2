@@ -53,6 +53,22 @@ Config.Rebirth = {
 	RequiredFloor = 5, -- the first rebirth costs as much as unlocking this floor
 	CostGrowth = 4, -- each rebirth costs 4x more
 	MultiplierPerRebirth = 0.5, -- each rebirth adds +0.5x to all income
+	-- Rebirth ranks: reaching rebirth N earns that rank and its perk, forever.
+	-- Perk kinds: Income (+x to the income multiplier), Start (extra cash after a
+	-- rebirth), Offline (+% offline earnings, 0.05 = +5%), Quest / Gift (+% rewards),
+	-- Speed (+walk speed). Perks of every rank earned so far add up.
+	Ranks = {
+		{ Rebirths = 1, Name = "Reborn", Icon = "🌱", Perks = { Start = 500 }, Text = "+500 starting cash after each rebirth" },
+		{ Rebirths = 2, Name = "Hustler", Icon = "💼", Perks = { Speed = 2 }, Text = "+2 walk speed" },
+		{ Rebirths = 3, Name = "Saver", Icon = "💤", Perks = { Offline = 0.05 }, Text = "+5% offline earnings" },
+		{ Rebirths = 4, Name = "Quest Hunter", Icon = "📜", Perks = { Quest = 0.1 }, Text = "+10% quest rewards" },
+		{ Rebirths = 5, Name = "Gift Magnet", Icon = "🎁", Perks = { Gift = 0.1 }, Text = "+10% playtime gifts" },
+		{ Rebirths = 6, Name = "Mogul", Icon = "🏢", Perks = { Income = 0.5 }, Text = "+0.5x income" },
+		{ Rebirths = 7, Name = "Sprinter", Icon = "👟", Perks = { Speed = 2 }, Text = "+2 more walk speed" },
+		{ Rebirths = 8, Name = "Banker", Icon = "🏦", Perks = { Start = 5000, Offline = 0.05 }, Text = "+5,000 starting cash, +5% offline" },
+		{ Rebirths = 9, Name = "Legend", Icon = "🏆", Perks = { Quest = 0.15, Gift = 0.15 }, Text = "+15% quest rewards and gifts" },
+		{ Rebirths = 10, Name = "Mythic", Icon = "👑", Perks = { Income = 1, Offline = 0.1 }, Text = "+1x income, +10% offline" },
+	},
 }
 
 ---------------------------------------------------------------------------
@@ -529,5 +545,27 @@ Config.Tips = {
 	"Every 45 minutes there's a 2x CASH HOUR for everyone.",
 	"Earthquakes dig up cash geodes - grab them before they vanish!",
 }
+
+-- the highest rebirth rank reached with `rebirths` rebirths: index, rank (nil before the first)
+function Config.RebirthRank(rebirths: number): (number?, any?)
+	local index
+	for i, rank in Config.Rebirth.Ranks do
+		if rebirths >= rank.Rebirths then
+			index = i
+		end
+	end
+	return index, index and Config.Rebirth.Ranks[index]
+end
+
+-- total of one perk kind over every rank earned with `rebirths` rebirths
+function Config.RebirthPerk(rebirths: number, kind: string): number
+	local total = 0
+	for _, rank in Config.Rebirth.Ranks do
+		if rebirths >= rank.Rebirths then
+			total += rank.Perks[kind] or 0
+		end
+	end
+	return total
+end
 
 return Config

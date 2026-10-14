@@ -478,7 +478,7 @@ function DataService:GetMultiplier(player: Player, permanentOnly: boolean?): num
 		if not own then
 			return 1
 		end
-		local mult = 1 + own.Rebirths * Config.Rebirth.MultiplierPerRebirth
+		local mult = 1 + own.Rebirths * Config.Rebirth.MultiplierPerRebirth + Config.RebirthPerk(own.Rebirths, "Income")
 		local monetization = S and S.MonetizationService
 		if monetization and monetization:HasPass(player, "DoubleCash") then
 			mult *= 2
@@ -493,7 +493,7 @@ function DataService:GetMultiplier(player: Player, permanentOnly: boolean?): num
 	if not data then
 		return 1
 	end
-	local mult = 1 + data.Rebirths * Config.Rebirth.MultiplierPerRebirth
+	local mult = 1 + data.Rebirths * Config.Rebirth.MultiplierPerRebirth + Config.RebirthPerk(data.Rebirths, "Income")
 	if self:TeamHasPass(host, "DoubleCash") then
 		mult *= 2
 	end

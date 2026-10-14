@@ -18,7 +18,8 @@ local C
 
 ---------------------------------------------------------------------------
 local function buildRebirth()
-	local _, content = C.UI:MakePanel("Rebirth", "🔄 REBIRTH", Theme.Purple, 560, 440)
+	local _, panel = C.UI:MakePanel("Rebirth", "🔄 REBIRTH", Theme.Purple, 560, 520)
+	local content = UIKit.Scroll({ Parent = panel })
 	UIKit.List(content, 12)
 	local current = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 40), LayoutOrder = 1, ZIndex = 7, Parent = content })
 	local arrow = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 34), LayoutOrder = 2, TextColor3 = Color3.fromRGB(120, 255, 150), ZIndex = 7, Parent = content })
@@ -78,13 +79,37 @@ local function buildRebirth()
 		end,
 	})
 
+	-- the rebirth ranks and their perks
+	local ranksFrame = UIKit.new("Frame", { Name = "Ranks", Size = UDim2.new(1, -10, 0, #Config.Rebirth.Ranks * 28), BackgroundTransparency = 1, LayoutOrder = 6, ZIndex = 7, Parent = content })
+	UIKit.List(ranksFrame, 4)
+	local rankLabels = {}
+	for i, rank in Config.Rebirth.Ranks do
+		rankLabels[i] = UIKit.Label({
+			Name = "Rank" .. i,
+			Text = "",
+			Size = UDim2.new(1, 0, 0, 24),
+			TextXAlignment = Enum.TextXAlignment.Left,
+			Font = Theme.BodyFont,
+			LayoutOrder = i,
+			ZIndex = 7,
+			Parent = ranksFrame,
+		})
+	end
+
 	local function refresh()
 		local rebirths = player:GetAttribute("Rebirths") or 0
 		local per = Config.Rebirth.MultiplierPerRebirth
+		for i, rank in Config.Rebirth.Ranks do
+			local label = rankLabels[i]
+			local earned = rebirths >= rank.Rebirths
+			label.Text = (earned and "✅ " or "🔒 ") .. rank.Rebirths .. " · " .. rank.Icon .. " " .. rank.Name .. " - " .. rank.Text
+			label.TextColor3 = earned and Color3.fromRGB(150, 255, 160) or Theme.SubText
+		end
 		local cost = player:GetAttribute("RebirthCost") or TycoonItems.GetRebirthCost(rebirths)
 		local cash = player:GetAttribute("Cash") or 0
-		current.Text = "Rebirths: " .. rebirths
-		arrow.Text = string.format("x%s  ➜  x%s rebirth bonus", tostring(1 + rebirths * per), tostring(1 + (rebirths + 1) * per))
+		local _, rank = Config.RebirthRank(rebirths)
+		current.Text = "Rebirths: " .. rebirths .. (rank and ("  ·  " .. rank.Icon .. " " .. rank.Name) or "")
+		arrow.Text = string.format("x%s  ➜  x%s rebirth bonus", tostring(1 + rebirths * per + Config.RebirthPerk(rebirths, "Income")), tostring(1 + (rebirths + 1) * per + Config.RebirthPerk(rebirths + 1, "Income")))
 		local alpha = math.clamp(cash / cost, 0, 1)
 		TweenService:Create(barFill, TweenInfo.new(0.3), { Size = UDim2.fromScale(alpha, 1) }):Play()
 		barText.Text = Util.Money(cash) .. " / " .. Util.Money(cost)
