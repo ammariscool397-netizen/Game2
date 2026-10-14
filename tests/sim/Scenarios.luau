@@ -2509,7 +2509,13 @@ add({
 			join()
 		end
 		T.Wait(30)
-		local baseline = #ws:GetDescendants()
+		-- towers grow and shrink as bots buy, leave and rejoin; everything
+		-- else in the world (effects, collectibles, rubble...) must not pile up
+		local function outsideTowers(): number
+			return #ws:GetDescendants() - #ws:FindFirstChild("Tycoons"):GetDescendants()
+		end
+		local baseline = outsideTowers()
+		local maxOutside = baseline
 		local samples = {}
 		local start = T.Engine.Now
 		local hour = 0
@@ -2540,14 +2546,15 @@ add({
 			if h > hour then
 				hour = h
 				local count = #ws:GetDescendants()
-				table.insert(samples, count)
-				print(("    hour %d: %d instances in workspace, %d players"):format(h, count, #game:GetService("Players"):GetPlayers()))
+				local outside = outsideTowers()
+				maxOutside = math.max(maxOutside, outside)
+				table.insert(samples, outside)
+				print(("    hour %d: %d instances (%d outside the towers), %d players"):format(h, count, outside, #game:GetService("Players"):GetPlayers()))
 			end
 		end
-		-- once the towers are maxed (~3h of bot play) the world stops growing:
-		-- effects, drops, rubble, collectibles... are all cleaned up
-		local before, last = samples[#samples - 1] or samples[1], samples[#samples]
-		T.Check(last < before * 1.05 + 500, ("no instance leak in the last hour (%d -> %d)"):format(before, last))
+		T.Check(samples[#samples] < baseline + 1500, ("nothing piles up outside the towers (%d -> %d)"):format(baseline, samples[#samples]))
+		local towers = #ws:FindFirstChild("Tycoons"):GetDescendants()
+		T.Check(towers < 8 * 4600, ("towers stay within their maximum size (%d)"):format(towers))
 		for _, p in game:GetService("Players"):GetPlayers() do
 			local data = DataService:Get(p)
 			T.Check(data ~= nil and finite(data.Cash) and finite(data.Vault) and finite(data.TotalEarned), p.Name .. " data valid")
@@ -2702,6 +2709,41 @@ add({
 		end
 		local final = #ws:GetDescendants()
 		T.Check(final < first * 1.03 + 300, ("no growth with maxed towers (%d -> %d)"):format(first, final))
+	end,
+})
+
+-- Diagnostics: the client's UI, lighting and sound don't pile up objects. (Slow.)
+add({
+	Name = "uiprobe",
+	Slow = true,
+	MaxSeconds = 2 * 3600,
+	Run = function(T, place)
+		local game, me = T.Boot(place)
+		T.SetDt(1)
+		T.Wait(10)
+		local function counts()
+			return #me.PlayerGui:GetDescendants(), #game:GetService("Lighting"):GetDescendants(), #game:GetService("SoundService"):GetDescendants()
+		end
+		local kinds = { "meteors", "tornado", "ufo", "earthquake", "nuke" }
+		local g0, l0, s0
+		for round = 1, 10 do
+			T.Admin(me, ";" .. kinds[(round - 1) % #kinds + 1])
+			T.Admin(me, ";givecash me 1m")
+			T.Client(function()
+				T.Remote("BuyAll"):FireServer()
+				T.Remote("ClaimDaily"):InvokeServer()
+			end)
+			T.Wait(300)
+			local g, l, snd = counts()
+			print(("    round %d: PlayerGui %d, Lighting %d, SoundService %d"):format(round, g, l, snd))
+			if round == 2 then
+				g0, l0, s0 = g, l, snd
+			end
+		end
+		local g, l, snd = counts()
+		T.Check(g < g0 * 1.1 + 50, ("PlayerGui doesn't grow (%d -> %d)"):format(g0, g))
+		T.Check(l <= l0 + 3, ("Lighting doesn't grow (%d -> %d)"):format(l0, l))
+		T.Check(snd <= s0 + 10, ("SoundService doesn't grow (%d -> %d)"):format(s0, snd))
 	end,
 })
 
