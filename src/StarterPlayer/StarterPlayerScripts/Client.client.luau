@@ -20,6 +20,7 @@ local ORDER = {
 	"Gifts",
 	"Wheel",
 	"Shield",
+	"Pets",
 	"Guide",
 	"DropVisuals",
 	"Admin",

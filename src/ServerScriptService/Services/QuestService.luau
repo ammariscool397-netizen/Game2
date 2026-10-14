@@ -78,6 +78,8 @@ function QuestService:_available(kind: string, player: Player, data, new: boolea
 		return Config.Minigames.Enabled
 	elseif kind == "Survive" then
 		return Config.Disasters.Enabled
+	elseif kind == "Hatch" then
+		return Config.Pets.Enabled
 	elseif kind == "Buy" then
 		return tower ~= nil and count(tower.Purchased) < TycoonItems.BuyableCount
 	elseif kind == "Earn" then

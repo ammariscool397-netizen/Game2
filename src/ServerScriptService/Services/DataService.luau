@@ -50,6 +50,7 @@ local TEMPLATE = {
 	Wheel = { Last = 0, Spins = 0 },
 	Gifts = { Day = 0, Index = 1, Played = 0 }, -- playtime gifts (see GiftService)
 	Shield = { Start = 0 }, -- when the personal shield was last activated
+	Pets = { Owned = {}, Equipped = {}, NextUid = 1, Hatched = 0 }, -- see PetService
 	Settings = { MusicVolume = Config.Music.DefaultVolume, SFX = true, LowGraphics = false, Guide = true, AutoBuild = true },
 }
 
@@ -481,7 +482,7 @@ function DataService:GetMultiplier(player: Player, permanentOnly: boolean?): num
 		if not own then
 			return 1
 		end
-		local mult = 1 + own.Rebirths * Config.Rebirth.MultiplierPerRebirth + Config.RebirthPerk(own.Rebirths, "Income")
+		local mult = 1 + own.Rebirths * Config.Rebirth.MultiplierPerRebirth + Config.RebirthPerk(own.Rebirths, "Income") + Config.PetsBonus(own.Pets)
 		local monetization = S and S.MonetizationService
 		if monetization and monetization:HasPass(player, "DoubleCash") then
 			mult *= 2
@@ -506,8 +507,11 @@ function DataService:GetMultiplier(player: Player, permanentOnly: boolean?): num
 	local boosted = false
 	for _, member in self:GetTeam(host) do
 		local memberData = profiles[member]
-		if memberData and memberData.BoostEnd > os.time() then
-			boosted = true
+		if memberData then
+			mult += Config.PetsBonus(memberData.Pets) -- (a duo's pets both help)
+			if memberData.BoostEnd > os.time() then
+				boosted = true
+			end
 		end
 	end
 	if boosted then

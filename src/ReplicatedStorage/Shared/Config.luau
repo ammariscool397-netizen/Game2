@@ -515,6 +515,7 @@ Config.Quests = {
 		Earn = { Text = "Earn %s from your tower", IncomeSeconds = { 120, 240, 400 }, MinTarget = 500, RewardSeconds = 120, MinCash = 500 },
 		Collect = { Text = "Collect your vault %d times", Targets = { 3, 5 }, RewardSeconds = 60, MinCash = 300 },
 		Floor = { Text = "Unlock %s", RewardSeconds = 240, MinCash = 2000, BoostSeconds = 300 },
+		Hatch = { Text = "Hatch %d eggs", Targets = { 1, 2, 3 }, RewardSeconds = 100, MinCash = 800 },
 		Secret = { Text = "Find a hidden secret", RewardSeconds = 180, MinCash = 2500, BoostSeconds = 300 },
 		Obby = { Text = "Finish the obby", RewardSeconds = 150, MinCash = 2000 },
 		Minigame = { Text = "Play a minigame", RewardSeconds = 120, MinCash = 1500 },
@@ -532,6 +533,58 @@ Config.Gifts = {
 	IncomeMinutes = { 1, 2, 3, 5, 8, 12 },
 	MinCash = { 500, 1_000, 2_000, 4_000, 8_000, 15_000 },
 	FinalBoostSeconds = 10 * 60, -- the last gift also gives a 2x boost
+}
+
+---------------------------------------------------------------------------
+-- Pets: hatch eggs with cash, equip pets (they follow you) for a permanent
+-- income bonus. Each equipped pet adds its rarity's Bonus (+x) to your
+-- income multiplier. Slots = MaxEquipped + 1 for every SlotRebirths reached.
+-- Egg cost = the bigger of IncomeSeconds of income or MinCash x (1 + rebirths).
+-- Selling pays SellCash x (1 + rebirths) (always far below the egg cost).
+---------------------------------------------------------------------------
+Config.Pets = {
+	Enabled = true,
+	MaxEquipped = 3,
+	SlotRebirths = { 5, 10 },
+	MaxOwned = 60,
+	Rarities = {
+		Common = { Color = Color3.fromRGB(190, 190, 200), Bonus = 0.05, SellCash = 200 },
+		Uncommon = { Color = Color3.fromRGB(90, 220, 110), Bonus = 0.1, SellCash = 600 },
+		Rare = { Color = Color3.fromRGB(70, 150, 255), Bonus = 0.25, SellCash = 2_000 },
+		Epic = { Color = Color3.fromRGB(180, 90, 255), Bonus = 0.5, SellCash = 8_000 },
+		Legendary = { Color = Color3.fromRGB(255, 190, 40), Bonus = 1, SellCash = 40_000 },
+		Mythic = { Color = Color3.fromRGB(255, 80, 120), Bonus = 2, SellCash = 200_000 },
+	},
+	RarityOrder = { "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic" },
+	Eggs = {
+		{ Id = "Basic", Name = "Basic Egg", Icon = "🥚", IncomeSeconds = 300, MinCash = 2_000, Weights = { Common = 70, Uncommon = 25, Rare = 5 } },
+		{ Id = "Golden", Name = "Golden Egg", Icon = "🌟", IncomeSeconds = 1_800, MinCash = 40_000, Weights = { Uncommon = 40, Rare = 40, Epic = 17, Legendary = 3 } },
+		{ Id = "Cosmic", Name = "Cosmic Egg", Icon = "🪐", IncomeSeconds = 7_200, MinCash = 800_000, Weights = { Epic = 60, Legendary = 35, Mythic = 5 } },
+	},
+	List = {
+		{ Id = "Dog", Name = "Dog", Icon = "🐶", Rarity = "Common" },
+		{ Id = "Cat", Name = "Cat", Icon = "🐱", Rarity = "Common" },
+		{ Id = "Mouse", Name = "Mouse", Icon = "🐭", Rarity = "Common" },
+		{ Id = "Bunny", Name = "Bunny", Icon = "🐰", Rarity = "Common" },
+		{ Id = "Chick", Name = "Chick", Icon = "🐥", Rarity = "Common" },
+		{ Id = "Fox", Name = "Fox", Icon = "🦊", Rarity = "Uncommon" },
+		{ Id = "Panda", Name = "Panda", Icon = "🐼", Rarity = "Uncommon" },
+		{ Id = "Frog", Name = "Frog", Icon = "🐸", Rarity = "Uncommon" },
+		{ Id = "Pig", Name = "Pig", Icon = "🐷", Rarity = "Uncommon" },
+		{ Id = "Tiger", Name = "Tiger", Icon = "🐯", Rarity = "Rare" },
+		{ Id = "Lion", Name = "Lion", Icon = "🦁", Rarity = "Rare" },
+		{ Id = "Koala", Name = "Koala", Icon = "🐨", Rarity = "Rare" },
+		{ Id = "Monkey", Name = "Monkey", Icon = "🐵", Rarity = "Rare" },
+		{ Id = "Unicorn", Name = "Unicorn", Icon = "🦄", Rarity = "Epic" },
+		{ Id = "Dragon", Name = "Dragon", Icon = "🐲", Rarity = "Epic" },
+		{ Id = "Owl", Name = "Wise Owl", Icon = "🦉", Rarity = "Epic" },
+		{ Id = "Phoenix", Name = "Phoenix", Icon = "🦅", Rarity = "Legendary" },
+		{ Id = "Kraken", Name = "Kraken", Icon = "🐙", Rarity = "Legendary" },
+		{ Id = "TRex", Name = "T-Rex", Icon = "🦖", Rarity = "Legendary" },
+		{ Id = "Alien", Name = "Cosmic Alien", Icon = "👽", Rarity = "Mythic" },
+		{ Id = "Mecha", Name = "Mecha King", Icon = "🤖", Rarity = "Mythic" },
+		{ Id = "Crown", Name = "Golden Crown", Icon = "👑", Rarity = "Mythic" },
+	},
 }
 
 ---------------------------------------------------------------------------
@@ -626,6 +679,47 @@ function Config.RebirthPerk(rebirths: number, kind: string): number
 	for _, rank in Config.Rebirth.Ranks do
 		if rebirths >= rank.Rebirths then
 			total += rank.Perks[kind] or 0
+		end
+	end
+	return total
+end
+
+Config.PetById = {}
+for _, pet in Config.Pets.List do
+	Config.PetById[pet.Id] = pet
+end
+
+-- the income bonus (+x) of one pet type
+function Config.PetBonus(petId: string): number
+	local pet = Config.PetById[petId]
+	return pet and Config.Pets.Rarities[pet.Rarity].Bonus or 0
+end
+
+-- how many pets can be equipped with `rebirths` rebirths
+function Config.PetSlots(rebirths: number): number
+	local slots = Config.Pets.MaxEquipped
+	for _, needed in Config.Pets.SlotRebirths do
+		if rebirths >= needed then
+			slots += 1
+		end
+	end
+	return slots
+end
+
+-- the total income bonus (+x) of a player's equipped pets (`pets` = the saved pet data)
+function Config.PetsBonus(pets: any): number
+	if type(pets) ~= "table" or type(pets.Owned) ~= "table" or type(pets.Equipped) ~= "table" then
+		return 0
+	end
+	local byUid = {}
+	for _, pet in pets.Owned do
+		byUid[pet.Uid] = pet
+	end
+	local total = 0
+	for _, uid in pets.Equipped do
+		local pet = byUid[uid]
+		if pet then
+			total += Config.PetBonus(pet.Id)
 		end
 	end
 	return total

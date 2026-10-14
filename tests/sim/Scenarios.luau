@@ -3263,4 +3263,168 @@ add({
 	end,
 })
 
+---------------------------------------------------------------------------
+-- Pets
+---------------------------------------------------------------------------
+add({
+	Name = "pets",
+	MaxSeconds = 900,
+	Run = function(T, place)
+		local game, me = T.Boot(place, { Name = "PetOwner", UserId = 6500 })
+		T.Wait(6)
+		local Config = T.Shared("Config")
+		local PC = Config.Pets
+		local DataService = T.Service("DataService")
+		local PetService = T.Service("PetService")
+		local data = DataService:Get(me)
+		local ws = game:GetService("Workspace")
+		local function pets(action, arg)
+			T.Wait(0.3) -- (the server ignores actions closer than 0.25 s)
+			return T.Client(function()
+				return { T.Remote("PetAction"):InvokeServer(action, arg) }
+			end)
+		end
+		local function floating()
+			local n = 0
+			for _, child in ws:GetChildren() do
+				if child.Name:match("^Pet_") then
+					n += 1
+				end
+			end
+			return n
+		end
+
+		-- the data is consistent
+		for _, pet in PC.List do
+			T.Check(PC.Rarities[pet.Rarity] ~= nil, pet.Id .. " has a real rarity")
+		end
+		for _, egg in PC.Eggs do
+			for rarity in egg.Weights do
+				local any = false
+				for _, pet in PC.List do
+					any = any or pet.Rarity == rarity
+				end
+				T.Check(any, egg.Id .. " egg can hatch " .. rarity .. " pets")
+			end
+		end
+		T.Check(Config.PetSlots(0) == 3 and Config.PetSlots(5) == 4 and Config.PetSlots(10) == 5, "slots grow with rebirths")
+
+		-- the egg odds follow the weights
+		for _, egg in PC.Eggs do
+			local seen, rolls = {}, 4000
+			for _ = 1, rolls do
+				local rarity = PetService:_roll(egg).Rarity
+				seen[rarity] = (seen[rarity] or 0) + 1
+			end
+			local total = 0
+			for _, weight in egg.Weights do
+				total += weight
+			end
+			for rarity, weight in egg.Weights do
+				local expected = weight / total
+				T.Check(math.abs((seen[rarity] or 0) / rolls - expected) < 0.04 + expected * 0.3, egg.Id .. " odds for " .. rarity)
+			end
+			for rarity in seen do
+				T.Check(egg.Weights[rarity] ~= nil, egg.Id .. " never gives " .. rarity)
+			end
+		end
+
+		-- too poor
+		local broke = pets("Hatch", "Basic")
+		T.Check(broke[1] == false and #data.Pets.Owned == 0, "can't hatch without the cash")
+		T.Check(pets("Hatch", "Nope")[1] == false, "unknown egg")
+
+		-- hatch from the panel
+		DataService:AddCash(me, 1e6, false)
+		T.Client(function()
+			T.Controller("UI"):Open("Pets")
+		end)
+		T.Wait(1.5)
+		local hatch = T.FindButton(me.PlayerGui, "^HATCH$")
+		T.Check(hatch ~= nil, "HATCH button")
+		local cash, mult = data.Cash, DataService:GetMultiplier(me)
+		T.Client(function()
+			T.Engine.Click(hatch)
+		end)
+		T.Wait(1)
+		T.Check(#data.Pets.Owned == 1 and data.Pets.Hatched == 1 and data.Cash < cash, "hatching costs cash and gives a pet")
+		T.Check(T.Controller("Pets").State and #T.Controller("Pets").State.Owned == 1, "the client sees it")
+		-- equip from the card
+		local equip = T.FindButton(me.PlayerGui, "^EQUIP$")
+		T.Check(equip ~= nil, "EQUIP button on the pet card")
+		T.Client(function()
+			T.Engine.Click(equip)
+		end)
+		T.Wait(1)
+		T.Check(#data.Pets.Equipped == 1 and me:GetAttribute("Pets") ~= "", "equipped")
+		T.Check(DataService:GetMultiplier(me) > mult, "an equipped pet raises the income multiplier")
+		T.Check(floating() == 1, "the pet floats behind the player")
+
+		-- admin: more pets, slots, best first
+		T.Admin(me, ";givepet me Dragon 2")
+		T.Admin(me, ";givepet me Dog 4")
+		T.Check(#data.Pets.Owned == 7, "givepet adds pets")
+		local full = 0
+		for _, owned in data.Pets.Owned do
+			if not table.find(data.Pets.Equipped, owned.Uid) then
+				full = full + 1
+				if pets("Equip", owned.Uid)[1] then
+					T.Check(#data.Pets.Equipped <= 3, "never above the slots")
+				end
+			end
+		end
+		T.Check(#data.Pets.Equipped == 3, "three slots at 0 rebirths")
+		T.Check(pets("Equip", 9999)[1] == false, "can't equip a pet you don't have")
+		T.Check(pets("Equip", "x")[1] == false, "bad ids are rejected")
+		local best = pets("EquipBest")
+		T.Check(best[1] == true, "equip best")
+		local top = 0
+		for _, owned in data.Pets.Owned do
+			if table.find(data.Pets.Equipped, owned.Uid) then
+				top += Config.PetBonus(owned.Id)
+			end
+		end
+		T.Check(top >= 1.0, "the best pets are worn: two Dragons + the best other (bonus " .. tostring(top) .. ")")
+		T.Check(math.abs(Config.PetsBonus(data.Pets) - top) < 1e-9, "the bonus counts equipped pets")
+		T.Wait(1)
+		T.Check(floating() == 3, "three pets float")
+		local permanent = DataService:GetMultiplier(me, true)
+		T.Check(math.abs(permanent - (1 + top)) < 1e-9, "offline earnings use the pet bonus too (" .. tostring(permanent) .. ")")
+
+		-- selling
+		local victim = data.Pets.Owned[#data.Pets.Owned]
+		local cashBefore = data.Cash
+		T.Check(pets("Sell", victim.Uid)[1] == true and #data.Pets.Owned == 6, "sell a pet")
+		T.Check(data.Cash > cashBefore, "selling pays")
+		T.Check(pets("Sell", victim.Uid)[1] == false, "can't sell it twice")
+		T.Check(PetService:GetSellValue(me, "Dog") < PetService:GetEggCost(me, PC.Eggs[1]), "selling pays less than an egg costs")
+
+		-- storage cap
+		for _ = 1, 4 do
+			T.Admin(me, ";givepet me Cat 20")
+		end
+		T.Check(#data.Pets.Owned == PC.MaxOwned, "storage is capped at " .. PC.MaxOwned .. " (" .. #data.Pets.Owned .. ")")
+		T.Check(pets("Hatch", "Basic")[1] == false, "can't hatch with full storage")
+
+		-- the Hatch quest
+		DataService:AddCash(me, 1e6, false)
+		data.Pets.Owned = { data.Pets.Owned[1] }
+		data.Pets.Equipped = {}
+		data.Quests.List = { { Type = "Hatch", Target = 1, Progress = 0 } }
+		pets("Hatch", "Basic")
+		T.Check(data.Quests.List[1] == nil or data.Quests.List[1].Type ~= "Hatch" or data.Quests.List[1].Progress >= 1, "hatching counts for the Hatch quest")
+
+		-- saved across a rejoin
+		pets("EquipBest")
+		local ownedCount, equippedCount = #data.Pets.Owned, #data.Pets.Equipped
+		T.LeaveClient()
+		T.Wait(1)
+		me = T.StartClient("PetOwner", { UserId = 6500 })
+		T.Wait(8)
+		data = DataService:Get(me)
+		T.Check(#data.Pets.Owned == ownedCount and #data.Pets.Equipped == equippedCount and equippedCount > 0, "pets are saved")
+		T.Check(me:GetAttribute("Pets") ~= "" and #T.Controller("Pets").State.Owned == ownedCount, "and shown after rejoining")
+	end,
+})
+
 return Scenarios

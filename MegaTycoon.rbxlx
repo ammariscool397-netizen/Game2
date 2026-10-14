@@ -929,6 +929,7 @@ Config.Quests = {
 		Earn = { Text = "Earn %s from your tower", IncomeSeconds = { 120, 240, 400 }, MinTarget = 500, RewardSeconds = 120, MinCash = 500 },
 		Collect = { Text = "Collect your vault %d times", Targets = { 3, 5 }, RewardSeconds = 60, MinCash = 300 },
 		Floor = { Text = "Unlock %s", RewardSeconds = 240, MinCash = 2000, BoostSeconds = 300 },
+		Hatch = { Text = "Hatch %d eggs", Targets = { 1, 2, 3 }, RewardSeconds = 100, MinCash = 800 },
 		Secret = { Text = "Find a hidden secret", RewardSeconds = 180, MinCash = 2500, BoostSeconds = 300 },
 		Obby = { Text = "Finish the obby", RewardSeconds = 150, MinCash = 2000 },
 		Minigame = { Text = "Play a minigame", RewardSeconds = 120, MinCash = 1500 },
@@ -946,6 +947,58 @@ Config.Gifts = {
 	IncomeMinutes = { 1, 2, 3, 5, 8, 12 },
 	MinCash = { 500, 1_000, 2_000, 4_000, 8_000, 15_000 },
 	FinalBoostSeconds = 10 * 60, -- the last gift also gives a 2x boost
+}
+
+---------------------------------------------------------------------------
+-- Pets: hatch eggs with cash, equip pets (they follow you) for a permanent
+-- income bonus. Each equipped pet adds its rarity's Bonus (+x) to your
+-- income multiplier. Slots = MaxEquipped + 1 for every SlotRebirths reached.
+-- Egg cost = the bigger of IncomeSeconds of income or MinCash x (1 + rebirths).
+-- Selling pays SellCash x (1 + rebirths) (always far below the egg cost).
+---------------------------------------------------------------------------
+Config.Pets = {
+	Enabled = true,
+	MaxEquipped = 3,
+	SlotRebirths = { 5, 10 },
+	MaxOwned = 60,
+	Rarities = {
+		Common = { Color = Color3.fromRGB(190, 190, 200), Bonus = 0.05, SellCash = 200 },
+		Uncommon = { Color = Color3.fromRGB(90, 220, 110), Bonus = 0.1, SellCash = 600 },
+		Rare = { Color = Color3.fromRGB(70, 150, 255), Bonus = 0.25, SellCash = 2_000 },
+		Epic = { Color = Color3.fromRGB(180, 90, 255), Bonus = 0.5, SellCash = 8_000 },
+		Legendary = { Color = Color3.fromRGB(255, 190, 40), Bonus = 1, SellCash = 40_000 },
+		Mythic = { Color = Color3.fromRGB(255, 80, 120), Bonus = 2, SellCash = 200_000 },
+	},
+	RarityOrder = { "Common", "Uncommon", "Rare", "Epic", "Legendary", "Mythic" },
+	Eggs = {
+		{ Id = "Basic", Name = "Basic Egg", Icon = "🥚", IncomeSeconds = 300, MinCash = 2_000, Weights = { Common = 70, Uncommon = 25, Rare = 5 } },
+		{ Id = "Golden", Name = "Golden Egg", Icon = "🌟", IncomeSeconds = 1_800, MinCash = 40_000, Weights = { Uncommon = 40, Rare = 40, Epic = 17, Legendary = 3 } },
+		{ Id = "Cosmic", Name = "Cosmic Egg", Icon = "🪐", IncomeSeconds = 7_200, MinCash = 800_000, Weights = { Epic = 60, Legendary = 35, Mythic = 5 } },
+	},
+	List = {
+		{ Id = "Dog", Name = "Dog", Icon = "🐶", Rarity = "Common" },
+		{ Id = "Cat", Name = "Cat", Icon = "🐱", Rarity = "Common" },
+		{ Id = "Mouse", Name = "Mouse", Icon = "🐭", Rarity = "Common" },
+		{ Id = "Bunny", Name = "Bunny", Icon = "🐰", Rarity = "Common" },
+		{ Id = "Chick", Name = "Chick", Icon = "🐥", Rarity = "Common" },
+		{ Id = "Fox", Name = "Fox", Icon = "🦊", Rarity = "Uncommon" },
+		{ Id = "Panda", Name = "Panda", Icon = "🐼", Rarity = "Uncommon" },
+		{ Id = "Frog", Name = "Frog", Icon = "🐸", Rarity = "Uncommon" },
+		{ Id = "Pig", Name = "Pig", Icon = "🐷", Rarity = "Uncommon" },
+		{ Id = "Tiger", Name = "Tiger", Icon = "🐯", Rarity = "Rare" },
+		{ Id = "Lion", Name = "Lion", Icon = "🦁", Rarity = "Rare" },
+		{ Id = "Koala", Name = "Koala", Icon = "🐨", Rarity = "Rare" },
+		{ Id = "Monkey", Name = "Monkey", Icon = "🐵", Rarity = "Rare" },
+		{ Id = "Unicorn", Name = "Unicorn", Icon = "🦄", Rarity = "Epic" },
+		{ Id = "Dragon", Name = "Dragon", Icon = "🐲", Rarity = "Epic" },
+		{ Id = "Owl", Name = "Wise Owl", Icon = "🦉", Rarity = "Epic" },
+		{ Id = "Phoenix", Name = "Phoenix", Icon = "🦅", Rarity = "Legendary" },
+		{ Id = "Kraken", Name = "Kraken", Icon = "🐙", Rarity = "Legendary" },
+		{ Id = "TRex", Name = "T-Rex", Icon = "🦖", Rarity = "Legendary" },
+		{ Id = "Alien", Name = "Cosmic Alien", Icon = "👽", Rarity = "Mythic" },
+		{ Id = "Mecha", Name = "Mecha King", Icon = "🤖", Rarity = "Mythic" },
+		{ Id = "Crown", Name = "Golden Crown", Icon = "👑", Rarity = "Mythic" },
+	},
 }
 
 ---------------------------------------------------------------------------
@@ -1045,6 +1098,47 @@ function Config.RebirthPerk(rebirths: number, kind: string): number
 	return total
 end
 
+Config.PetById = {}
+for _, pet in Config.Pets.List do
+	Config.PetById[pet.Id] = pet
+end
+
+-- the income bonus (+x) of one pet type
+function Config.PetBonus(petId: string): number
+	local pet = Config.PetById[petId]
+	return pet and Config.Pets.Rarities[pet.Rarity].Bonus or 0
+end
+
+-- how many pets can be equipped with `rebirths` rebirths
+function Config.PetSlots(rebirths: number): number
+	local slots = Config.Pets.MaxEquipped
+	for _, needed in Config.Pets.SlotRebirths do
+		if rebirths >= needed then
+			slots += 1
+		end
+	end
+	return slots
+end
+
+-- the total income bonus (+x) of a player's equipped pets (`pets` = the saved pet data)
+function Config.PetsBonus(pets: any): number
+	if type(pets) ~= "table" or type(pets.Owned) ~= "table" or type(pets.Equipped) ~= "table" then
+		return 0
+	end
+	local byUid = {}
+	for _, pet in pets.Owned do
+		byUid[pet.Uid] = pet
+	end
+	local total = 0
+	for _, uid in pets.Equipped do
+		local pet = byUid[uid]
+		if pet then
+			total += Config.PetBonus(pet.Id)
+		end
+	end
+	return total
+end
+
 return Config
 ]]></string>
         </Properties>
@@ -1082,6 +1176,7 @@ local EVENTS = {
 	"DuoInvited", -- server -> client  { HostName, HostUserId, Timeout }
 	"QuestUpdate", -- server -> client  (quests, claimedCount)
 	"GiftUpdate", -- server -> client  { Index, ReadyIn, Total }
+	"PetUpdate", -- server -> client  { Owned, Equipped, Slots, Eggs }
 }
 
 local FUNCTIONS = {
@@ -1095,6 +1190,7 @@ local FUNCTIONS = {
 	"ClaimGift", -- () -> ok, message
 	"SpinWheel", -- () -> ok, segment index (0 if none), message
 	"ActivateShield", -- () -> ok, message
+	"PetAction", -- (action, arg) -> ok, message   (Hatch eggId | Equip uid | Unequip uid | Sell uid | EquipBest | Refresh)
 }
 
 local folder: Folder
@@ -2280,6 +2376,7 @@ local ORDER = {
 	"GiftService",
 	"WheelService",
 	"ShieldService",
+	"PetService",
 	"DisasterService",
 	"AdminService",
 	"AntiCheatService",
@@ -3357,6 +3454,30 @@ local function buildCommands()
 		end,
 	})
 	register({
+		Name = "givepet",
+		Aliases = { "pet" },
+		Rank = 3,
+		Args = "<player> <pet id> [count]",
+		Desc = "Give pets (e.g. givepet me Dragon 3)",
+		Run = function(executor, args)
+			local id
+			for key in Config.PetById do
+				if args[2] and key:lower() == args[2]:lower() then
+					id = key
+				end
+			end
+			if not id then
+				return "Unknown pet. Try: Dog, Cat, Fox, Tiger, Dragon, Phoenix, Alien..."
+			end
+			local count = math.clamp(math.floor(Util.Number(args[3]) or 1), 1, 20)
+			local given = 0
+			local affected = eachTarget(executor, args[1], false, function(target)
+				given += S.PetService:Give(target, id, count)
+			end)
+			return "Gave " .. given .. "x " .. id .. " to " .. namesOf(affected)
+		end,
+	})
+	register({
 		Name = "removepass",
 		Aliases = { "revokepass" },
 		Rank = 3,
@@ -4228,6 +4349,7 @@ local TEMPLATE = {
 	Wheel = { Last = 0, Spins = 0 },
 	Gifts = { Day = 0, Index = 1, Played = 0 }, -- playtime gifts (see GiftService)
 	Shield = { Start = 0 }, -- when the personal shield was last activated
+	Pets = { Owned = {}, Equipped = {}, NextUid = 1, Hatched = 0 }, -- see PetService
 	Settings = { MusicVolume = Config.Music.DefaultVolume, SFX = true, LowGraphics = false, Guide = true, AutoBuild = true },
 }
 
@@ -4659,7 +4781,7 @@ function DataService:GetMultiplier(player: Player, permanentOnly: boolean?): num
 		if not own then
 			return 1
 		end
-		local mult = 1 + own.Rebirths * Config.Rebirth.MultiplierPerRebirth + Config.RebirthPerk(own.Rebirths, "Income")
+		local mult = 1 + own.Rebirths * Config.Rebirth.MultiplierPerRebirth + Config.RebirthPerk(own.Rebirths, "Income") + Config.PetsBonus(own.Pets)
 		local monetization = S and S.MonetizationService
 		if monetization and monetization:HasPass(player, "DoubleCash") then
 			mult *= 2
@@ -4684,8 +4806,11 @@ function DataService:GetMultiplier(player: Player, permanentOnly: boolean?): num
 	local boosted = false
 	for _, member in self:GetTeam(host) do
 		local memberData = profiles[member]
-		if memberData and memberData.BoostEnd > os.time() then
-			boosted = true
+		if memberData then
+			mult += Config.PetsBonus(memberData.Pets) -- (a duo's pets both help)
+			if memberData.BoostEnd > os.time() then
+				boosted = true
+			end
 		end
 	end
 	if boosted then
@@ -7442,6 +7567,320 @@ return ObbyService
       </Item>
       <Item class="ModuleScript" referent="25">
         <Properties>
+          <string name="Name">PetService</string>
+          <string name="Source"><![CDATA[--[[
+	PetService - pets (see Config.Pets). Eggs cost cash and hatch a random pet;
+	equipped pets follow you and add a permanent income bonus (DataService
+	counts them in the multiplier). Everything is decided here: the client only
+	asks. Pets are saved with the player.
+]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local Remotes = require(Shared.Remotes)
+
+local PC = Config.Pets
+
+local PetService = {}
+local S
+
+local lastAction: { [Player]: number } = {}
+
+local function rebirthsOf(player: Player): number
+	local data = S.DataService:Get(player)
+	return data and data.Rebirths or 0
+end
+
+function PetService:GetEggCost(player: Player, egg): number
+	local wallet = S.DataService:GetWallet(player)
+	local rebirths = wallet and wallet.Rebirths or 0
+	return math.floor(math.max(egg.MinCash * (1 + rebirths), S.TycoonService:GetIncome(player) * egg.IncomeSeconds))
+end
+
+function PetService:GetSellValue(player: Player, petId: string): number
+	local pet = Config.PetById[petId]
+	return pet and math.floor(PC.Rarities[pet.Rarity].SellCash * (1 + rebirthsOf(player))) or 0
+end
+
+local function findOwned(data, uid: any)
+	for index, pet in data.Pets.Owned do
+		if pet.Uid == uid then
+			return pet, index
+		end
+	end
+	return nil, nil
+end
+
+local function equippedIndex(data, uid: number): number?
+	for index, equipped in data.Pets.Equipped do
+		if equipped == uid then
+			return index
+		end
+	end
+	return nil
+end
+
+-- picks a pet from an egg: first a rarity by the egg's weights, then a pet of it
+function PetService:_roll(egg)
+	local total = 0
+	for _, weight in egg.Weights do
+		total += weight
+	end
+	local roll = math.random() * total
+	local rarity
+	for _, name in PC.RarityOrder do
+		local weight = egg.Weights[name]
+		if weight then
+			rarity = name
+			roll -= weight
+			if roll < 0 then
+				break
+			end
+		end
+	end
+	local options = {}
+	for _, pet in PC.List do
+		if pet.Rarity == rarity then
+			table.insert(options, pet)
+		end
+	end
+	return options[math.random(1, #options)]
+end
+
+-- the client's view: the pets, the slots and what the eggs cost right now
+function PetService:_state(player: Player)
+	local data = S.DataService:Get(player)
+	if not data then
+		return nil
+	end
+	local eggs = {}
+	for _, egg in PC.Eggs do
+		table.insert(eggs, { Id = egg.Id, Cost = self:GetEggCost(player, egg) })
+	end
+	local owned = {}
+	for _, pet in data.Pets.Owned do
+		table.insert(owned, { Uid = pet.Uid, Id = pet.Id, Sell = self:GetSellValue(player, pet.Id) })
+	end
+	return { Owned = owned, Equipped = data.Pets.Equipped, Slots = Config.PetSlots(data.Rebirths), Eggs = eggs, Bonus = Config.PetsBonus(data.Pets) }
+end
+
+-- everyone sees equipped pets (attribute), the owner gets the full list
+function PetService:_sync(player: Player)
+	local data = S.DataService:Get(player)
+	if not data then
+		return
+	end
+	local ids = {}
+	local byUid = {}
+	for _, pet in data.Pets.Owned do
+		byUid[pet.Uid] = pet
+	end
+	for _, uid in data.Pets.Equipped do
+		if byUid[uid] then
+			table.insert(ids, byUid[uid].Id)
+		end
+	end
+	player:SetAttribute("Pets", table.concat(ids, ","))
+	S.DataService:RefreshMultiplier(player)
+	if player.Parent then
+		Remotes.PetUpdate:FireClient(player, self:_state(player))
+	end
+end
+
+-- drops equipped pets that don't exist or don't fit the slots (e.g. after a data edit)
+function PetService:_clean(data)
+	local seen, kept = {}, {}
+	local slots = Config.PetSlots(data.Rebirths)
+	for _, uid in data.Pets.Equipped do
+		if not seen[uid] and findOwned(data, uid) and #kept < slots then
+			seen[uid] = true
+			table.insert(kept, uid)
+		end
+	end
+	data.Pets.Equipped = kept
+end
+
+-- gives pets (hatching and the admin command); returns how many fit
+function PetService:Give(player: Player, petId: string, count: number?): number
+	local data = S.DataService:Get(player)
+	if not data or not Config.PetById[petId] then
+		return 0
+	end
+	local given = 0
+	for _ = 1, count or 1 do
+		if #data.Pets.Owned >= PC.MaxOwned then
+			break
+		end
+		table.insert(data.Pets.Owned, { Uid = data.Pets.NextUid, Id = petId })
+		data.Pets.NextUid += 1
+		given += 1
+	end
+	self:_sync(player)
+	return given
+end
+
+function PetService:Hatch(player: Player, eggId: any): (boolean, string)
+	local data = S.DataService:Get(player)
+	if not data then
+		return false, "Data still loading..."
+	end
+	local egg
+	for _, candidate in PC.Eggs do
+		if candidate.Id == eggId then
+			egg = candidate
+		end
+	end
+	if not egg then
+		return false, "Unknown egg."
+	end
+	if #data.Pets.Owned >= PC.MaxOwned then
+		return false, "Your pet storage is full (" .. PC.MaxOwned .. ") - sell some pets!"
+	end
+	local cost = self:GetEggCost(player, egg)
+	if not S.DataService:SpendCash(player, cost) then
+		return false, "You need " .. Util.Money(cost) .. " for a " .. egg.Name .. "!"
+	end
+	local pet = self:_roll(egg)
+	self:Give(player, pet.Id, 1)
+	data.Pets.Hatched += 1
+	if S.QuestService then
+		S.QuestService:Progress(player, "Hatch", 1)
+	end
+	local rarity = PC.Rarities[pet.Rarity]
+	if rarity.Bonus >= 1 then
+		Remotes.VFX:FireClient(player, "Confetti", {})
+		if rarity.Bonus >= 2 then
+			Remotes.Announce:FireAllClients({
+				Title = "🥚 " .. player.DisplayName .. " hatched a MYTHIC!",
+				Text = pet.Icon .. " " .. pet.Name .. " (+" .. rarity.Bonus .. "x income)",
+				Color = rarity.Color,
+			})
+		end
+	end
+	return true, ("%s You hatched a %s %s! (%s, +%sx income)"):format(pet.Icon, pet.Rarity, pet.Name, pet.Rarity, tostring(rarity.Bonus))
+end
+
+function PetService:Equip(player: Player, uid: any): (boolean, string)
+	local data = S.DataService:Get(player)
+	local pet = data and findOwned(data, uid)
+	if not data or not pet then
+		return false, "You don't have that pet."
+	end
+	if equippedIndex(data, pet.Uid) then
+		return false, "Already equipped."
+	end
+	local slots = Config.PetSlots(data.Rebirths)
+	if #data.Pets.Equipped >= slots then
+		return false, "All " .. slots .. " pet slots are used - unequip one first. (More slots at " .. table.concat(PC.SlotRebirths, " and ") .. " rebirths.)"
+	end
+	table.insert(data.Pets.Equipped, pet.Uid)
+	self:_sync(player)
+	return true, "Equipped " .. Config.PetById[pet.Id].Name .. "!"
+end
+
+function PetService:Unequip(player: Player, uid: any): (boolean, string)
+	local data = S.DataService:Get(player)
+	local index = data and type(uid) == "number" and equippedIndex(data, uid)
+	if not data or not index then
+		return false, "That pet isn't equipped."
+	end
+	table.remove(data.Pets.Equipped, index)
+	self:_sync(player)
+	return true, "Unequipped."
+end
+
+function PetService:Sell(player: Player, uid: any): (boolean, string)
+	local data = S.DataService:Get(player)
+	local pet, index = nil, nil
+	if data then
+		pet, index = findOwned(data, uid)
+	end
+	if not data or not pet or not index then
+		return false, "You don't have that pet."
+	end
+	local value = self:GetSellValue(player, pet.Id)
+	local equipped = equippedIndex(data, pet.Uid)
+	if equipped then
+		table.remove(data.Pets.Equipped, equipped)
+	end
+	table.remove(data.Pets.Owned, index)
+	S.DataService:AddCash(player, value, false)
+	self:_sync(player)
+	return true, "Sold " .. Config.PetById[pet.Id].Name .. " for " .. Util.Money(value) .. "."
+end
+
+-- the best pets (by bonus) fill the slots
+function PetService:EquipBest(player: Player): (boolean, string)
+	local data = S.DataService:Get(player)
+	if not data then
+		return false, "Data still loading..."
+	end
+	local sorted = table.clone(data.Pets.Owned)
+	table.sort(sorted, function(a, b)
+		local ba, bb = Config.PetBonus(a.Id), Config.PetBonus(b.Id)
+		if ba ~= bb then
+			return ba > bb
+		end
+		return a.Uid < b.Uid
+	end)
+	data.Pets.Equipped = {}
+	for _, pet in sorted do
+		if #data.Pets.Equipped < Config.PetSlots(data.Rebirths) then
+			table.insert(data.Pets.Equipped, pet.Uid)
+		end
+	end
+	self:_sync(player)
+	return true, "Equipped your best pets (+" .. tostring(Config.PetsBonus(data.Pets)) .. "x income)."
+end
+
+function PetService:Init(services)
+	S = services
+	Remotes.PetAction.OnServerInvoke = function(player, action, arg)
+		if not PC.Enabled then
+			return false, "Pets are turned off."
+		end
+		if lastAction[player] and os.clock() - lastAction[player] < 0.25 then
+			return false, "Slow down!"
+		end
+		lastAction[player] = os.clock()
+		if action == "Hatch" then
+			return self:Hatch(player, arg)
+		elseif action == "Equip" then
+			return self:Equip(player, arg)
+		elseif action == "Unequip" then
+			return self:Unequip(player, arg)
+		elseif action == "Sell" then
+			return self:Sell(player, arg)
+		elseif action == "EquipBest" then
+			return self:EquipBest(player)
+		elseif action == "Refresh" then
+			self:_sync(player)
+			return true, ""
+		end
+		return false, "Unknown action."
+	end
+	S.DataService.PlayerLoaded:Connect(function(player, data)
+		self:_clean(data)
+		self:_sync(player)
+	end)
+	-- a rebirth can't remove slots, but a data edit could: keep the list valid
+	S.DataService.BeforeSave:Connect(function(_, data)
+		self:_clean(data)
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		lastAction[player] = nil
+	end)
+end
+
+return PetService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="26">
+        <Properties>
           <string name="Name">QuestService</string>
           <string name="Source"><![CDATA[--[[
 	QuestService - every player has 3 quests (see Config.Quests). Other
@@ -7523,6 +7962,8 @@ function QuestService:_available(kind: string, player: Player, data, new: boolea
 		return Config.Minigames.Enabled
 	elseif kind == "Survive" then
 		return Config.Disasters.Enabled
+	elseif kind == "Hatch" then
+		return Config.Pets.Enabled
 	elseif kind == "Buy" then
 		return tower ~= nil and count(tower.Purchased) < TycoonItems.BuyableCount
 	elseif kind == "Earn" then
@@ -7780,7 +8221,7 @@ return QuestService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">RewardService</string>
           <string name="Source"><![CDATA[--[[
@@ -7907,7 +8348,7 @@ return RewardService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">SecretService</string>
           <string name="Source"><![CDATA[--[[
@@ -8060,7 +8501,7 @@ return SecretService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">ShieldService</string>
           <string name="Source"><![CDATA[--[[
@@ -8170,7 +8611,7 @@ return ShieldService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">TycoonBuilder</string>
           <string name="Source"><![CDATA[--[[
@@ -8995,7 +9436,7 @@ return TycoonBuilder
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">TycoonService</string>
           <string name="Source"><![CDATA[--[[
@@ -10223,7 +10664,7 @@ return TycoonService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">WheelService</string>
           <string name="Source"><![CDATA[--[[
@@ -10340,7 +10781,7 @@ return WheelService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">WorldBuilder</string>
           <string name="Source"><![CDATA[--[[
@@ -11120,22 +11561,22 @@ return WorldBuilder
       </Item>
     </Item>
   </Item>
-  <Item class="SoundService" referent="33">
+  <Item class="SoundService" referent="34">
     <Properties>
       <string name="Name">SoundService</string>
     </Properties>
   </Item>
-  <Item class="StarterPlayer" referent="34">
+  <Item class="StarterPlayer" referent="35">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <float name="CharacterJumpPower">50</float>
       <float name="CharacterWalkSpeed">16</float>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="35">
+    <Item class="StarterPlayerScripts" referent="36">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="36">
+      <Item class="LocalScript" referent="37">
         <Properties>
           <string name="Name">Client</string>
           <string name="Source"><![CDATA[--[[
@@ -11160,6 +11601,7 @@ local ORDER = {
 	"Gifts",
 	"Wheel",
 	"Shield",
+	"Pets",
 	"Guide",
 	"DropVisuals",
 	"Admin",
@@ -11204,11 +11646,11 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="37">
+      <Item class="Folder" referent="38">
         <Properties>
           <string name="Name">Controllers</string>
         </Properties>
-        <Item class="ModuleScript" referent="38">
+        <Item class="ModuleScript" referent="39">
           <Properties>
             <string name="Name">Admin</string>
             <string name="Source"><![CDATA[--[[
@@ -11807,7 +12249,7 @@ return Admin
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="39">
+        <Item class="ModuleScript" referent="40">
           <Properties>
             <string name="Name">Animator</string>
             <string name="Source"><![CDATA[--[[
@@ -12014,7 +12456,7 @@ return Animator
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="40">
+        <Item class="ModuleScript" referent="41">
           <Properties>
             <string name="Name">Build</string>
             <string name="Source"><![CDATA[--[[
@@ -12468,7 +12910,7 @@ return Build
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="41">
+        <Item class="ModuleScript" referent="42">
           <Properties>
             <string name="Name">ChatTags</string>
             <string name="Source"><![CDATA[--[[ ChatTags - [Owner] / [Admin] / [VIP] / rebirth tags in the chat ]]
@@ -12528,7 +12970,7 @@ return ChatTags
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="42">
+        <Item class="ModuleScript" referent="43">
           <Properties>
             <string name="Name">Disasters</string>
             <string name="Source"><![CDATA[--[[
@@ -13425,7 +13867,7 @@ return Disasters
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="43">
+        <Item class="ModuleScript" referent="44">
           <Properties>
             <string name="Name">DropVisuals</string>
             <string name="Source"><![CDATA[--[[
@@ -13700,7 +14142,7 @@ return DropVisuals
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="44">
+        <Item class="ModuleScript" referent="45">
           <Properties>
             <string name="Name">Duo</string>
             <string name="Source"><![CDATA[--[[ Duo (client) - invite players to build one tower together + invite popups ]]
@@ -13899,7 +14341,7 @@ return Duo
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="45">
+        <Item class="ModuleScript" referent="46">
           <Properties>
             <string name="Name">Gifts</string>
             <string name="Source"><![CDATA[--[[ Gifts (client) - the playtime gift button (bottom right) ]]
@@ -13998,7 +14440,7 @@ return Gifts
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="46">
+        <Item class="ModuleScript" referent="47">
           <Properties>
             <string name="Name">Guide</string>
             <string name="Source"><![CDATA[--[[
@@ -14179,7 +14621,7 @@ return Guide
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">HUD</string>
             <string name="Source"><![CDATA[--[[ HUD - cash counter, income, multiplier/boost info, floor indicator,
@@ -14374,6 +14816,7 @@ function HUD:Init(controllers)
 		{ "Secrets", "🕵️", "SECRETS", Color3.fromRGB(120, 200, 120) },
 		{ "Daily", "🎁", "DAILY", Color3.fromRGB(255, 90, 120) },
 		{ "Wheel", "🎰", "WHEEL", Color3.fromRGB(255, 120, 60) },
+		{ "Pets", "🐾", "PETS", Color3.fromRGB(255, 150, 200) },
 		{ "Shield", "🛡️", "SHIELD", Color3.fromRGB(70, 170, 255) },
 		{ "Codes", "🎟️", "CODES", Color3.fromRGB(0, 200, 160) },
 		{ "Home", "🏠", "HOME", Color3.fromRGB(70, 200, 100) },
@@ -14509,7 +14952,7 @@ return HUD
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="49">
           <Properties>
             <string name="Name">Minigame</string>
             <string name="Source"><![CDATA[--[[ Minigame (client) - join popup, countdown, in-game HUD and results ]]
@@ -14744,7 +15187,7 @@ return Minigame
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">Music</string>
             <string name="Source"><![CDATA[--[[
@@ -14964,7 +15407,7 @@ return Music
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">Notifications</string>
             <string name="Source"><![CDATA[--[[ Notifications - toast messages (top right) + big announcement banners ]]
@@ -15154,7 +15597,7 @@ return Notifications
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">Panels</string>
             <string name="Source"><![CDATA[--[[ Panels - Rebirth, Daily Rewards, Codes and Settings menus ]]
@@ -15576,7 +16019,272 @@ return Panels
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="53">
+          <Properties>
+            <string name="Name">Pets</string>
+            <string name="Source"><![CDATA[--[[
+	Pets (client) - the Pets panel (eggs + your pets) and the pets that float
+	behind every player. Which pets a player wears comes from their "Pets"
+	attribute, so everyone sees them; the visuals are made locally.
+]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local UIKit = require(Shared.UIKit)
+local Remotes = require(Shared.Remotes)
+
+local Theme = UIKit.Theme
+local PC = Config.Pets
+
+local Pets = {}
+Pets.State = nil :: any
+local C
+
+---------------------------------------------------------------------------
+-- Floating pets
+---------------------------------------------------------------------------
+local followers: { [Player]: { Key: string, Parts: { BasePart } } } = {}
+
+local function clearFollowers(target: Player)
+	local entry = followers[target]
+	if entry then
+		for _, part in entry.Parts do
+			part:Destroy()
+		end
+		followers[target] = nil
+	end
+end
+
+local function makePart(petId: string): BasePart
+	local pet = Config.PetById[petId]
+	local part = Instance.new("Part")
+	part.Name = "Pet_" .. petId
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.Transparency = 1
+	part.Size = Vector3.one
+	local gui = Instance.new("BillboardGui")
+	gui.Size = UDim2.fromOffset(54, 54)
+	gui.MaxDistance = 90
+	gui.Parent = part
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.TextScaled = true
+	label.Text = pet and pet.Icon or "?"
+	label.TextStrokeTransparency = 0
+	label.TextStrokeColor3 = pet and PC.Rarities[pet.Rarity].Color or Color3.new(1, 1, 1)
+	label.Parent = gui
+	part.Parent = workspace
+	return part
+end
+
+-- make the floating pets match a player's "Pets" attribute
+local function refreshFollowers(target: Player)
+	local key = tostring(target:GetAttribute("Pets") or "")
+	local entry = followers[target]
+	if entry and entry.Key == key then
+		return
+	end
+	clearFollowers(target)
+	if key == "" then
+		return
+	end
+	local parts = {}
+	for id in string.gmatch(key, "[^,]+") do
+		table.insert(parts, makePart(id))
+	end
+	followers[target] = { Key = key, Parts = parts }
+end
+
+local function follow(dt: number)
+	local now = os.clock()
+	for target, entry in followers do
+		local character = target.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+		if root then
+			local count = #entry.Parts
+			for i, part in entry.Parts do
+				local angle = (i - (count + 1) / 2) * 0.75
+				local offset = Vector3.new(math.sin(angle) * 3.4, 1.3 + math.sin(now * 2 + i) * 0.3, 3 + math.cos(angle) * 0.6)
+				local goal = root.CFrame * CFrame.new(offset)
+				part.CFrame = part.CFrame:Lerp(goal, math.min(1, dt * 7))
+			end
+		end
+	end
+end
+
+---------------------------------------------------------------------------
+-- The panel
+---------------------------------------------------------------------------
+local infoLabel: TextLabel
+local eggButtons: { [string]: { Button: TextButton, Cost: TextLabel } } = {}
+local grid: ScrollingFrame
+
+local function act(action: string, arg: any?)
+	local ok, message = Remotes.PetAction:InvokeServer(action, arg)
+	if message and message ~= "" then
+		C.Notifications:Toast(tostring(message), ok and "success" or "error")
+	end
+	return ok
+end
+
+local function render()
+	local state = Pets.State
+	if not state then
+		return
+	end
+	infoLabel.Text = string.format("🐾 %d/%d equipped  •  +%sx income  •  %d pets", #state.Equipped, state.Slots, tostring(state.Bonus), #state.Owned)
+	for _, egg in state.Eggs do
+		local entry = eggButtons[egg.Id]
+		if entry then
+			entry.Cost.Text = Util.Money(egg.Cost)
+		end
+	end
+	for _, child in grid:GetChildren() do
+		if child:IsA("Frame") then
+			child:Destroy()
+		end
+	end
+	local equipped = {}
+	for _, uid in state.Equipped do
+		equipped[uid] = true
+	end
+	-- best pets first
+	local sorted = table.clone(state.Owned)
+	table.sort(sorted, function(a, b)
+		local ba, bb = Config.PetBonus(a.Id), Config.PetBonus(b.Id)
+		if ba ~= bb then
+			return ba > bb
+		end
+		return a.Uid < b.Uid
+	end)
+	for order, owned in sorted do
+		local pet = Config.PetById[owned.Id]
+		local rarity = PC.Rarities[pet.Rarity]
+		local card = UIKit.new("Frame", { Name = "Pet" .. owned.Uid, BackgroundColor3 = equipped[owned.Uid] and Color3.fromRGB(40, 70, 45) or Theme.Panel, LayoutOrder = order, ZIndex = 7, Parent = grid })
+		UIKit.Corner(card, 10)
+		UIKit.Stroke(card, rarity.Color, 2, 0.1)
+		UIKit.Label({ Text = pet.Icon, Size = UDim2.new(1, 0, 0, 40), Position = UDim2.fromOffset(0, 4), ZIndex = 8, Parent = card })
+		UIKit.Label({ Text = pet.Name, Size = UDim2.new(1, -8, 0, 16), Position = UDim2.fromOffset(4, 46), Font = Theme.BodyFont, ZIndex = 8, Parent = card })
+		UIKit.Label({ Text = pet.Rarity .. " +" .. tostring(rarity.Bonus) .. "x", Size = UDim2.new(1, -8, 0, 14), Position = UDim2.fromOffset(4, 62), Font = Theme.BodyFont, TextColor3 = rarity.Color, Stroke = false, ZIndex = 8, Parent = card })
+		UIKit.Button({
+			Name = "Equip",
+			Text = equipped[owned.Uid] and "UNEQUIP" or "EQUIP",
+			Color = equipped[owned.Uid] and Theme.PanelLight or Theme.Green,
+			Size = UDim2.new(0.58, -6, 0, 26),
+			Position = UDim2.new(0, 4, 1, -30),
+			ZIndex = 8,
+			Parent = card,
+			Callback = function()
+				act(equipped[owned.Uid] and "Unequip" or "Equip", owned.Uid)
+			end,
+		})
+		UIKit.Button({
+			Name = "Sell",
+			Text = "SELL",
+			Color = Theme.Red,
+			Size = UDim2.new(0.42, -6, 0, 26),
+			Position = UDim2.new(0.58, 2, 1, -30),
+			ZIndex = 8,
+			Parent = card,
+			Callback = function()
+				act("Sell", owned.Uid)
+			end,
+		})
+	end
+end
+
+function Pets:Init(controllers)
+	C = controllers
+	local _, content = C.UI:MakePanel("Pets", "🐾 PETS", Color3.fromRGB(255, 150, 200), 760, 560, function()
+		act("Refresh")
+	end)
+	infoLabel = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 30), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 7, Parent = content })
+	-- eggs
+	local eggRow = UIKit.new("Frame", { Name = "Eggs", Size = UDim2.new(1, 0, 0, 110), Position = UDim2.fromOffset(0, 34), BackgroundTransparency = 1, ZIndex = 6, Parent = content })
+	UIKit.List(eggRow, 8, Enum.FillDirection.Horizontal, Enum.HorizontalAlignment.Left)
+	for i, egg in PC.Eggs do
+		local frame = UIKit.new("Frame", { Name = "Egg" .. egg.Id, Size = UDim2.new(1 / #PC.Eggs, -6, 1, 0), BackgroundColor3 = Theme.Panel, LayoutOrder = i, ZIndex = 7, Parent = eggRow })
+		UIKit.Corner(frame, 10)
+		UIKit.Stroke(frame, Theme.Accent, 2, 0.3)
+		UIKit.Label({ Text = egg.Icon .. " " .. egg.Name, Size = UDim2.new(1, -8, 0, 26), Position = UDim2.fromOffset(4, 4), ZIndex = 8, Parent = frame })
+		local cost = UIKit.Label({ Text = "...", Size = UDim2.new(1, -8, 0, 18), Position = UDim2.fromOffset(4, 32), Font = Theme.BodyFont, TextColor3 = Color3.fromRGB(150, 255, 160), ZIndex = 8, Parent = frame })
+		local odds = {}
+		for _, name in PC.RarityOrder do
+			if egg.Weights[name] then
+				table.insert(odds, name:sub(1, 1) .. egg.Weights[name] .. "%")
+			end
+		end
+		UIKit.Label({ Text = table.concat(odds, " "), Size = UDim2.new(1, -8, 0, 14), Position = UDim2.fromOffset(4, 52), Font = Theme.BodyFont, TextColor3 = Theme.SubText, Stroke = false, ZIndex = 8, Parent = frame })
+		local button = UIKit.Button({
+			Name = "Hatch" .. egg.Id,
+			Text = "HATCH",
+			Color = Theme.Accent,
+			Size = UDim2.new(1, -16, 0, 30),
+			Position = UDim2.new(0, 8, 1, -36),
+			ZIndex = 8,
+			Parent = frame,
+			Callback = function()
+				act("Hatch", egg.Id)
+			end,
+		})
+		eggButtons[egg.Id] = { Button = button, Cost = cost }
+	end
+	UIKit.Button({
+		Name = "EquipBest",
+		Text = "⭐ EQUIP BEST",
+		Color = Theme.Green,
+		Size = UDim2.fromOffset(170, 34),
+		Position = UDim2.new(1, -170, 0, -2),
+		ZIndex = 8,
+		Parent = content,
+		Callback = function()
+			act("EquipBest")
+		end,
+	})
+	grid = UIKit.Scroll({ Size = UDim2.new(1, 0, 1, -154), Position = UDim2.fromOffset(0, 152), Parent = content })
+	local layout = UIKit.new("UIGridLayout", { CellSize = UDim2.fromOffset(112, 124), CellPadding = UDim2.fromOffset(8, 8), SortOrder = Enum.SortOrder.LayoutOrder, Parent = grid })
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+
+	Remotes.PetUpdate.OnClientEvent:Connect(function(state)
+		if type(state) == "table" then
+			Pets.State = state
+			render()
+		end
+	end)
+
+	-- floating pets for every player
+	local function watch(target: Player)
+		target:GetAttributeChangedSignal("Pets"):Connect(function()
+			refreshFollowers(target)
+		end)
+		target.CharacterAdded:Connect(function()
+			refreshFollowers(target)
+		end)
+		refreshFollowers(target)
+	end
+	for _, target in Players:GetPlayers() do
+		watch(target)
+	end
+	Players.PlayerAdded:Connect(watch)
+	Players.PlayerRemoving:Connect(clearFollowers)
+	RunService.Heartbeat:Connect(function(dt)
+		Util.Try("Pets", follow, dt)
+	end)
+end
+
+return Pets
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">Quests</string>
             <string name="Source"><![CDATA[--[[ Quests (client) - the quest tracker in the bottom-right corner ]]
@@ -15599,7 +16307,7 @@ local C
 
 local ICONS = {
 	Buy = "🏗️", Earn = "💵", Collect = "🏦", Floor = "🏢", Secret = "🕵️",
-	Obby = "🏃", Minigame = "🎮", Survive = "🛡️",
+	Obby = "🏃", Minigame = "🎮", Survive = "🛡️", Hatch = "🥚",
 }
 local ROW_HEIGHT = 58
 
@@ -15752,7 +16460,7 @@ return Quests
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">Shield</string>
             <string name="Source"><![CDATA[--[[
@@ -15868,7 +16576,7 @@ return Shield
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">Shop</string>
             <string name="Source"><![CDATA[--[[ Shop - Robux panel with Game Passes and Developer Products ]]
@@ -16035,7 +16743,7 @@ return Shop
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">UI</string>
             <string name="Source"><![CDATA[--[[ UI - owns the main ScreenGui and the "one panel at a time" manager ]]
@@ -16174,7 +16882,7 @@ return UI
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">VFX</string>
             <string name="Source"><![CDATA[--[[
@@ -16717,7 +17425,7 @@ return VFX
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">Wheel</string>
             <string name="Source"><![CDATA[--[[
@@ -16900,13 +17608,13 @@ return Wheel
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="58">
+  <Item class="TextChatService" referent="60">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="59">
+  <Item class="Workspace" referent="61">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="Gravity">196.2</float>

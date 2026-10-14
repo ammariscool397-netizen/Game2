@@ -18,7 +18,7 @@ local C
 
 local ICONS = {
 	Buy = "🏗️", Earn = "💵", Collect = "🏦", Floor = "🏢", Secret = "🕵️",
-	Obby = "🏃", Minigame = "🎮", Survive = "🛡️",
+	Obby = "🏃", Minigame = "🎮", Survive = "🛡️", Hatch = "🥚",
 }
 local ROW_HEIGHT = 58
 

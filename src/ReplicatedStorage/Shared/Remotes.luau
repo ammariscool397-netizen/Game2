@@ -28,6 +28,7 @@ local EVENTS = {
 	"DuoInvited", -- server -> client  { HostName, HostUserId, Timeout }
 	"QuestUpdate", -- server -> client  (quests, claimedCount)
 	"GiftUpdate", -- server -> client  { Index, ReadyIn, Total }
+	"PetUpdate", -- server -> client  { Owned, Equipped, Slots, Eggs }
 }
 
 local FUNCTIONS = {
@@ -41,6 +42,7 @@ local FUNCTIONS = {
 	"ClaimGift", -- () -> ok, message
 	"SpinWheel", -- () -> ok, segment index (0 if none), message
 	"ActivateShield", -- () -> ok, message
+	"PetAction", -- (action, arg) -> ok, message   (Hatch eggId | Equip uid | Unequip uid | Sell uid | EquipBest | Refresh)
 }
 
 local folder: Folder

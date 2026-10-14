@@ -1020,6 +1020,30 @@ local function buildCommands()
 		end,
 	})
 	register({
+		Name = "givepet",
+		Aliases = { "pet" },
+		Rank = 3,
+		Args = "<player> <pet id> [count]",
+		Desc = "Give pets (e.g. givepet me Dragon 3)",
+		Run = function(executor, args)
+			local id
+			for key in Config.PetById do
+				if args[2] and key:lower() == args[2]:lower() then
+					id = key
+				end
+			end
+			if not id then
+				return "Unknown pet. Try: Dog, Cat, Fox, Tiger, Dragon, Phoenix, Alien..."
+			end
+			local count = math.clamp(math.floor(Util.Number(args[3]) or 1), 1, 20)
+			local given = 0
+			local affected = eachTarget(executor, args[1], false, function(target)
+				given += S.PetService:Give(target, id, count)
+			end)
+			return "Gave " .. given .. "x " .. id .. " to " .. namesOf(affected)
+		end,
+	})
+	register({
 		Name = "removepass",
 		Aliases = { "revokepass" },
 		Rank = 3,
