@@ -13,7 +13,9 @@
 	Visuals are rendered on the clients (Disasters controller); the server only
 	decides what happens and when.
 ]]
+local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -34,6 +36,9 @@ local folder: Folder
 local rng = Random.new()
 
 local KINDS = { "Nuke", "Meteors", "Tornado", "UFO", "Earthquake" }
+for _, def in Config.ExtraDisasters do
+	table.insert(KINDS, def.Name) -- (see "More disasters" below)
+end
 local TITLES = {
 	Nuke = "☢️ NUKE INCOMING!",
 	Meteors = "☄️ METEOR STORM!",
@@ -575,6 +580,365 @@ function handlers.Earthquake(by: string?)
 end
 
 ---------------------------------------------------------------------------
+---------------------------------------------------------------------------
+-- More disasters (Config.ExtraDisasters): Rain, Wave, Zone and Status kinds
+---------------------------------------------------------------------------
+local spawnedFx: { Instance } = {}
+local slowedPlayers: { [Player]: boolean } = {}
+
+local function track<T>(instance: T & Instance): T & Instance
+	table.insert(spawnedFx, instance)
+	return instance
+end
+
+local function cleanupFx()
+	for _, instance in spawnedFx do
+		instance:Destroy()
+	end
+	table.clear(spawnedFx)
+end
+
+-- slows a player (factor) or gives their normal speed back (nil)
+local function setSlow(player: Player, factor: number?)
+	local humanoid = getHumanoid(player)
+	if not humanoid then
+		slowedPlayers[player] = nil
+		return
+	end
+	if factor then
+		humanoid.WalkSpeed = S.MonetizationService:GetBaseSpeed(player) * factor
+		slowedPlayers[player] = true
+	elseif slowedPlayers[player] then
+		humanoid.WalkSpeed = S.MonetizationService:GetBaseSpeed(player)
+		slowedPlayers[player] = nil
+	end
+end
+
+-- a flat glowing circle on the ground
+local function marker(position: Vector3, radius: number, color: Color3, seconds: number): BasePart
+	local disc = BuildKit.Part({
+		Name = "XD_Marker",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.4, radius * 2, radius * 2),
+		CFrame = CFrame.new(position.X, 0.5, position.Z) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = color,
+		Material = Enum.Material.Neon,
+		Transparency = 0.5,
+		CanCollide = false,
+		CanTouch = false,
+		CanQuery = false,
+		Parent = folder,
+	})
+	Debris:AddItem(disc, seconds)
+	return track(disc)
+end
+
+local function flatDistance(a: Vector3, b: Vector3): number
+	return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
+end
+
+local function hurt(info, damage: number, awayFrom: Vector3?, knock: number?)
+	info.Humanoid:TakeDamage(damage)
+	if knock and awayFrom then
+		local away = info.Root.Position - awayFrom
+		local direction = away.Magnitude > 0.1 and away.Unit or Vector3.yAxis
+		fling(info.Player, direction * knock + Vector3.new(0, knock * 0.7, 0))
+	end
+end
+
+-- knocks out part of the towers near `position` (unless their dome protects them)
+local function wreckNear(def, position: Vector3, notified)
+	for _, plot in S.TycoonService:GetPlots() do
+		if plot.Owner and flatDistance(plot.TowerCF.Position, position) <= def.WreckRadius then
+			if S.TycoonService:IsShielded(plot) then
+				if not notified[plot] then
+					notified[plot] = true
+					Remotes.VFX:FireAllClients("ShieldHit", { Center = plot.ShieldCenter, Radius = plot.ShieldRadius })
+					notifyPlot(plot, "🛡️ Your Nuke Shield Dome protected your tower from the " .. def.Name .. "!", "success")
+				end
+			else
+				local wrecked = S.TycoonService:KnockOutFraction(plot, def.Wreck, def.KnockoutSeconds)
+				if wrecked > 0 and not notified[plot] then
+					notified[plot] = true
+					notifyPlot(plot, def.Icon .. " The " .. def.Name .. " is wrecking your tower! Wrecked upgrades rebuild by themselves.")
+				end
+			end
+		end
+	end
+end
+
+-- Rain: a burning puddle that keeps hurting for a few seconds
+local function spawnPatch(def, position: Vector3)
+	local patch = def.Patch
+	local disc = marker(position, patch.Radius, def.Color, patch.Seconds)
+	disc.Transparency = 0.3
+	task.spawn(function()
+		local untilTime = os.clock() + patch.Seconds
+		while os.clock() < untilTime and not stopRequested and disc.Parent do
+			for _, info in mainMapPlayers() do
+				if info.Root.Position.Y < 8 and flatDistance(info.Root.Position, position) <= patch.Radius and not DisasterService:IsProtected(info.Player, info.Root.Position) then
+					info.Humanoid:TakeDamage(patch.Damage * 0.5)
+				end
+			end
+			task.wait(0.5)
+		end
+	end)
+end
+
+local function rainImpact(def, position: Vector3, notified)
+	Remotes.VFX:FireAllClients("Shockwave", { Position = position + Vector3.new(0, 2, 0), Color = def.Color, Size = def.Radius * 2.5 })
+	if def.Shake then
+		broadcast({ Phase = "Shock", Kind = def.Name, Intensity = def.Shake })
+	end
+	for _, info in mainMapPlayers() do
+		if (info.Root.Position - position).Magnitude <= def.Radius and not DisasterService:IsProtected(info.Player, info.Root.Position) then
+			hurt(info, def.Damage, position, def.Knock)
+		end
+	end
+	if def.Wreck then
+		wreckNear(def, position, notified)
+	end
+	if def.Patch then
+		spawnPatch(def, position)
+	end
+end
+
+local function rainDrop(def, target: Vector3, notified)
+	marker(target, def.Radius, def.Color, def.FallTime + 0.3)
+	if def.Bolt then
+		task.wait(def.FallTime)
+		if stopRequested then
+			return
+		end
+		local bolt = track(BuildKit.Part({ Name = "XD_Bolt", Size = Vector3.new(1.4, 130, 1.4), Position = target + Vector3.new(0, 65, 0), Color = Color3.fromRGB(255, 255, 220), Material = Enum.Material.Neon, CanCollide = false, CanTouch = false, CanQuery = false, Parent = folder }))
+		Debris:AddItem(bolt, 0.3)
+	else
+		local size = def.DropSize or 3
+		local drop = track(BuildKit.Part({ Name = "XD_Drop", Shape = Enum.PartType.Ball, Size = Vector3.one * size, Position = target + Vector3.new(0, 130, 0), Color = def.Color, Material = Enum.Material.Neon, CanCollide = false, CanTouch = false, CanQuery = false, Parent = folder }))
+		TweenService:Create(drop, TweenInfo.new(def.FallTime, Enum.EasingStyle.Linear), { Position = target + Vector3.new(0, size / 2, 0) }):Play()
+		Debris:AddItem(drop, def.FallTime + 0.1)
+		task.wait(def.FallTime)
+		if stopRequested then
+			return
+		end
+	end
+	rainImpact(def, target, notified)
+end
+
+local function runRain(def, notified)
+	local endTime = os.clock() + def.Duration
+	local nextWave = os.clock() + 1
+	local lastTick = 0
+	while os.clock() < endTime and not stopRequested do
+		local now = os.clock()
+		if now - lastTick >= 1 then
+			lastTick = now
+			broadcast({ Phase = "Active", Kind = def.Name, TimeLeft = math.ceil(endTime - now), Tint = def.Tint })
+		end
+		if now >= nextWave then
+			nextWave = now + def.Interval
+			local players = mainMapPlayers()
+			if #players > 0 then
+				for _ = 1, def.PerWave do
+					local root = players[rng:NextInteger(1, #players)].Root.Position
+					local angle, distance = rng:NextNumber(0, math.pi * 2), rng:NextNumber(0, def.Spread)
+					task.spawn(rainDrop, def, Vector3.new(root.X + math.cos(angle) * distance, 0.5, root.Z + math.sin(angle) * distance), notified)
+				end
+			end
+		end
+		task.wait(0.1)
+	end
+	task.wait(def.FallTime + 0.3) -- the last drops land
+end
+
+-- Wave: a wall sweeps across the whole map
+local function runWave(def, notified)
+	local reach = 1100
+	for wave = 1, def.Waves do
+		if stopRequested then
+			return
+		end
+		local alongX = rng:NextInteger(1, 2) == 1
+		local sign = rng:NextInteger(0, 1) == 0 and -1 or 1
+		local y = def.Height / 2
+		local from = alongX and Vector3.new(-sign * reach, y, 0) or Vector3.new(0, y, -sign * reach)
+		local to = alongX and Vector3.new(sign * reach, y, 0) or Vector3.new(0, y, sign * reach)
+		local size = alongX and Vector3.new(def.Thickness, def.Height, def.Width) or Vector3.new(def.Width, def.Height, def.Thickness)
+		local wall = track(BuildKit.Part({ Name = "XD_Wall", Size = size, Position = from, Color = def.Color, Material = Enum.Material[def.Material], Transparency = def.WallTransparency, CanCollide = false, CanTouch = false, CanQuery = false, Parent = folder }))
+		local side = alongX and (sign < 0 and "west" or "east") or (sign < 0 and "north" or "south")
+		Remotes.Announce:FireAllClients({ Title = def.Icon .. " WAVE " .. wave .. "/" .. def.Waves, Text = "It comes from the " .. side .. " - get above " .. def.SafeY .. " studs or into cover!", Color = def.Color })
+		for t = def.Warning, 1, -1 do
+			if stopRequested then
+				return
+			end
+			broadcast({ Phase = "Active", Kind = def.Name, TimeLeft = t, Tint = def.Tint })
+			task.wait(1)
+		end
+		local travel = 2 * reach / def.Speed
+		TweenService:Create(wall, TweenInfo.new(travel, Enum.EasingStyle.Linear), { Position = to }):Play()
+		local hitPlayers, hitPlots = {}, {}
+		local started = os.clock()
+		while os.clock() - started < travel and not stopRequested do
+			local cf = wall.CFrame
+			for _, info in mainMapPlayers() do
+				if not hitPlayers[info.Player] and info.Root.Position.Y < def.SafeY and insideBox(info.Root.Position, cf, wall.Size) then
+					hitPlayers[info.Player] = true
+					if not DisasterService:IsProtected(info.Player, info.Root.Position) then
+						hurt(info, def.Damage, cf.Position, def.Knock)
+					end
+				end
+			end
+			for _, plot in S.TycoonService:GetPlots() do
+				local delta = plot.TowerCF.Position - cf.Position
+				local along = alongX and math.abs(delta.X) or math.abs(delta.Z)
+				if plot.Owner and not hitPlots[plot] and along <= def.Thickness / 2 + 25 then
+					hitPlots[plot] = true
+					wreckNear({ Name = def.Name, Icon = def.Icon, Wreck = def.Wreck, WreckRadius = 1e9, KnockoutSeconds = def.KnockoutSeconds }, plot.TowerCF.Position, notified)
+				end
+			end
+			task.wait(0.1)
+		end
+		wall:Destroy()
+		if wave < def.Waves and not stopRequested then
+			task.wait(def.Gap)
+		end
+	end
+end
+
+-- Zone: danger circles that hurt / slow / pull whoever stands in them
+local function runZones(def)
+	local zones = {}
+	local endTime = os.clock() + def.Duration
+	local nextSpawn = os.clock() + 1
+	local lastTick, lastCheck = 0, os.clock()
+	while (os.clock() < endTime or #zones > 0) and not stopRequested do
+		local now = os.clock()
+		if now - lastTick >= 1 then
+			lastTick = now
+			broadcast({ Phase = "Active", Kind = def.Name, TimeLeft = math.max(0, math.ceil(endTime - now)), Tint = def.Tint })
+		end
+		if now < endTime and now >= nextSpawn then
+			nextSpawn = now + def.Interval
+			local players = mainMapPlayers()
+			if #players > 0 then
+				for _ = 1, def.Count do
+					local root = players[rng:NextInteger(1, #players)].Root.Position
+					local angle, distance = rng:NextNumber(0, math.pi * 2), rng:NextNumber(0, 30)
+					local position = Vector3.new(root.X + math.cos(angle) * distance, 0, root.Z + math.sin(angle) * distance)
+					table.insert(zones, { Position = position, Part = marker(position, def.Radius, Color3.fromRGB(255, 255, 255), def.Warning + def.Lifetime + 1), Born = now, Active = false })
+				end
+			end
+		end
+		-- warning -> active -> gone
+		for i = #zones, 1, -1 do
+			local zone = zones[i]
+			if not zone.Active and now - zone.Born >= def.Warning then
+				zone.Active = true
+				zone.Part.Color = def.Color
+				zone.Part.Transparency = 0.2
+			elseif now - zone.Born >= def.Warning + def.Lifetime then
+				zone.Part:Destroy()
+				table.remove(zones, i)
+			end
+		end
+		-- the effects, twice a second
+		if now - lastCheck >= 0.5 then
+			local dt = now - lastCheck
+			lastCheck = now
+			for _, info in mainMapPlayers() do
+				local inside
+				for _, zone in zones do
+					if zone.Active and info.Root.Position.Y < 12 and flatDistance(info.Root.Position, zone.Position) <= def.Radius then
+						inside = zone
+					end
+				end
+				if inside and not DisasterService:IsProtected(info.Player, info.Root.Position) then
+					if def.Damage > 0 then
+						info.Humanoid:TakeDamage(def.Damage * dt)
+					end
+					if def.Slow then
+						setSlow(info.Player, def.Slow)
+					end
+					if def.Pull then
+						local toCenter = Vector3.new(inside.Position.X - info.Root.Position.X, 0, inside.Position.Z - info.Root.Position.Z)
+						if toCenter.Magnitude > 1 then
+							fling(info.Player, toCenter.Unit * def.Pull)
+						end
+					end
+				else
+					setSlow(info.Player, nil)
+				end
+			end
+		end
+		task.wait(0.1)
+	end
+end
+
+-- Status: everyone outside cover suffers
+local function runStatus(def)
+	local endTime = os.clock() + def.Duration
+	local lastTick = 0
+	local nextGravity, gravityIndex = os.clock(), 0
+	while os.clock() < endTime and not stopRequested do
+		local now = os.clock()
+		if def.Gravities and now >= nextGravity then
+			gravityIndex = gravityIndex % #def.Gravities + 1
+			workspace.Gravity = def.Gravities[gravityIndex]
+			nextGravity = now + def.GravityEvery
+		end
+		if now - lastTick >= 1 then
+			lastTick = now
+			broadcast({ Phase = "Active", Kind = def.Name, TimeLeft = math.ceil(endTime - now), Tint = def.Tint })
+			for _, info in mainMapPlayers() do
+				if DisasterService:IsProtected(info.Player, info.Root.Position) then
+					setSlow(info.Player, nil)
+				else
+					if def.Damage then
+						info.Humanoid:TakeDamage(def.Damage)
+					end
+					if def.Slow then
+						setSlow(info.Player, def.Slow)
+					end
+					if def.Push then
+						fling(info.Player, Vector3.new(rng:NextNumber(-1, 1), 0.1, rng:NextNumber(-1, 1)).Unit * def.Push)
+					end
+				end
+			end
+		end
+		task.wait(0.1)
+	end
+end
+
+for _, def in Config.ExtraDisasters do
+	handlers[def.Name] = function(by: string?)
+		local originalGravity = workspace.Gravity
+		Remotes.Announce:FireAllClients({ Title = def.Title, Text = (by and (by .. " triggered it! ") or "") .. def.Intro, Color = def.Color })
+		local notified = {}
+		local ok, err = pcall(function()
+			if def.Type == "Rain" then
+				runRain(def, notified)
+			elseif def.Type == "Wave" then
+				runWave(def, notified)
+			elseif def.Type == "Zone" then
+				runZones(def)
+			else
+				runStatus(def)
+			end
+		end)
+		-- always put everything back
+		workspace.Gravity = originalGravity
+		for player in slowedPlayers do
+			setSlow(player, nil)
+		end
+		task.wait(1)
+		cleanupFx()
+		if not ok then
+			error(err, 0)
+		end
+	end
+end
+
+---------------------------------------------------------------------------
 function DisasterService:Init(services)
 	S = services
 	folder = Instance.new("Folder")
@@ -661,6 +1025,10 @@ function DisasterService:Trigger(kind: string, by: string?): string
 		return key .. " queued (a " .. active .. " is happening right now)"
 	end
 	return key .. " incoming!"
+end
+
+function DisasterService:ListKinds(): string
+	return table.concat(KINDS, ", ")
 end
 
 function DisasterService:Stop(): string

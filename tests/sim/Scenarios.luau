@@ -3650,4 +3650,107 @@ add({
 	end,
 })
 
+---------------------------------------------------------------------------
+-- The 15 extra disasters
+---------------------------------------------------------------------------
+add({
+	Name = "extra_disasters",
+	MaxSeconds = 4000,
+	Run = function(T, place)
+		local game, me = T.Boot(place, { Name = "Victim", UserId = 6800 })
+		local safe = T.AddPlayer("Safe", { UserId = 6801 })
+		T.Wait(8)
+		local Config = T.Shared("Config")
+		local DataService = T.Service("DataService")
+		local ShieldService = T.Service("ShieldService")
+		local DisasterService = T.Service("DisasterService")
+		local ws = game:GetService("Workspace")
+		local normalGravity = ws.Gravity
+		local HUGE = 1e6
+
+		T.Check(#Config.ExtraDisasters == 15, "15 extra disasters")
+		local kinds = DisasterService:ListKinds()
+		for _, def in Config.ExtraDisasters do
+			T.Check(kinds:find(def.Name, 1, true) ~= nil, def.Name .. " is in the disaster list")
+			T.Check(Config.Disasters[def.Name].Weight > 0, def.Name .. " can happen by itself")
+		end
+		T.Check(select(2, T.Admin(me, ";disaster")):find("Hailstorm", 1, true) ~= nil, ";disaster lists them")
+		T.Check(select(2, T.Admin(me, ";disaster nonsense")):find("Unknown", 1, true) ~= nil, "unknown names are refused")
+
+		local function leftovers()
+			local n = 0
+			for _, child in ws.Disasters:GetChildren() do
+				if child.Name:match("^XD_") then
+					n += 1
+				end
+			end
+			return n
+		end
+		local function announced(title)
+			for _, args in T.Sent(me, "Announce") do
+				if type(args[1]) == "table" and args[1].Title == title then
+					return true
+				end
+			end
+			return false
+		end
+
+		-- stopping one early cleans up
+		T.Humanoid(me).MaxHealth = HUGE
+		T.Humanoid(me).Health = HUGE
+		T.Admin(me, ";hailstorm")
+		T.Wait(6)
+		T.Check(ws:GetAttribute("Disaster") == "Hailstorm", "a hailstorm is running")
+		T.Admin(me, ";stopdisaster")
+		T.WaitFor(function()
+			return ws:GetAttribute("Disaster") == nil
+		end, 20, "the hailstorm to stop")
+		T.Wait(2)
+		T.Check(leftovers() == 0, "stopping cleans up everything (" .. leftovers() .. " left)")
+
+		-- every disaster: it hurts whoever is out in the open, not a shielded player, and it cleans up after itself
+		for _, def in Config.ExtraDisasters do
+			T.Humanoid(me).MaxHealth = HUGE
+			T.Humanoid(me).Health = HUGE
+			T.Humanoid(safe).MaxHealth = HUGE
+			T.Humanoid(safe).Health = HUGE
+			local now = T.Engine.EpochBase + math.floor(T.Engine.Now)
+			DataService:Get(safe).Shield.Start = now
+			T.Server(function()
+				ShieldService:_apply(safe)
+			end)
+			local ok, text = T.Admin(me, ";" .. def.Name:lower())
+			T.Check(ok == true and tostring(text):find("incoming", 1, true) ~= nil, def.Name .. " starts (" .. tostring(text) .. ")")
+			T.WaitFor(function()
+				return ws:GetAttribute("Disaster") == def.Name
+			end, 10, def.Name .. " to begin")
+			T.Check(announced(def.Title), def.Name .. " is announced")
+			local gravities = {}
+			local deadline = T.Engine.Now + 200
+			while ws:GetAttribute("Disaster") ~= nil and T.Engine.Now < deadline do
+				gravities[ws.Gravity] = true
+				T.Wait(0.5)
+			end
+			T.Wait(2)
+			local taken = HUGE - T.Humanoid(me).Health
+			if def.Gravities then
+				local changes = 0
+				for gravity in gravities do
+					if gravity ~= normalGravity then
+						changes += 1
+					end
+				end
+				T.Check(changes >= 3, def.Name .. " changed gravity (" .. changes .. " different values)")
+			else
+				T.Check(taken > 0, def.Name .. " hurt the player in the open (took " .. tostring(taken) .. ")")
+			end
+			T.Check(T.Humanoid(safe).Health == HUGE, def.Name .. " didn't touch the shielded player")
+			T.Check(leftovers() == 0, def.Name .. " cleaned up (" .. leftovers() .. " left)")
+			T.Check(ws.Gravity == normalGravity, def.Name .. " restored gravity")
+			T.Check(T.Humanoid(me).WalkSpeed == Config.BaseWalkSpeed, def.Name .. " restored walk speed (" .. tostring(T.Humanoid(me).WalkSpeed) .. ")")
+			T.Check(me.Parent ~= nil and T.Humanoid(me).Health > 0, "the victim is still alive after " .. def.Name)
+		end
+	end,
+})
+
 return Scenarios

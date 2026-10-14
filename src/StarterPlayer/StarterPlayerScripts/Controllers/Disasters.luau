@@ -768,6 +768,22 @@ local ACTIVE_TEXT = {
 	Earthquake = { "🌍 EARTHQUAKE", "Hold on! • grab the cash geodes", Color3.fromRGB(210, 150, 90) },
 }
 
+for _, def in Config.ExtraDisasters do
+	ACTIVE_TEXT[def.Name] = { (def.Title:gsub("!$", "")), def.Hint, def.Color }
+end
+
+-- the screen takes on the disaster's colour while it lasts
+local tintEffect: ColorCorrectionEffect? = nil
+local function setTint(color: Color3?)
+	local effect: ColorCorrectionEffect = tintEffect or (Instance.new("ColorCorrectionEffect") :: ColorCorrectionEffect)
+	if not tintEffect then
+		effect.Name = "DisasterTint"
+		effect.Parent = Lighting
+		tintEffect = effect
+	end
+	TweenService:Create(effect, TweenInfo.new(1.2), { TintColor = color or Color3.new(1, 1, 1) }):Play()
+end
+
 -- one shock of an earthquake: the camera shakes, the ground rumbles, dust flies
 local function quakeShock(intensity: number)
 	shake(1.6 * intensity, 1.3)
@@ -809,11 +825,15 @@ local function onState(state)
 		if text then
 			showBanner(text[1] .. "  " .. tostring(state.TimeLeft) .. "s", text[2], text[3])
 		end
+		if typeof(state.Tint) == "Color3" then
+			setTint(state.Tint)
+		end
 	elseif phase == "Meteor" then
 		meteor(state.Target, state.Delay or 1.4, state.Radius or 12, state.Shield == true)
-	elseif phase == "Shock" and kind == "Earthquake" then
+	elseif phase == "Shock" then
 		quakeShock(tonumber(state.Intensity) or 1)
 	elseif phase == "End" then
+		setTint(nil)
 		stopSiren()
 		clearBeam()
 		nukeActive = false

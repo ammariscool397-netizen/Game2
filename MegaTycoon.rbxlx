@@ -548,6 +548,52 @@ Config.Disasters = {
 }
 
 ---------------------------------------------------------------------------
+-- 15 more disasters, built from four kinds (see DisasterService). They hurt
+-- players who aren't in a shelter or wearing a personal shield; the ones with
+-- Wreck also knock out part of an unshielded tower for KnockoutSeconds.
+--   Rain    objects fall near players (a marker shows where). Radius, Damage,
+--           FallTime, PerWave per Interval, Patch = a burning puddle left behind
+--   Wave    a wall sweeps across the map Waves times; players below SafeY get hit
+--   Zone    danger circles appear (Warning), then hurt / slow / pull for Lifetime
+--   Status  everyone outside cover suffers: Damage per second, Slow, Push, Gravity
+---------------------------------------------------------------------------
+Config.ExtraDisasters = {
+	{ Name = "Hailstorm", Type = "Rain", Icon = "🧊", Title = "🧊 HAILSTORM!", Intro = "Ice balls are falling - find cover!", Hint = "Dodge the circles • hail hurts", Color = Color3.fromRGB(190, 230, 255), Tint = Color3.fromRGB(210, 225, 255), Weight = 2,
+		Duration = 35, Interval = 0.45, PerWave = 3, Spread = 40, Radius = 7, Damage = 18, FallTime = 1.1, DropSize = 3.5, Knock = 25 },
+	{ Name = "Lightning", Type = "Rain", Icon = "⚡", Title = "⚡ LIGHTNING STORM!", Intro = "Watch the glowing circles - bolts are coming!", Hint = "Get out of the circles", Color = Color3.fromRGB(255, 250, 160), Tint = Color3.fromRGB(150, 150, 185), Weight = 2, Bolt = true,
+		Duration = 35, Interval = 0.9, PerWave = 3, Spread = 45, Radius = 9, Damage = 40, FallTime = 1.4, Knock = 40, Shake = 0.5 },
+	{ Name = "AcidRain", Type = "Rain", Icon = "☣️", Title = "☣️ ACID RAIN!", Intro = "Toxic drops leave burning puddles - keep moving!", Hint = "Avoid the green puddles", Color = Color3.fromRGB(130, 255, 60), Tint = Color3.fromRGB(190, 230, 150), Weight = 1,
+		Duration = 40, Interval = 0.35, PerWave = 4, Spread = 45, Radius = 6, Damage = 8, FallTime = 1.2, DropSize = 2.5, Patch = { Seconds = 7, Damage = 6, Radius = 6 } },
+	{ Name = "FireRain", Type = "Rain", Icon = "🔥", Title = "🔥 FIRE RAIN!", Intro = "Flaming rocks fall from the sky!", Hint = "Fire burns • towers can burn too", Color = Color3.fromRGB(255, 110, 30), Tint = Color3.fromRGB(255, 190, 150), Weight = 1,
+		Duration = 35, Interval = 0.5, PerWave = 3, Spread = 45, Radius = 8, Damage = 25, FallTime = 1.2, DropSize = 4, Patch = { Seconds = 6, Damage = 8, Radius = 7 }, Wreck = 0.01, WreckRadius = 70, KnockoutSeconds = 90 },
+	{ Name = "Volcano", Type = "Rain", Icon = "🌋", Title = "🌋 VOLCANO ERUPTION!", Intro = "Giant lava bombs are raining down!", Hint = "Lava bombs • stay away from the pools", Color = Color3.fromRGB(255, 70, 10), Tint = Color3.fromRGB(255, 150, 110), Weight = 1, Shake = 1,
+		Duration = 40, Interval = 1.0, PerWave = 3, Spread = 55, Radius = 14, Damage = 45, FallTime = 1.8, DropSize = 7, Knock = 50, Patch = { Seconds = 10, Damage = 12, Radius = 9 }, Wreck = 0.03, WreckRadius = 80, KnockoutSeconds = 120 },
+	{ Name = "Airstrike", Type = "Rain", Icon = "🛩️", Title = "🛩️ AIRSTRIKE!", Intro = "Bombers overhead - bombs incoming!", Hint = "Run from the red circles", Color = Color3.fromRGB(255, 60, 60), Tint = Color3.fromRGB(190, 190, 190), Weight = 1, Shake = 1,
+		Duration = 30, Interval = 2.0, PerWave = 6, Spread = 60, Radius = 11, Damage = 50, FallTime = 2.0, DropSize = 5, Knock = 60, Wreck = 0.03, WreckRadius = 80, KnockoutSeconds = 120 },
+	{ Name = "Tsunami", Type = "Wave", Icon = "🌊", Title = "🌊 TSUNAMI!", Intro = "A giant wave is crossing the map - climb up high!", Hint = "Get above the wave (high floors are safe)", Color = Color3.fromRGB(40, 130, 235), Tint = Color3.fromRGB(190, 220, 255), Weight = 1,
+		Waves = 2, Gap = 8, Warning = 8, Speed = 90, Width = 2300, Height = 60, Thickness = 24, SafeY = 30, Damage = 80, Knock = 70, Wreck = 0.06, WreckRadius = 90, KnockoutSeconds = 120, Material = "Glass", WallTransparency = 0.35 },
+	{ Name = "Avalanche", Type = "Wave", Icon = "🏔️", Title = "🏔️ AVALANCHE!", Intro = "A wall of snow and rock is rolling across the map!", Hint = "Get out of the way or climb above it", Color = Color3.fromRGB(240, 248, 255), Tint = Color3.fromRGB(235, 240, 250), Weight = 1,
+		Waves = 3, Gap = 5, Warning = 6, Speed = 130, Width = 2300, Height = 40, Thickness = 22, SafeY = 22, Damage = 60, Knock = 80, Wreck = 0.04, WreckRadius = 90, KnockoutSeconds = 100, Material = "Snow", WallTransparency = 0 },
+	{ Name = "Sinkholes", Type = "Zone", Icon = "🕳️", Title = "🕳️ SINKHOLES!", Intro = "The ground is opening up - don't fall in!", Hint = "Stay out of the dark holes", Color = Color3.fromRGB(35, 25, 20), Tint = Color3.fromRGB(200, 190, 180), Weight = 1,
+		Duration = 40, Interval = 6, Count = 3, Radius = 14, Warning = 2.5, Lifetime = 14, Damage = 12, Pull = 25 },
+	{ Name = "ToxicGas", Type = "Zone", Icon = "☁️", Title = "☁️ TOXIC GAS!", Intro = "Poison clouds are drifting in - hold your breath!", Hint = "Avoid the green clouds", Color = Color3.fromRGB(140, 220, 70), Tint = Color3.fromRGB(205, 235, 160), Weight = 1,
+		Duration = 45, Interval = 5, Count = 4, Radius = 18, Warning = 2, Lifetime = 16, Damage = 5, Slow = 0.6 },
+	{ Name = "Quicksand", Type = "Zone", Icon = "⏳", Title = "⏳ QUICKSAND!", Intro = "Sticky sand pits are forming - they slow you right down!", Hint = "Don't step in the sand pits", Color = Color3.fromRGB(215, 185, 110), Tint = Color3.fromRGB(235, 215, 170), Weight = 1,
+		Duration = 40, Interval = 5, Count = 4, Radius = 15, Warning = 2, Lifetime = 14, Damage = 2, Slow = 0.2, Pull = 8 },
+	{ Name = "Blizzard", Type = "Status", Icon = "❄️", Title = "❄️ BLIZZARD!", Intro = "Freezing winds - get inside or put on your shield!", Hint = "Cold hurts and slows you • shelter!", Color = Color3.fromRGB(190, 225, 255), Tint = Color3.fromRGB(215, 232, 255), Weight = 1,
+		Duration = 40, Damage = 2, Slow = 0.65 },
+	{ Name = "HeatWave", Type = "Status", Icon = "🥵", Title = "🥵 HEAT WAVE!", Intro = "Scorching heat - find shade!", Hint = "Heat hurts • shelter in the shade", Color = Color3.fromRGB(255, 160, 70), Tint = Color3.fromRGB(255, 185, 120), Weight = 1,
+		Duration = 40, Damage = 3, Slow = 0.8 },
+	{ Name = "Sandstorm", Type = "Status", Icon = "🏜️", Title = "🏜️ SANDSTORM!", Intro = "A howling sandstorm shoves everyone around!", Hint = "The wind pushes you • shelter!", Color = Color3.fromRGB(225, 185, 120), Tint = Color3.fromRGB(225, 190, 130), Weight = 1,
+		Duration = 40, Damage = 1, Push = 14 },
+	{ Name = "GravityStorm", Type = "Status", Icon = "🌀", Title = "🌀 GRAVITY STORM!", Intro = "Gravity is going wild!", Hint = "Gravity changes every few seconds", Color = Color3.fromRGB(180, 120, 255), Tint = Color3.fromRGB(220, 200, 255), Weight = 1,
+		Duration = 35, GravityEvery = 5, Gravities = { 55, 300, 80, 250 } },
+}
+for _, def in Config.ExtraDisasters do
+	Config.Disasters[def.Name] = def
+end
+
+---------------------------------------------------------------------------
 -- Secrets hidden around the map. Each one gives cash and permanently builds
 -- a secret relic in your tower (+5% income each, kept through rebirths).
 ---------------------------------------------------------------------------
@@ -3237,6 +3283,25 @@ local function buildCommands()
 	disasterCommand("tornado", { "twister" }, "Tornado", "Summon a tornado")
 	disasterCommand("ufo", { "aliens", "invasion" }, "UFO", "Start a UFO invasion")
 	disasterCommand("earthquake", { "quake" }, "Earthquake", "Start an earthquake")
+	for _, def in Config.ExtraDisasters do
+		disasterCommand(def.Name:lower(), {}, def.Name, "Start a " .. def.Name .. " (" .. def.Type .. " disaster)")
+	end
+	register({
+		Name = "disaster",
+		Aliases = { "disasters" },
+		Rank = 2,
+		Args = "[name]",
+		Desc = "Start any disaster by name (no name = list them)",
+		Run = function(executor, args)
+			if not S.DisasterService then
+				return "Disasters unavailable"
+			end
+			if not args[1] then
+				return "Disasters: " .. S.DisasterService:ListKinds()
+			end
+			return S.DisasterService:Trigger(args[1], executor.DisplayName)
+		end,
+	})
 	register({
 		Name = "stopdisaster",
 		Aliases = { "stopevent", "calm" },
@@ -5096,7 +5161,9 @@ return DataService
 	Visuals are rendered on the clients (Disasters controller); the server only
 	decides what happens and when.
 ]]
+local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -5117,6 +5184,9 @@ local folder: Folder
 local rng = Random.new()
 
 local KINDS = { "Nuke", "Meteors", "Tornado", "UFO", "Earthquake" }
+for _, def in Config.ExtraDisasters do
+	table.insert(KINDS, def.Name) -- (see "More disasters" below)
+end
 local TITLES = {
 	Nuke = "☢️ NUKE INCOMING!",
 	Meteors = "☄️ METEOR STORM!",
@@ -5658,6 +5728,365 @@ function handlers.Earthquake(by: string?)
 end
 
 ---------------------------------------------------------------------------
+---------------------------------------------------------------------------
+-- More disasters (Config.ExtraDisasters): Rain, Wave, Zone and Status kinds
+---------------------------------------------------------------------------
+local spawnedFx: { Instance } = {}
+local slowedPlayers: { [Player]: boolean } = {}
+
+local function track<T>(instance: T & Instance): T & Instance
+	table.insert(spawnedFx, instance)
+	return instance
+end
+
+local function cleanupFx()
+	for _, instance in spawnedFx do
+		instance:Destroy()
+	end
+	table.clear(spawnedFx)
+end
+
+-- slows a player (factor) or gives their normal speed back (nil)
+local function setSlow(player: Player, factor: number?)
+	local humanoid = getHumanoid(player)
+	if not humanoid then
+		slowedPlayers[player] = nil
+		return
+	end
+	if factor then
+		humanoid.WalkSpeed = S.MonetizationService:GetBaseSpeed(player) * factor
+		slowedPlayers[player] = true
+	elseif slowedPlayers[player] then
+		humanoid.WalkSpeed = S.MonetizationService:GetBaseSpeed(player)
+		slowedPlayers[player] = nil
+	end
+end
+
+-- a flat glowing circle on the ground
+local function marker(position: Vector3, radius: number, color: Color3, seconds: number): BasePart
+	local disc = BuildKit.Part({
+		Name = "XD_Marker",
+		Shape = Enum.PartType.Cylinder,
+		Size = Vector3.new(0.4, radius * 2, radius * 2),
+		CFrame = CFrame.new(position.X, 0.5, position.Z) * CFrame.Angles(0, 0, math.rad(90)),
+		Color = color,
+		Material = Enum.Material.Neon,
+		Transparency = 0.5,
+		CanCollide = false,
+		CanTouch = false,
+		CanQuery = false,
+		Parent = folder,
+	})
+	Debris:AddItem(disc, seconds)
+	return track(disc)
+end
+
+local function flatDistance(a: Vector3, b: Vector3): number
+	return Vector3.new(a.X - b.X, 0, a.Z - b.Z).Magnitude
+end
+
+local function hurt(info, damage: number, awayFrom: Vector3?, knock: number?)
+	info.Humanoid:TakeDamage(damage)
+	if knock and awayFrom then
+		local away = info.Root.Position - awayFrom
+		local direction = away.Magnitude > 0.1 and away.Unit or Vector3.yAxis
+		fling(info.Player, direction * knock + Vector3.new(0, knock * 0.7, 0))
+	end
+end
+
+-- knocks out part of the towers near `position` (unless their dome protects them)
+local function wreckNear(def, position: Vector3, notified)
+	for _, plot in S.TycoonService:GetPlots() do
+		if plot.Owner and flatDistance(plot.TowerCF.Position, position) <= def.WreckRadius then
+			if S.TycoonService:IsShielded(plot) then
+				if not notified[plot] then
+					notified[plot] = true
+					Remotes.VFX:FireAllClients("ShieldHit", { Center = plot.ShieldCenter, Radius = plot.ShieldRadius })
+					notifyPlot(plot, "🛡️ Your Nuke Shield Dome protected your tower from the " .. def.Name .. "!", "success")
+				end
+			else
+				local wrecked = S.TycoonService:KnockOutFraction(plot, def.Wreck, def.KnockoutSeconds)
+				if wrecked > 0 and not notified[plot] then
+					notified[plot] = true
+					notifyPlot(plot, def.Icon .. " The " .. def.Name .. " is wrecking your tower! Wrecked upgrades rebuild by themselves.")
+				end
+			end
+		end
+	end
+end
+
+-- Rain: a burning puddle that keeps hurting for a few seconds
+local function spawnPatch(def, position: Vector3)
+	local patch = def.Patch
+	local disc = marker(position, patch.Radius, def.Color, patch.Seconds)
+	disc.Transparency = 0.3
+	task.spawn(function()
+		local untilTime = os.clock() + patch.Seconds
+		while os.clock() < untilTime and not stopRequested and disc.Parent do
+			for _, info in mainMapPlayers() do
+				if info.Root.Position.Y < 8 and flatDistance(info.Root.Position, position) <= patch.Radius and not DisasterService:IsProtected(info.Player, info.Root.Position) then
+					info.Humanoid:TakeDamage(patch.Damage * 0.5)
+				end
+			end
+			task.wait(0.5)
+		end
+	end)
+end
+
+local function rainImpact(def, position: Vector3, notified)
+	Remotes.VFX:FireAllClients("Shockwave", { Position = position + Vector3.new(0, 2, 0), Color = def.Color, Size = def.Radius * 2.5 })
+	if def.Shake then
+		broadcast({ Phase = "Shock", Kind = def.Name, Intensity = def.Shake })
+	end
+	for _, info in mainMapPlayers() do
+		if (info.Root.Position - position).Magnitude <= def.Radius and not DisasterService:IsProtected(info.Player, info.Root.Position) then
+			hurt(info, def.Damage, position, def.Knock)
+		end
+	end
+	if def.Wreck then
+		wreckNear(def, position, notified)
+	end
+	if def.Patch then
+		spawnPatch(def, position)
+	end
+end
+
+local function rainDrop(def, target: Vector3, notified)
+	marker(target, def.Radius, def.Color, def.FallTime + 0.3)
+	if def.Bolt then
+		task.wait(def.FallTime)
+		if stopRequested then
+			return
+		end
+		local bolt = track(BuildKit.Part({ Name = "XD_Bolt", Size = Vector3.new(1.4, 130, 1.4), Position = target + Vector3.new(0, 65, 0), Color = Color3.fromRGB(255, 255, 220), Material = Enum.Material.Neon, CanCollide = false, CanTouch = false, CanQuery = false, Parent = folder }))
+		Debris:AddItem(bolt, 0.3)
+	else
+		local size = def.DropSize or 3
+		local drop = track(BuildKit.Part({ Name = "XD_Drop", Shape = Enum.PartType.Ball, Size = Vector3.one * size, Position = target + Vector3.new(0, 130, 0), Color = def.Color, Material = Enum.Material.Neon, CanCollide = false, CanTouch = false, CanQuery = false, Parent = folder }))
+		TweenService:Create(drop, TweenInfo.new(def.FallTime, Enum.EasingStyle.Linear), { Position = target + Vector3.new(0, size / 2, 0) }):Play()
+		Debris:AddItem(drop, def.FallTime + 0.1)
+		task.wait(def.FallTime)
+		if stopRequested then
+			return
+		end
+	end
+	rainImpact(def, target, notified)
+end
+
+local function runRain(def, notified)
+	local endTime = os.clock() + def.Duration
+	local nextWave = os.clock() + 1
+	local lastTick = 0
+	while os.clock() < endTime and not stopRequested do
+		local now = os.clock()
+		if now - lastTick >= 1 then
+			lastTick = now
+			broadcast({ Phase = "Active", Kind = def.Name, TimeLeft = math.ceil(endTime - now), Tint = def.Tint })
+		end
+		if now >= nextWave then
+			nextWave = now + def.Interval
+			local players = mainMapPlayers()
+			if #players > 0 then
+				for _ = 1, def.PerWave do
+					local root = players[rng:NextInteger(1, #players)].Root.Position
+					local angle, distance = rng:NextNumber(0, math.pi * 2), rng:NextNumber(0, def.Spread)
+					task.spawn(rainDrop, def, Vector3.new(root.X + math.cos(angle) * distance, 0.5, root.Z + math.sin(angle) * distance), notified)
+				end
+			end
+		end
+		task.wait(0.1)
+	end
+	task.wait(def.FallTime + 0.3) -- the last drops land
+end
+
+-- Wave: a wall sweeps across the whole map
+local function runWave(def, notified)
+	local reach = 1100
+	for wave = 1, def.Waves do
+		if stopRequested then
+			return
+		end
+		local alongX = rng:NextInteger(1, 2) == 1
+		local sign = rng:NextInteger(0, 1) == 0 and -1 or 1
+		local y = def.Height / 2
+		local from = alongX and Vector3.new(-sign * reach, y, 0) or Vector3.new(0, y, -sign * reach)
+		local to = alongX and Vector3.new(sign * reach, y, 0) or Vector3.new(0, y, sign * reach)
+		local size = alongX and Vector3.new(def.Thickness, def.Height, def.Width) or Vector3.new(def.Width, def.Height, def.Thickness)
+		local wall = track(BuildKit.Part({ Name = "XD_Wall", Size = size, Position = from, Color = def.Color, Material = Enum.Material[def.Material], Transparency = def.WallTransparency, CanCollide = false, CanTouch = false, CanQuery = false, Parent = folder }))
+		local side = alongX and (sign < 0 and "west" or "east") or (sign < 0 and "north" or "south")
+		Remotes.Announce:FireAllClients({ Title = def.Icon .. " WAVE " .. wave .. "/" .. def.Waves, Text = "It comes from the " .. side .. " - get above " .. def.SafeY .. " studs or into cover!", Color = def.Color })
+		for t = def.Warning, 1, -1 do
+			if stopRequested then
+				return
+			end
+			broadcast({ Phase = "Active", Kind = def.Name, TimeLeft = t, Tint = def.Tint })
+			task.wait(1)
+		end
+		local travel = 2 * reach / def.Speed
+		TweenService:Create(wall, TweenInfo.new(travel, Enum.EasingStyle.Linear), { Position = to }):Play()
+		local hitPlayers, hitPlots = {}, {}
+		local started = os.clock()
+		while os.clock() - started < travel and not stopRequested do
+			local cf = wall.CFrame
+			for _, info in mainMapPlayers() do
+				if not hitPlayers[info.Player] and info.Root.Position.Y < def.SafeY and insideBox(info.Root.Position, cf, wall.Size) then
+					hitPlayers[info.Player] = true
+					if not DisasterService:IsProtected(info.Player, info.Root.Position) then
+						hurt(info, def.Damage, cf.Position, def.Knock)
+					end
+				end
+			end
+			for _, plot in S.TycoonService:GetPlots() do
+				local delta = plot.TowerCF.Position - cf.Position
+				local along = alongX and math.abs(delta.X) or math.abs(delta.Z)
+				if plot.Owner and not hitPlots[plot] and along <= def.Thickness / 2 + 25 then
+					hitPlots[plot] = true
+					wreckNear({ Name = def.Name, Icon = def.Icon, Wreck = def.Wreck, WreckRadius = 1e9, KnockoutSeconds = def.KnockoutSeconds }, plot.TowerCF.Position, notified)
+				end
+			end
+			task.wait(0.1)
+		end
+		wall:Destroy()
+		if wave < def.Waves and not stopRequested then
+			task.wait(def.Gap)
+		end
+	end
+end
+
+-- Zone: danger circles that hurt / slow / pull whoever stands in them
+local function runZones(def)
+	local zones = {}
+	local endTime = os.clock() + def.Duration
+	local nextSpawn = os.clock() + 1
+	local lastTick, lastCheck = 0, os.clock()
+	while (os.clock() < endTime or #zones > 0) and not stopRequested do
+		local now = os.clock()
+		if now - lastTick >= 1 then
+			lastTick = now
+			broadcast({ Phase = "Active", Kind = def.Name, TimeLeft = math.max(0, math.ceil(endTime - now)), Tint = def.Tint })
+		end
+		if now < endTime and now >= nextSpawn then
+			nextSpawn = now + def.Interval
+			local players = mainMapPlayers()
+			if #players > 0 then
+				for _ = 1, def.Count do
+					local root = players[rng:NextInteger(1, #players)].Root.Position
+					local angle, distance = rng:NextNumber(0, math.pi * 2), rng:NextNumber(0, 30)
+					local position = Vector3.new(root.X + math.cos(angle) * distance, 0, root.Z + math.sin(angle) * distance)
+					table.insert(zones, { Position = position, Part = marker(position, def.Radius, Color3.fromRGB(255, 255, 255), def.Warning + def.Lifetime + 1), Born = now, Active = false })
+				end
+			end
+		end
+		-- warning -> active -> gone
+		for i = #zones, 1, -1 do
+			local zone = zones[i]
+			if not zone.Active and now - zone.Born >= def.Warning then
+				zone.Active = true
+				zone.Part.Color = def.Color
+				zone.Part.Transparency = 0.2
+			elseif now - zone.Born >= def.Warning + def.Lifetime then
+				zone.Part:Destroy()
+				table.remove(zones, i)
+			end
+		end
+		-- the effects, twice a second
+		if now - lastCheck >= 0.5 then
+			local dt = now - lastCheck
+			lastCheck = now
+			for _, info in mainMapPlayers() do
+				local inside
+				for _, zone in zones do
+					if zone.Active and info.Root.Position.Y < 12 and flatDistance(info.Root.Position, zone.Position) <= def.Radius then
+						inside = zone
+					end
+				end
+				if inside and not DisasterService:IsProtected(info.Player, info.Root.Position) then
+					if def.Damage > 0 then
+						info.Humanoid:TakeDamage(def.Damage * dt)
+					end
+					if def.Slow then
+						setSlow(info.Player, def.Slow)
+					end
+					if def.Pull then
+						local toCenter = Vector3.new(inside.Position.X - info.Root.Position.X, 0, inside.Position.Z - info.Root.Position.Z)
+						if toCenter.Magnitude > 1 then
+							fling(info.Player, toCenter.Unit * def.Pull)
+						end
+					end
+				else
+					setSlow(info.Player, nil)
+				end
+			end
+		end
+		task.wait(0.1)
+	end
+end
+
+-- Status: everyone outside cover suffers
+local function runStatus(def)
+	local endTime = os.clock() + def.Duration
+	local lastTick = 0
+	local nextGravity, gravityIndex = os.clock(), 0
+	while os.clock() < endTime and not stopRequested do
+		local now = os.clock()
+		if def.Gravities and now >= nextGravity then
+			gravityIndex = gravityIndex % #def.Gravities + 1
+			workspace.Gravity = def.Gravities[gravityIndex]
+			nextGravity = now + def.GravityEvery
+		end
+		if now - lastTick >= 1 then
+			lastTick = now
+			broadcast({ Phase = "Active", Kind = def.Name, TimeLeft = math.ceil(endTime - now), Tint = def.Tint })
+			for _, info in mainMapPlayers() do
+				if DisasterService:IsProtected(info.Player, info.Root.Position) then
+					setSlow(info.Player, nil)
+				else
+					if def.Damage then
+						info.Humanoid:TakeDamage(def.Damage)
+					end
+					if def.Slow then
+						setSlow(info.Player, def.Slow)
+					end
+					if def.Push then
+						fling(info.Player, Vector3.new(rng:NextNumber(-1, 1), 0.1, rng:NextNumber(-1, 1)).Unit * def.Push)
+					end
+				end
+			end
+		end
+		task.wait(0.1)
+	end
+end
+
+for _, def in Config.ExtraDisasters do
+	handlers[def.Name] = function(by: string?)
+		local originalGravity = workspace.Gravity
+		Remotes.Announce:FireAllClients({ Title = def.Title, Text = (by and (by .. " triggered it! ") or "") .. def.Intro, Color = def.Color })
+		local notified = {}
+		local ok, err = pcall(function()
+			if def.Type == "Rain" then
+				runRain(def, notified)
+			elseif def.Type == "Wave" then
+				runWave(def, notified)
+			elseif def.Type == "Zone" then
+				runZones(def)
+			else
+				runStatus(def)
+			end
+		end)
+		-- always put everything back
+		workspace.Gravity = originalGravity
+		for player in slowedPlayers do
+			setSlow(player, nil)
+		end
+		task.wait(1)
+		cleanupFx()
+		if not ok then
+			error(err, 0)
+		end
+	end
+end
+
+---------------------------------------------------------------------------
 function DisasterService:Init(services)
 	S = services
 	folder = Instance.new("Folder")
@@ -5744,6 +6173,10 @@ function DisasterService:Trigger(kind: string, by: string?): string
 		return key .. " queued (a " .. active .. " is happening right now)"
 	end
 	return key .. " incoming!"
+end
+
+function DisasterService:ListKinds(): string
+	return table.concat(KINDS, ", ")
 end
 
 function DisasterService:Stop(): string
@@ -14218,6 +14651,22 @@ local ACTIVE_TEXT = {
 	Earthquake = { "🌍 EARTHQUAKE", "Hold on! • grab the cash geodes", Color3.fromRGB(210, 150, 90) },
 }
 
+for _, def in Config.ExtraDisasters do
+	ACTIVE_TEXT[def.Name] = { (def.Title:gsub("!$", "")), def.Hint, def.Color }
+end
+
+-- the screen takes on the disaster's colour while it lasts
+local tintEffect: ColorCorrectionEffect? = nil
+local function setTint(color: Color3?)
+	local effect: ColorCorrectionEffect = tintEffect or (Instance.new("ColorCorrectionEffect") :: ColorCorrectionEffect)
+	if not tintEffect then
+		effect.Name = "DisasterTint"
+		effect.Parent = Lighting
+		tintEffect = effect
+	end
+	TweenService:Create(effect, TweenInfo.new(1.2), { TintColor = color or Color3.new(1, 1, 1) }):Play()
+end
+
 -- one shock of an earthquake: the camera shakes, the ground rumbles, dust flies
 local function quakeShock(intensity: number)
 	shake(1.6 * intensity, 1.3)
@@ -14259,11 +14708,15 @@ local function onState(state)
 		if text then
 			showBanner(text[1] .. "  " .. tostring(state.TimeLeft) .. "s", text[2], text[3])
 		end
+		if typeof(state.Tint) == "Color3" then
+			setTint(state.Tint)
+		end
 	elseif phase == "Meteor" then
 		meteor(state.Target, state.Delay or 1.4, state.Radius or 12, state.Shield == true)
-	elseif phase == "Shock" and kind == "Earthquake" then
+	elseif phase == "Shock" then
 		quakeShock(tonumber(state.Intensity) or 1)
 	elseif phase == "End" then
+		setTint(nil)
 		stopSiren()
 		clearBeam()
 		nukeActive = false

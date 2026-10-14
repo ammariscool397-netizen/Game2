@@ -134,6 +134,52 @@ Config.Disasters = {
 }
 
 ---------------------------------------------------------------------------
+-- 15 more disasters, built from four kinds (see DisasterService). They hurt
+-- players who aren't in a shelter or wearing a personal shield; the ones with
+-- Wreck also knock out part of an unshielded tower for KnockoutSeconds.
+--   Rain    objects fall near players (a marker shows where). Radius, Damage,
+--           FallTime, PerWave per Interval, Patch = a burning puddle left behind
+--   Wave    a wall sweeps across the map Waves times; players below SafeY get hit
+--   Zone    danger circles appear (Warning), then hurt / slow / pull for Lifetime
+--   Status  everyone outside cover suffers: Damage per second, Slow, Push, Gravity
+---------------------------------------------------------------------------
+Config.ExtraDisasters = {
+	{ Name = "Hailstorm", Type = "Rain", Icon = "🧊", Title = "🧊 HAILSTORM!", Intro = "Ice balls are falling - find cover!", Hint = "Dodge the circles • hail hurts", Color = Color3.fromRGB(190, 230, 255), Tint = Color3.fromRGB(210, 225, 255), Weight = 2,
+		Duration = 35, Interval = 0.45, PerWave = 3, Spread = 40, Radius = 7, Damage = 18, FallTime = 1.1, DropSize = 3.5, Knock = 25 },
+	{ Name = "Lightning", Type = "Rain", Icon = "⚡", Title = "⚡ LIGHTNING STORM!", Intro = "Watch the glowing circles - bolts are coming!", Hint = "Get out of the circles", Color = Color3.fromRGB(255, 250, 160), Tint = Color3.fromRGB(150, 150, 185), Weight = 2, Bolt = true,
+		Duration = 35, Interval = 0.9, PerWave = 3, Spread = 45, Radius = 9, Damage = 40, FallTime = 1.4, Knock = 40, Shake = 0.5 },
+	{ Name = "AcidRain", Type = "Rain", Icon = "☣️", Title = "☣️ ACID RAIN!", Intro = "Toxic drops leave burning puddles - keep moving!", Hint = "Avoid the green puddles", Color = Color3.fromRGB(130, 255, 60), Tint = Color3.fromRGB(190, 230, 150), Weight = 1,
+		Duration = 40, Interval = 0.35, PerWave = 4, Spread = 45, Radius = 6, Damage = 8, FallTime = 1.2, DropSize = 2.5, Patch = { Seconds = 7, Damage = 6, Radius = 6 } },
+	{ Name = "FireRain", Type = "Rain", Icon = "🔥", Title = "🔥 FIRE RAIN!", Intro = "Flaming rocks fall from the sky!", Hint = "Fire burns • towers can burn too", Color = Color3.fromRGB(255, 110, 30), Tint = Color3.fromRGB(255, 190, 150), Weight = 1,
+		Duration = 35, Interval = 0.5, PerWave = 3, Spread = 45, Radius = 8, Damage = 25, FallTime = 1.2, DropSize = 4, Patch = { Seconds = 6, Damage = 8, Radius = 7 }, Wreck = 0.01, WreckRadius = 70, KnockoutSeconds = 90 },
+	{ Name = "Volcano", Type = "Rain", Icon = "🌋", Title = "🌋 VOLCANO ERUPTION!", Intro = "Giant lava bombs are raining down!", Hint = "Lava bombs • stay away from the pools", Color = Color3.fromRGB(255, 70, 10), Tint = Color3.fromRGB(255, 150, 110), Weight = 1, Shake = 1,
+		Duration = 40, Interval = 1.0, PerWave = 3, Spread = 55, Radius = 14, Damage = 45, FallTime = 1.8, DropSize = 7, Knock = 50, Patch = { Seconds = 10, Damage = 12, Radius = 9 }, Wreck = 0.03, WreckRadius = 80, KnockoutSeconds = 120 },
+	{ Name = "Airstrike", Type = "Rain", Icon = "🛩️", Title = "🛩️ AIRSTRIKE!", Intro = "Bombers overhead - bombs incoming!", Hint = "Run from the red circles", Color = Color3.fromRGB(255, 60, 60), Tint = Color3.fromRGB(190, 190, 190), Weight = 1, Shake = 1,
+		Duration = 30, Interval = 2.0, PerWave = 6, Spread = 60, Radius = 11, Damage = 50, FallTime = 2.0, DropSize = 5, Knock = 60, Wreck = 0.03, WreckRadius = 80, KnockoutSeconds = 120 },
+	{ Name = "Tsunami", Type = "Wave", Icon = "🌊", Title = "🌊 TSUNAMI!", Intro = "A giant wave is crossing the map - climb up high!", Hint = "Get above the wave (high floors are safe)", Color = Color3.fromRGB(40, 130, 235), Tint = Color3.fromRGB(190, 220, 255), Weight = 1,
+		Waves = 2, Gap = 8, Warning = 8, Speed = 90, Width = 2300, Height = 60, Thickness = 24, SafeY = 30, Damage = 80, Knock = 70, Wreck = 0.06, WreckRadius = 90, KnockoutSeconds = 120, Material = "Glass", WallTransparency = 0.35 },
+	{ Name = "Avalanche", Type = "Wave", Icon = "🏔️", Title = "🏔️ AVALANCHE!", Intro = "A wall of snow and rock is rolling across the map!", Hint = "Get out of the way or climb above it", Color = Color3.fromRGB(240, 248, 255), Tint = Color3.fromRGB(235, 240, 250), Weight = 1,
+		Waves = 3, Gap = 5, Warning = 6, Speed = 130, Width = 2300, Height = 40, Thickness = 22, SafeY = 22, Damage = 60, Knock = 80, Wreck = 0.04, WreckRadius = 90, KnockoutSeconds = 100, Material = "Snow", WallTransparency = 0 },
+	{ Name = "Sinkholes", Type = "Zone", Icon = "🕳️", Title = "🕳️ SINKHOLES!", Intro = "The ground is opening up - don't fall in!", Hint = "Stay out of the dark holes", Color = Color3.fromRGB(35, 25, 20), Tint = Color3.fromRGB(200, 190, 180), Weight = 1,
+		Duration = 40, Interval = 6, Count = 3, Radius = 14, Warning = 2.5, Lifetime = 14, Damage = 12, Pull = 25 },
+	{ Name = "ToxicGas", Type = "Zone", Icon = "☁️", Title = "☁️ TOXIC GAS!", Intro = "Poison clouds are drifting in - hold your breath!", Hint = "Avoid the green clouds", Color = Color3.fromRGB(140, 220, 70), Tint = Color3.fromRGB(205, 235, 160), Weight = 1,
+		Duration = 45, Interval = 5, Count = 4, Radius = 18, Warning = 2, Lifetime = 16, Damage = 5, Slow = 0.6 },
+	{ Name = "Quicksand", Type = "Zone", Icon = "⏳", Title = "⏳ QUICKSAND!", Intro = "Sticky sand pits are forming - they slow you right down!", Hint = "Don't step in the sand pits", Color = Color3.fromRGB(215, 185, 110), Tint = Color3.fromRGB(235, 215, 170), Weight = 1,
+		Duration = 40, Interval = 5, Count = 4, Radius = 15, Warning = 2, Lifetime = 14, Damage = 2, Slow = 0.2, Pull = 8 },
+	{ Name = "Blizzard", Type = "Status", Icon = "❄️", Title = "❄️ BLIZZARD!", Intro = "Freezing winds - get inside or put on your shield!", Hint = "Cold hurts and slows you • shelter!", Color = Color3.fromRGB(190, 225, 255), Tint = Color3.fromRGB(215, 232, 255), Weight = 1,
+		Duration = 40, Damage = 2, Slow = 0.65 },
+	{ Name = "HeatWave", Type = "Status", Icon = "🥵", Title = "🥵 HEAT WAVE!", Intro = "Scorching heat - find shade!", Hint = "Heat hurts • shelter in the shade", Color = Color3.fromRGB(255, 160, 70), Tint = Color3.fromRGB(255, 185, 120), Weight = 1,
+		Duration = 40, Damage = 3, Slow = 0.8 },
+	{ Name = "Sandstorm", Type = "Status", Icon = "🏜️", Title = "🏜️ SANDSTORM!", Intro = "A howling sandstorm shoves everyone around!", Hint = "The wind pushes you • shelter!", Color = Color3.fromRGB(225, 185, 120), Tint = Color3.fromRGB(225, 190, 130), Weight = 1,
+		Duration = 40, Damage = 1, Push = 14 },
+	{ Name = "GravityStorm", Type = "Status", Icon = "🌀", Title = "🌀 GRAVITY STORM!", Intro = "Gravity is going wild!", Hint = "Gravity changes every few seconds", Color = Color3.fromRGB(180, 120, 255), Tint = Color3.fromRGB(220, 200, 255), Weight = 1,
+		Duration = 35, GravityEvery = 5, Gravities = { 55, 300, 80, 250 } },
+}
+for _, def in Config.ExtraDisasters do
+	Config.Disasters[def.Name] = def
+end
+
+---------------------------------------------------------------------------
 -- Secrets hidden around the map. Each one gives cash and permanently builds
 -- a secret relic in your tower (+5% income each, kept through rebirths).
 ---------------------------------------------------------------------------

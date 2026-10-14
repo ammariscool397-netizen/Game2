@@ -764,6 +764,25 @@ local function buildCommands()
 	disasterCommand("tornado", { "twister" }, "Tornado", "Summon a tornado")
 	disasterCommand("ufo", { "aliens", "invasion" }, "UFO", "Start a UFO invasion")
 	disasterCommand("earthquake", { "quake" }, "Earthquake", "Start an earthquake")
+	for _, def in Config.ExtraDisasters do
+		disasterCommand(def.Name:lower(), {}, def.Name, "Start a " .. def.Name .. " (" .. def.Type .. " disaster)")
+	end
+	register({
+		Name = "disaster",
+		Aliases = { "disasters" },
+		Rank = 2,
+		Args = "[name]",
+		Desc = "Start any disaster by name (no name = list them)",
+		Run = function(executor, args)
+			if not S.DisasterService then
+				return "Disasters unavailable"
+			end
+			if not args[1] then
+				return "Disasters: " .. S.DisasterService:ListKinds()
+			end
+			return S.DisasterService:Trigger(args[1], executor.DisplayName)
+		end,
+	})
 	register({
 		Name = "stopdisaster",
 		Aliases = { "stopevent", "calm" },

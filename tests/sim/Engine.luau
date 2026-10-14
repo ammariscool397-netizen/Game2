@@ -1472,6 +1472,31 @@ function Tween:Play()
 		return -- infinite tweens never complete
 	end
 	local total = (info.Time * (info.Reverses and 2 or 1)) * (info.RepeatCount + 1) + info.DelayTime
+	-- a part moving over several seconds (a tsunami wall...) is seen at every point on its way
+	if info.Time >= 1 and info.RepeatCount == 0 and not info.Reverses and self.Instance:IsA("BasePart") then
+		local starts = {}
+		for property in self.Goals do
+			starts[property] = self.Instance[property]
+		end
+		local steps = math.floor(info.Time / 0.1)
+		for i = 1, steps - 1 do
+			taskLib.delay(info.DelayTime + i * 0.1, function()
+				if self.Cancelled or destroyed[idOf(self.Instance)] then
+					return
+				end
+				local alpha = i / steps
+				for property, goal in self.Goals do
+					local from = starts[property]
+					local kind = nativeTypeof(from)
+					if kind == "number" then
+						self.Instance[property] = from + (goal - from) * alpha
+					elseif kind == "Vector3" or kind == "CFrame" then
+						self.Instance[property] = from:Lerp(goal, alpha)
+					end
+				end
+			end)
+		end
+	end
 	taskLib.delay(total, function()
 		if self.Cancelled then
 			return
