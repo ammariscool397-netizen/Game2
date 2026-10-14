@@ -39,6 +39,7 @@ local FUNCTIONS = {
 	"GetTycoonState", -- () -> state
 	"ClaimQuest", -- (quest type or slot) -> ok, message
 	"ClaimGift", -- () -> ok, message
+	"SpinWheel", -- () -> ok, segment index (0 if none), message
 }
 
 local folder: Folder

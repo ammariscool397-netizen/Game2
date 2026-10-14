@@ -2848,4 +2848,99 @@ add({
 	end,
 })
 
+---------------------------------------------------------------------------
+-- Lucky Wheel
+---------------------------------------------------------------------------
+add({
+	Name = "wheel",
+	Run = function(T, place)
+		local game, me = T.Boot(place, { Name = "Spinner", UserId = 6200 })
+		T.Wait(6)
+		local Config = T.Shared("Config")
+		local WC = Config.Wheel
+		local DataService = T.Service("DataService")
+		local WheelService = T.Service("WheelService")
+		local Wheel = T.Controller("Wheel")
+		local data = DataService:Get(me)
+
+		-- the prize odds follow the weights
+		local counts = {}
+		local rolls = 6000
+		for _ = 1, rolls do
+			local i = WheelService:_pick()
+			counts[i] = (counts[i] or 0) + 1
+		end
+		local total = 0
+		for _, segment in WC.Segments do
+			total += segment.Weight
+		end
+		for i, segment in WC.Segments do
+			local expected = segment.Weight / total
+			local seen = (counts[i] or 0) / rolls
+			T.Check(math.abs(seen - expected) < 0.04 + expected * 0.3, segment.Name .. " odds " .. string.format("%.3f vs %.3f", seen, expected))
+		end
+		T.Check((counts[#WC.Segments] or 0) > 0, "the jackpot can be won")
+
+		-- prizes: cash segments pay at least MinCash, boosts pay no cash
+		for _, segment in WC.Segments do
+			local cash, boost = WheelService:GetPrize(me, segment)
+			if segment.Minutes then
+				T.Check(cash >= segment.MinCash and boost == 0, segment.Name .. " pays cash")
+			else
+				T.Check(cash == 0 and boost == segment.BoostSeconds, segment.Name .. " pays a boost")
+			end
+		end
+
+		-- a new player can spin right away, from the panel
+		T.Check(Wheel:IsReady(), "first spin is ready")
+		T.Client(function()
+			T.Controller("UI"):Open("Wheel")
+		end)
+		T.Wait(1)
+		local spinButton = T.FindButton(me.PlayerGui, "SPIN!")
+		T.Check(spinButton ~= nil, "SPIN button is shown")
+		local cash, boostEnd = data.Cash, data.BoostEnd
+		T.Client(function()
+			T.Engine.Click(spinButton)
+		end)
+		T.Wait(1)
+		T.Check(data.Wheel.Spins == 1 and data.Wheel.Last > 0, "the spin is counted and saved")
+		T.Check(data.Cash > cash or data.BoostEnd > boostEnd, "the prize was paid")
+		T.Check(Wheel.Spinning, "the reel is spinning")
+		T.Wait(WC.SpinSeconds + 1)
+		T.Check(not Wheel.Spinning, "the reel stopped")
+		T.Check(not Wheel:IsReady() and T.FindButton(me.PlayerGui, "Next spin in") ~= nil, "button shows the countdown")
+
+		-- no second spin before the cooldown, even straight from the remote
+		local early = T.Client(function()
+			return { T.Remote("SpinWheel"):InvokeServer() }
+		end)
+		T.Check(early[1] == false and early[2] == 0 and tostring(early[3]):find("next free spin"), "can't spin early")
+		T.Check(data.Wheel.Spins == 1, "no extra spin counted")
+
+		-- it comes back after the cooldown
+		data.Wheel.Last -= WC.CooldownMinutes * 60 -- (the cooldown has passed)
+		WheelService:_sync(me)
+		T.Wait(1)
+		T.Check(Wheel:IsReady(), "ready again after the cooldown")
+		local again = T.Client(function()
+			return { T.Remote("SpinWheel"):InvokeServer() }
+		end)
+		T.Check(again[1] == true and WC.Segments[again[2]] ~= nil, "second spin works")
+		T.Check(data.Wheel.Spins == 2, "two spins counted")
+
+		-- the cooldown is saved: rejoining doesn't give a free spin
+		T.LeaveClient()
+		T.Wait(1)
+		me = T.StartClient("Spinner", { UserId = 6200 })
+		T.Wait(8)
+		data = DataService:Get(me)
+		T.Check(data.Wheel.Spins == 2, "spins saved")
+		local rejoin = T.Client(function()
+			return { T.Remote("SpinWheel"):InvokeServer() }
+		end)
+		T.Check(rejoin[1] == false, "rejoining doesn't skip the cooldown")
+	end,
+})
+
 return Scenarios

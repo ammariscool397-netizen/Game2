@@ -47,6 +47,7 @@ local TEMPLATE = {
 	LastOnline = 0,
 	LastIncome = 0,
 	Quests = { List = {}, Claimed = 0 },
+	Wheel = { Last = 0, Spins = 0 },
 	Settings = { MusicVolume = Config.Music.DefaultVolume, SFX = true, LowGraphics = false, Guide = true, AutoBuild = true },
 }
 

@@ -30,7 +30,7 @@ All settings live in `src/ReplicatedStorage/Shared/Config.luau`.
 | Pace / economy | `Config.Tycoon`, `Config.Rebirth` | `PaceStartSeconds`/`PaceEndSeconds` rescale every price at once |
 | Disasters | `Config.Disasters` | Frequency, weights, damage, wreck time |
 | Secrets | `Config.Secrets` | Names, hints, optional `BadgeId` |
-| Quests / gifts | `Config.Quests`, `Config.Gifts` | Quest types, targets and rewards; playtime gift times |
+| Quests / gifts / wheel | `Config.Quests`, `Config.Gifts`, `Config.Wheel` | Quest types, targets and rewards; playtime gift times |
 | Free bonuses | `Config.Bonuses` | Premium and friends-in-server income bonus |
 
 Also: **Game Settings → Security → Enable Studio Access to API Services**
@@ -82,6 +82,7 @@ rojo build -o MegaTycoon.rbxlx   # rebuild the place file
 - **Elevators** on every floor + **🛗 FLOORS** menu to jump between floors
 - Vault pads on every floor (or skip them with Auto Collect), **offline earnings**
 - Rebirths for a permanent multiplier, global leaderboard
+- **Lucky Wheel**: a free reel spin every 30 minutes (cash or 2x boosts, rare jackpot). Prizes and odds are in `Config.Wheel`
 - **10 rebirth ranks** (Reborn → Mythic): each rank gives a permanent perk (starting cash, walk speed, offline earnings, quest/gift bonuses, extra income) and a rank tag over your head. Edit them in `Config.Rebirth.Ranks`
 - **Safe saving**: session-locked DataStore saves (hopping servers can't lose or
   duplicate progress), corrupted values are repaired, nothing invalid is ever saved

@@ -917,6 +917,26 @@ Config.Gifts = {
 }
 
 ---------------------------------------------------------------------------
+-- Lucky Wheel: one free spin every CooldownMinutes (saved, so it counts while
+-- you're offline). A prize is picked by Weight. Cash prizes pay the bigger of
+-- Minutes of income or MinCash x (1 + rebirths); BoostSeconds gives a 2x boost.
+---------------------------------------------------------------------------
+Config.Wheel = {
+	Enabled = true,
+	CooldownMinutes = 30,
+	SpinSeconds = 4.5, -- how long the reel animation runs
+	Segments = {
+		{ Name = "Pocket Change", Icon = "💵", Minutes = 1, MinCash = 400, Weight = 28, Color = Color3.fromRGB(60, 170, 90) },
+		{ Name = "Cash Stack", Icon = "💰", Minutes = 5, MinCash = 2_000, Weight = 22, Color = Color3.fromRGB(40, 150, 200) },
+		{ Name = "Cash Bag", Icon = "👜", Minutes = 15, MinCash = 7_000, Weight = 12, Color = Color3.fromRGB(150, 90, 230) },
+		{ Name = "2x Boost 5m", Icon = "⚡", BoostSeconds = 5 * 60, Weight = 16, Color = Color3.fromRGB(240, 170, 20) },
+		{ Name = "2x Boost 15m", Icon = "🔥", BoostSeconds = 15 * 60, Weight = 8, Color = Color3.fromRGB(235, 100, 40) },
+		{ Name = "Mega Cash", Icon = "💎", Minutes = 60, MinCash = 40_000, Weight = 3, Color = Color3.fromRGB(60, 210, 230) },
+		{ Name = "JACKPOT", Icon = "🎰", Minutes = 180, MinCash = 150_000, Weight = 1, Color = Color3.fromRGB(255, 70, 110) },
+	},
+}
+
+---------------------------------------------------------------------------
 -- Codes (case-insensitive). Remove a code or set Expired = true to disable.
 ---------------------------------------------------------------------------
 Config.Codes = {
@@ -1030,6 +1050,7 @@ local FUNCTIONS = {
 	"GetTycoonState", -- () -> state
 	"ClaimQuest", -- (quest type or slot) -> ok, message
 	"ClaimGift", -- () -> ok, message
+	"SpinWheel", -- () -> ok, segment index (0 if none), message
 }
 
 local folder: Folder
@@ -2213,6 +2234,7 @@ local ORDER = {
 	"DuoService",
 	"QuestService",
 	"GiftService",
+	"WheelService",
 	"DisasterService",
 	"AdminService",
 	"MinigameService",
@@ -3642,6 +3664,7 @@ local TEMPLATE = {
 	LastOnline = 0,
 	LastIncome = 0,
 	Quests = { List = {}, Claimed = 0 },
+	Wheel = { Last = 0, Spins = 0 },
 	Settings = { MusicVolume = Config.Music.DefaultVolume, SFX = true, LowGraphics = false, Guide = true, AutoBuild = true },
 }
 
@@ -9478,6 +9501,123 @@ return TycoonService
       </Item>
       <Item class="ModuleScript" referent="29">
         <Properties>
+          <string name="Name">WheelService</string>
+          <string name="Source"><![CDATA[--[[
+	WheelService - the Lucky Wheel (see Config.Wheel): a free spin every
+	CooldownMinutes. The server picks the prize; the client only animates it.
+	The time of the last spin is saved, so the wait also counts while offline.
+]]
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local Remotes = require(Shared.Remotes)
+
+local WC = Config.Wheel
+
+local WheelService = {}
+local S
+
+-- picks a segment index by weight
+function WheelService:_pick(): number
+	local total = 0
+	for _, segment in WC.Segments do
+		total += segment.Weight
+	end
+	local roll = math.random() * total
+	for i, segment in WC.Segments do
+		roll -= segment.Weight
+		if roll < 0 then
+			return i
+		end
+	end
+	return #WC.Segments
+end
+
+-- (cash, boost seconds) a segment pays this player
+function WheelService:GetPrize(player: Player, segment): (number, number)
+	local wallet = S.DataService:GetWallet(player)
+	local rebirths = wallet and wallet.Rebirths or 0
+	local cash = 0
+	if segment.Minutes then
+		cash = math.floor(math.max((segment.MinCash or 0) * (1 + rebirths), S.TycoonService:GetIncome(player) * segment.Minutes * 60))
+	end
+	return cash, segment.BoostSeconds or 0
+end
+
+function WheelService:_sync(player: Player)
+	local data = S.DataService:Get(player)
+	if data then
+		player:SetAttribute("WheelReadyAt", data.Wheel.Last + WC.CooldownMinutes * 60)
+	end
+end
+
+function WheelService:Spin(player: Player): (boolean, number, string)
+	local data = S.DataService:Get(player)
+	if not data then
+		return false, 0, "Data still loading..."
+	end
+	local readyAt = data.Wheel.Last + WC.CooldownMinutes * 60
+	if os.time() < readyAt then
+		return false, 0, "Your next free spin is in " .. Util.FormatTime(readyAt - os.time())
+	end
+	local index = self:_pick()
+	local segment = WC.Segments[index]
+	local cash, boost = self:GetPrize(player, segment)
+	data.Wheel.Last = os.time()
+	data.Wheel.Spins += 1
+	self:_sync(player)
+	if cash > 0 then
+		S.DataService:AddCash(player, cash, false)
+	end
+	if boost > 0 then
+		S.DataService:AddBoost(player, boost)
+	end
+	local text = segment.Icon .. " " .. segment.Name .. ": "
+	if cash > 0 then
+		text ..= "+" .. Util.Money(cash)
+	else
+		text ..= "2x cash for " .. Util.FormatTime(boost)
+	end
+	-- the effects wait until the client's reel has stopped
+	task.delay(WC.SpinSeconds, function()
+		if player.Parent then
+			if cash > 0 then
+				Remotes.VFX:FireClient(player, "CashBurst", { Amount = cash })
+			end
+			Remotes.VFX:FireClient(player, "Confetti", {})
+		end
+		if segment.Weight <= 3 then
+			Remotes.Announce:FireAllClients({
+				Title = "🎰 " .. player.DisplayName .. " won " .. segment.Name .. "!",
+				Text = text,
+				Color = segment.Color,
+			})
+		end
+	end)
+	return true, index, text
+end
+
+function WheelService:Init(services)
+	S = services
+	Remotes.SpinWheel.OnServerInvoke = function(player)
+		if not WC.Enabled then
+			return false, 0, "The wheel is turned off."
+		end
+		return self:Spin(player)
+	end
+	S.DataService.PlayerLoaded:Connect(function(player)
+		self:_sync(player)
+	end)
+end
+
+return WheelService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="30">
+        <Properties>
           <string name="Name">WorldBuilder</string>
           <string name="Source"><![CDATA[--[[
 	WorldBuilder - builds the whole map from code (terrain + parts):
@@ -10256,22 +10396,22 @@ return WorldBuilder
       </Item>
     </Item>
   </Item>
-  <Item class="SoundService" referent="30">
+  <Item class="SoundService" referent="31">
     <Properties>
       <string name="Name">SoundService</string>
     </Properties>
   </Item>
-  <Item class="StarterPlayer" referent="31">
+  <Item class="StarterPlayer" referent="32">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <float name="CharacterJumpPower">50</float>
       <float name="CharacterWalkSpeed">16</float>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="32">
+    <Item class="StarterPlayerScripts" referent="33">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="33">
+      <Item class="LocalScript" referent="34">
         <Properties>
           <string name="Name">Client</string>
           <string name="Source"><![CDATA[--[[
@@ -10294,6 +10434,7 @@ local ORDER = {
 	"Disasters",
 	"Quests",
 	"Gifts",
+	"Wheel",
 	"Guide",
 	"DropVisuals",
 	"Admin",
@@ -10338,11 +10479,11 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="34">
+      <Item class="Folder" referent="35">
         <Properties>
           <string name="Name">Controllers</string>
         </Properties>
-        <Item class="ModuleScript" referent="35">
+        <Item class="ModuleScript" referent="36">
           <Properties>
             <string name="Name">Admin</string>
             <string name="Source"><![CDATA[--[[
@@ -10862,7 +11003,7 @@ return Admin
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="36">
+        <Item class="ModuleScript" referent="37">
           <Properties>
             <string name="Name">Animator</string>
             <string name="Source"><![CDATA[--[[
@@ -11069,7 +11210,7 @@ return Animator
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="37">
+        <Item class="ModuleScript" referent="38">
           <Properties>
             <string name="Name">Build</string>
             <string name="Source"><![CDATA[--[[
@@ -11523,7 +11664,7 @@ return Build
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="38">
+        <Item class="ModuleScript" referent="39">
           <Properties>
             <string name="Name">ChatTags</string>
             <string name="Source"><![CDATA[--[[ ChatTags - [Owner] / [Admin] / [VIP] / rebirth tags in the chat ]]
@@ -11583,7 +11724,7 @@ return ChatTags
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="39">
+        <Item class="ModuleScript" referent="40">
           <Properties>
             <string name="Name">Disasters</string>
             <string name="Source"><![CDATA[--[[
@@ -12480,7 +12621,7 @@ return Disasters
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="40">
+        <Item class="ModuleScript" referent="41">
           <Properties>
             <string name="Name">DropVisuals</string>
             <string name="Source"><![CDATA[--[[
@@ -12755,7 +12896,7 @@ return DropVisuals
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="41">
+        <Item class="ModuleScript" referent="42">
           <Properties>
             <string name="Name">Duo</string>
             <string name="Source"><![CDATA[--[[ Duo (client) - invite players to build one tower together + invite popups ]]
@@ -12954,7 +13095,7 @@ return Duo
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="42">
+        <Item class="ModuleScript" referent="43">
           <Properties>
             <string name="Name">Gifts</string>
             <string name="Source"><![CDATA[--[[ Gifts (client) - the playtime gift button (bottom right) ]]
@@ -13053,7 +13194,7 @@ return Gifts
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="43">
+        <Item class="ModuleScript" referent="44">
           <Properties>
             <string name="Name">Guide</string>
             <string name="Source"><![CDATA[--[[
@@ -13234,7 +13375,7 @@ return Guide
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="44">
+        <Item class="ModuleScript" referent="45">
           <Properties>
             <string name="Name">HUD</string>
             <string name="Source"><![CDATA[--[[ HUD - cash counter, income, multiplier/boost info, floor indicator,
@@ -13428,6 +13569,7 @@ function HUD:Init(controllers)
 		{ "Floors", "🛗", "FLOORS", Color3.fromRGB(0, 160, 220) },
 		{ "Secrets", "🕵️", "SECRETS", Color3.fromRGB(120, 200, 120) },
 		{ "Daily", "🎁", "DAILY", Color3.fromRGB(255, 90, 120) },
+		{ "Wheel", "🎰", "WHEEL", Color3.fromRGB(255, 120, 60) },
 		{ "Codes", "🎟️", "CODES", Color3.fromRGB(0, 200, 160) },
 		{ "Home", "🏠", "HOME", Color3.fromRGB(70, 200, 100) },
 		{ "Settings", "⚙️", "SETTINGS", Color3.fromRGB(130, 140, 160) },
@@ -13562,7 +13704,7 @@ return HUD
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="45">
+        <Item class="ModuleScript" referent="46">
           <Properties>
             <string name="Name">Minigame</string>
             <string name="Source"><![CDATA[--[[ Minigame (client) - join popup, countdown, in-game HUD and results ]]
@@ -13797,7 +13939,7 @@ return Minigame
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="46">
+        <Item class="ModuleScript" referent="47">
           <Properties>
             <string name="Name">Music</string>
             <string name="Source"><![CDATA[--[[
@@ -14017,7 +14159,7 @@ return Music
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">Notifications</string>
             <string name="Source"><![CDATA[--[[ Notifications - toast messages (top right) + big announcement banners ]]
@@ -14207,7 +14349,7 @@ return Notifications
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="49">
           <Properties>
             <string name="Name">Panels</string>
             <string name="Source"><![CDATA[--[[ Panels - Rebirth, Daily Rewards, Codes and Settings menus ]]
@@ -14629,7 +14771,7 @@ return Panels
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">Quests</string>
             <string name="Source"><![CDATA[--[[ Quests (client) - the quest tracker in the bottom-right corner ]]
@@ -14805,7 +14947,7 @@ return Quests
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">Shop</string>
             <string name="Source"><![CDATA[--[[ Shop - Robux panel with Game Passes and Developer Products ]]
@@ -14972,7 +15114,7 @@ return Shop
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">UI</string>
             <string name="Source"><![CDATA[--[[ UI - owns the main ScreenGui and the "one panel at a time" manager ]]
@@ -15111,7 +15253,7 @@ return UI
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">VFX</string>
             <string name="Source"><![CDATA[--[[
@@ -15654,16 +15796,196 @@ return VFX
 ]]></string>
           </Properties>
         </Item>
+        <Item class="ModuleScript" referent="54">
+          <Properties>
+            <string name="Name">Wheel</string>
+            <string name="Source"><![CDATA[--[[
+	Wheel (client) - the Lucky Wheel panel. A reel of prize cards scrolls past
+	a pointer and slows down on the prize the server picked.
+]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local UIKit = require(Shared.UIKit)
+local Remotes = require(Shared.Remotes)
+
+local player = Players.LocalPlayer
+local Theme = UIKit.Theme
+local WC = Config.Wheel
+
+local Wheel = {}
+Wheel.Spinning = false
+local C
+
+local CARD_W = 120
+local CARDS = 40
+local WIN_AT = 34 -- the card that stops under the pointer
+
+local reel: Frame
+local strip: Frame
+local spinButton: TextButton
+local infoLabel: TextLabel
+
+-- a random segment, weighted like the server's pick (for the filler cards)
+local function randomSegment()
+	local total = 0
+	for _, segment in WC.Segments do
+		total += segment.Weight
+	end
+	local roll = math.random() * total
+	for _, segment in WC.Segments do
+		roll -= segment.Weight
+		if roll < 0 then
+			return segment
+		end
+	end
+	return WC.Segments[1]
+end
+
+local function buildStrip(winIndex: number)
+	strip:ClearAllChildren()
+	for i = 1, CARDS do
+		local segment = i == WIN_AT and WC.Segments[winIndex] or randomSegment()
+		local card = UIKit.new("Frame", {
+			Name = "Card" .. i,
+			Size = UDim2.new(0, CARD_W - 8, 1, -16),
+			Position = UDim2.fromOffset((i - 1) * CARD_W + 4, 8),
+			BackgroundColor3 = segment.Color,
+			Parent = strip,
+		})
+		UIKit.Corner(card, 10)
+		UIKit.Stroke(card, Color3.new(0, 0, 0), 2, 0.3)
+		UIKit.Label({ Text = segment.Icon, Size = UDim2.new(1, 0, 0, 44), Position = UDim2.fromOffset(0, 8), Parent = card })
+		UIKit.Label({ Text = segment.Name, Size = UDim2.new(1, -8, 0, 22), Position = UDim2.fromOffset(4, 62), Font = Theme.BodyFont, Parent = card })
+	end
+	strip.Position = UDim2.fromOffset(0, 0)
+end
+
+function Wheel:IsReady(): boolean
+	return Util.ServerNow() >= (player:GetAttribute("WheelReadyAt") or math.huge)
+end
+
+local function refresh()
+	local readyAt = player:GetAttribute("WheelReadyAt")
+	if not readyAt then
+		spinButton.Text = "..."
+		return
+	end
+	local left = readyAt - Util.ServerNow()
+	if Wheel.Spinning then
+		spinButton.Text = "SPINNING..."
+		spinButton.BackgroundColor3 = Theme.PanelLight
+	elseif left <= 0 then
+		spinButton.Text = "🎰 SPIN!"
+		spinButton.BackgroundColor3 = Theme.Green
+		infoLabel.Text = "Your free spin is ready!"
+	else
+		spinButton.Text = "Next spin in " .. Util.Clock(left)
+		spinButton.BackgroundColor3 = Theme.PanelLight
+		infoLabel.Text = "A free spin every " .. WC.CooldownMinutes .. " minutes - it keeps counting while you're away."
+	end
+	if C.HUD and C.HUD.SetBadge then
+		C.HUD:SetBadge("Wheel", left <= 0 and not Wheel.Spinning)
+	end
+end
+
+local function spin()
+	if Wheel.Spinning then
+		return
+	end
+	if not Wheel:IsReady() then
+		C.Notifications:Toast("Your next free spin isn't ready yet!", "error")
+		return
+	end
+	Wheel.Spinning = true
+	refresh()
+	local ok, index, message = Remotes.SpinWheel:InvokeServer()
+	if not ok or not WC.Segments[index] then
+		Wheel.Spinning = false
+		C.Notifications:Toast(tostring(message), "error")
+		refresh()
+		return
+	end
+	buildStrip(index)
+	-- stop somewhere inside the winning card
+	local stopAt = reel.AbsoluteSize.X / 2 - ((WIN_AT - 1) * CARD_W + CARD_W / 2) + math.random(-30, 30)
+	UIKit.PlaySound("Notify", 0.5, 0.8)
+	TweenService:Create(strip, TweenInfo.new(WC.SpinSeconds, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { Position = UDim2.fromOffset(stopAt, 0) }):Play()
+	task.delay(WC.SpinSeconds, function()
+		Wheel.Spinning = false
+		UIKit.PlaySound("Notify", 0.7, 1.4)
+		C.Notifications:Toast(tostring(message), "success")
+		refresh()
+	end)
+end
+
+function Wheel:Init(controllers)
+	C = controllers
+	local _, content = C.UI:MakePanel("Wheel", "🎰 LUCKY WHEEL", Color3.fromRGB(255, 120, 60), 600, 400)
+	UIKit.List(content, 14)
+	infoLabel = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 34), Font = Theme.BodyFont, TextColor3 = Theme.SubText, LayoutOrder = 1, ZIndex = 7, Parent = content })
+	reel = UIKit.new("Frame", { Name = "Reel", Size = UDim2.new(1, -10, 0, 120), BackgroundColor3 = Theme.Background, ClipsDescendants = true, LayoutOrder = 2, ZIndex = 7, Parent = content })
+	UIKit.Corner(reel, 12)
+	UIKit.Stroke(reel, Color3.new(0, 0, 0), 3)
+	strip = UIKit.new("Frame", { Name = "Strip", Size = UDim2.fromOffset(CARD_W * CARDS, 120), BackgroundTransparency = 1, ZIndex = 8, Parent = reel })
+	UIKit.new("Frame", { Name = "Pointer", Size = UDim2.new(0, 4, 1, 0), Position = UDim2.fromScale(0.5, 0), AnchorPoint = Vector2.new(0.5, 0), BackgroundColor3 = Theme.Accent, ZIndex = 12, Parent = reel })
+	buildStrip(1)
+	spinButton = UIKit.Button({
+		Name = "SpinButton",
+		Text = "...",
+		Color = Theme.Green,
+		Size = UDim2.fromOffset(300, 56),
+		LayoutOrder = 3,
+		ZIndex = 7,
+		Parent = content,
+		Callback = spin,
+	})
+	-- the prizes
+	local prizes = {}
+	for _, segment in WC.Segments do
+		table.insert(prizes, segment.Icon .. " " .. segment.Name)
+	end
+	UIKit.new("TextLabel", {
+		Text = "Prizes: " .. table.concat(prizes, "  ·  "),
+		Size = UDim2.new(1, -20, 0, 44),
+		BackgroundTransparency = 1,
+		TextWrapped = true,
+		TextSize = 14,
+		Font = Theme.BodyFont,
+		TextColor3 = Theme.SubText,
+		LayoutOrder = 4,
+		ZIndex = 7,
+		Parent = content,
+	})
+	player:GetAttributeChangedSignal("WheelReadyAt"):Connect(refresh)
+	refresh()
+end
+
+function Wheel:Start()
+	while true do
+		task.wait(1)
+		Util.Try("Wheel", refresh)
+	end
+end
+
+return Wheel
+]]></string>
+          </Properties>
+        </Item>
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="53">
+  <Item class="TextChatService" referent="55">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="54">
+  <Item class="Workspace" referent="56">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="Gravity">196.2</float>

@@ -17,6 +17,7 @@ local ORDER = {
 	"DuoService",
 	"QuestService",
 	"GiftService",
+	"WheelService",
 	"DisasterService",
 	"AdminService",
 	"MinigameService",

@@ -503,6 +503,26 @@ Config.Gifts = {
 }
 
 ---------------------------------------------------------------------------
+-- Lucky Wheel: one free spin every CooldownMinutes (saved, so it counts while
+-- you're offline). A prize is picked by Weight. Cash prizes pay the bigger of
+-- Minutes of income or MinCash x (1 + rebirths); BoostSeconds gives a 2x boost.
+---------------------------------------------------------------------------
+Config.Wheel = {
+	Enabled = true,
+	CooldownMinutes = 30,
+	SpinSeconds = 4.5, -- how long the reel animation runs
+	Segments = {
+		{ Name = "Pocket Change", Icon = "💵", Minutes = 1, MinCash = 400, Weight = 28, Color = Color3.fromRGB(60, 170, 90) },
+		{ Name = "Cash Stack", Icon = "💰", Minutes = 5, MinCash = 2_000, Weight = 22, Color = Color3.fromRGB(40, 150, 200) },
+		{ Name = "Cash Bag", Icon = "👜", Minutes = 15, MinCash = 7_000, Weight = 12, Color = Color3.fromRGB(150, 90, 230) },
+		{ Name = "2x Boost 5m", Icon = "⚡", BoostSeconds = 5 * 60, Weight = 16, Color = Color3.fromRGB(240, 170, 20) },
+		{ Name = "2x Boost 15m", Icon = "🔥", BoostSeconds = 15 * 60, Weight = 8, Color = Color3.fromRGB(235, 100, 40) },
+		{ Name = "Mega Cash", Icon = "💎", Minutes = 60, MinCash = 40_000, Weight = 3, Color = Color3.fromRGB(60, 210, 230) },
+		{ Name = "JACKPOT", Icon = "🎰", Minutes = 180, MinCash = 150_000, Weight = 1, Color = Color3.fromRGB(255, 70, 110) },
+	},
+}
+
+---------------------------------------------------------------------------
 -- Codes (case-insensitive). Remove a code or set Expired = true to disable.
 ---------------------------------------------------------------------------
 Config.Codes = {

@@ -18,6 +18,7 @@ local ORDER = {
 	"Disasters",
 	"Quests",
 	"Gifts",
+	"Wheel",
 	"Guide",
 	"DropVisuals",
 	"Admin",
