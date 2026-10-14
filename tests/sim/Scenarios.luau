@@ -3427,4 +3427,142 @@ add({
 	end,
 })
 
+---------------------------------------------------------------------------
+-- Islands and treasure chests
+---------------------------------------------------------------------------
+add({
+	Name = "islands",
+	MaxSeconds = 900,
+	Run = function(T, place)
+		local game, me = T.Boot(place, { Name = "Sailor", UserId = 6600 })
+		T.Wait(6)
+		local Config = T.Shared("Config")
+		local IC = Config.Islands
+		local DataService = T.Service("DataService")
+		local IslandService = T.Service("IslandService")
+		local WorldBuilder = T.Service("WorldBuilder")
+		local data = DataService:Get(me)
+		local ws = game:GetService("Workspace")
+		local function travel(destination)
+			T.Wait(IC.TravelDelay + 0.5)
+			return T.Client(function()
+				return { T.Remote("Travel"):InvokeServer(destination) }
+			end)
+		end
+		local function near(position, radius)
+			return (T.Root(me).Position - position).Magnitude <= radius
+		end
+
+		-- the world has the islands, outside the world's edge, each with its chests
+		T.Check(#IC.List == 3, "3 islands")
+		local chestCount = 0
+		for _, island in IC.List do
+			local info = WorldBuilder.Islands[island.Id]
+			T.Check(info ~= nil and math.max(math.abs(island.Position.X), math.abs(island.Position.Z)) > 1100, island.Name .. " is built beyond the edge")
+			T.Check(ws.World:FindFirstChild("Island_" .. island.Id) ~= nil, island.Name .. " is in the world")
+			for _, entry in WorldBuilder.Chests do
+				if entry.Island == island.Id then
+					chestCount += 1
+				end
+			end
+		end
+		T.Check(chestCount == 12, "12 treasure chests (" .. chestCount .. ")")
+		T.Check(#WorldBuilder.ReturnPads == 3, "a return pad on each island")
+
+		-- rebirth requirements
+		local locked = travel("Volcano")
+		T.Check(locked[1] == false and tostring(locked[2]):find("unlocks at 1"), "Volcano Isle needs a rebirth")
+		T.Check(travel("Nowhere")[1] == false, "unknown places are rejected")
+		T.Check(travel({})[1] == false, "bad destinations are rejected")
+
+		-- go from the panel
+		T.Client(function()
+			T.Controller("UI"):Open("Travel")
+		end)
+		T.Wait(1)
+		local goTreasure = T.FindButton(me.PlayerGui, "GO")
+		T.Check(goTreasure ~= nil, "GO buttons in the Travel panel")
+		local treasure = WorldBuilder.Islands.Treasure
+		T.Wait(IC.TravelDelay + 0.5)
+		local button = me.PlayerGui:FindFirstChild("DestTreasure", true):FindFirstChild("GoTreasure")
+		T.Client(function()
+			T.Engine.Click(button)
+		end)
+		T.Wait(1)
+		T.Check(near(treasure.Spawn, 12), "travelled to Treasure Isle")
+		local tooFast = T.Client(function()
+			return { T.Remote("Travel"):InvokeServer("Plaza") }
+		end)
+		T.Check(tooFast[1] == false and tostring(tooFast[2]):find("Slow down"), "trips are rate limited")
+
+		-- the chests
+		local entry
+		for _, e in WorldBuilder.Chests do
+			if e.Island == "Treasure" then
+				entry = e
+				break
+			end
+		end
+		T.Check(me:GetAttribute("ChestsReady_Treasure") == 4, "4 chests ready on Treasure Isle")
+		local cash = data.Cash
+		T.Engine.Touch(entry.Part, me)
+		T.Wait(1)
+		T.Check(data.Cash >= cash + 3000 and data.Chests[entry.Id] ~= nil, "opening a chest pays and is saved")
+		cash = data.Cash
+		T.Engine.Touch(entry.Part, me)
+		T.Wait(1)
+		T.Check(data.Cash == cash, "the chest is closed for the cooldown")
+		T.Wait(5.5)
+		T.Check(me:GetAttribute("ChestsReady_Treasure") == 3 and me:GetAttribute("ChestNext_Treasure") > 0, "ready count goes down")
+		-- a touch from far away doesn't count (the anti-exploit distance check)
+		local other
+		for _, e in WorldBuilder.Chests do
+			if e.Island == "Treasure" and e ~= entry then
+				other = e
+				break
+			end
+		end
+		cash = data.Cash
+		T.Engine.RemoteTouch(other.Part, me)
+		T.Wait(1)
+		T.Check(data.Cash == cash and data.Chests[other.Id] == nil, "a chest can't be opened from far away")
+
+		-- rejoining doesn't reopen it
+		T.LeaveClient()
+		T.Wait(1)
+		me = T.StartClient("Sailor", { UserId = 6600 })
+		T.Wait(8)
+		data = DataService:Get(me)
+		T.Check(data.Chests[entry.Id] ~= nil, "chest times are saved")
+		T.Wait(5.5)
+		T.Check(me:GetAttribute("ChestsReady_Treasure") == 3, "still 3 ready after rejoining")
+		local before = data.Cash
+		T.Engine.Touch(entry.Part, me)
+		T.Wait(1)
+		T.Check(data.Cash == before, "rejoining doesn't reopen the chest")
+		-- after the cooldown it opens again
+		data.Chests[entry.Id] -= IC.Cooldown
+		T.Engine.Touch(entry.Part, me)
+		T.Wait(1)
+		T.Check(data.Cash > before, "it opens again after the cooldown")
+
+		-- back by the pad, and Volcano Isle after a rebirth
+		local pad
+		for _, p in WorldBuilder.ReturnPads do
+			if p.Island == "Treasure" then
+				pad = p
+			end
+		end
+		T.Wait(IC.TravelDelay + 0.5)
+		T.Engine.Touch(pad.Part, me)
+		T.Wait(1)
+		T.Check(near(IC.Plaza, 12), "the pad brings you back to the plaza")
+		data.Rebirths = 1
+		DataService:Sync(me)
+		local ok = travel("Volcano")
+		T.Check(ok[1] == true and near(WorldBuilder.Islands.Volcano.Spawn, 12), "Volcano Isle opens at 1 rebirth")
+		T.Check(travel("Frost")[1] == false, "Frost Isle still needs 3")
+	end,
+})
+
 return Scenarios

@@ -42,6 +42,7 @@ local FUNCTIONS = {
 	"ClaimGift", -- () -> ok, message
 	"SpinWheel", -- () -> ok, segment index (0 if none), message
 	"ActivateShield", -- () -> ok, message
+	"Travel", -- (island id or "Plaza") -> ok, message
 	"PetAction", -- (action, arg) -> ok, message   (Hatch eggId | Equip uid | Unequip uid | Sell uid | EquipBest | Refresh)
 }
 

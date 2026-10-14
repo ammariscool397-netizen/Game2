@@ -21,6 +21,7 @@ local ORDER = {
 	"Wheel",
 	"Shield",
 	"Pets",
+	"Travel",
 	"Guide",
 	"DropVisuals",
 	"Admin",

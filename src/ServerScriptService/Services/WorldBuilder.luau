@@ -32,6 +32,9 @@ WorldBuilder.LeaderboardBody = nil :: Frame?
 WorldBuilder.SecretSpots = {} :: { [string]: Vector3 }
 WorldBuilder.LaunchPads = {}
 WorldBuilder.Shelter = nil -- public bunker { CFrame, Size, Door }
+WorldBuilder.Islands = {} :: { [string]: { Center: Vector3, Spawn: Vector3 } } -- the far islands (Config.Islands)
+WorldBuilder.Chests = {} :: { { Id: string, Island: string, Part: BasePart } } -- their treasure chests
+WorldBuilder.ReturnPads = {} :: { { Island: string, Part: BasePart } } -- pads that bring you back
 
 local PLAZA_RADIUS = 70
 local MAP_HALF = 1000
@@ -686,6 +689,95 @@ local function buildEdge(world: Folder)
 	WorldBuilder.SecretSpots.Edge = EDGE + Vector3.new(14, 2, 14)
 end
 
+---------------------------------------------------------------------------
+-- Far islands (Config.Islands): a round island, scenery in the island's
+-- style, treasure chests, a spawn dock and a pad back to the plaza
+---------------------------------------------------------------------------
+local function chest(parent: Instance, island, index: number, position: Vector3)
+	local gold = Color3.fromRGB(255, 205, 60)
+	local model = BuildKit.Model("Chest" .. index, parent)
+	local body = Part({ Name = "Body", Size = Vector3.new(4.4, 2.6, 3), Position = position + Vector3.new(0, 1.3, 0), Color = Color3.fromRGB(120, 78, 40), Material = Enum.Material.Wood, Parent = model })
+	Part({ Name = "Lid", Size = Vector3.new(4.6, 1.2, 3.2), Position = position + Vector3.new(0, 3.2, 0), Color = gold, Material = Enum.Material.Neon, CanCollide = false, Parent = model })
+	BuildKit.Light(body, gold, 16, 2)
+	BuildKit.Billboard(body, "💰 TREASURE CHEST", { Offset = Vector3.new(0, 4.5, 0), MaxDistance = 90, Color = gold, Size = UDim2.fromOffset(190, 36) })
+	table.insert(WorldBuilder.Chests, { Id = island.Id .. "_" .. index, Island = island.Id, Part = body })
+end
+
+local function buildIsland(world: Folder, island, rng: Random)
+	local model = BuildKit.Model("Island_" .. island.Id, world)
+	local c = island.Position
+	local r = island.Radius
+	local function at(angle: number, distance: number, y: number?): Vector3
+		return c + Vector3.new(math.cos(angle) * distance, y or 0, math.sin(angle) * distance)
+	end
+	-- the ground: a thick disc whose top is at y = 0
+	Part({ Name = "Ground", Shape = Enum.PartType.Cylinder, Size = Vector3.new(8, r * 2, r * 2), CFrame = CFrame.new(c + Vector3.new(0, -4, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color = island.Color, Material = island.Material, Parent = model })
+	Part({ Name = "Cliff", Shape = Enum.PartType.Cylinder, Size = Vector3.new(30, r * 1.7, r * 1.7), CFrame = CFrame.new(c + Vector3.new(0, -23, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(90, 85, 80), Material = Enum.Material.Rock, CanCollide = false, Parent = model })
+
+	-- scenery
+	if island.Id == "Treasure" then
+		for i = 1, 14 do
+			tree(model, at(rng:NextNumber(0, math.pi * 2), rng:NextNumber(30, r - 14)), rng:NextNumber(0.9, 1.5), rng)
+		end
+		Part({ Name = "ShipHull", Size = Vector3.new(34, 9, 12), CFrame = CFrame.new(at(2.2, 62, 3.5)) * CFrame.Angles(0.12, 0.6, 0.2), Color = Color3.fromRGB(95, 62, 35), Material = Enum.Material.WoodPlanks, Parent = model })
+		Part({ Name = "ShipMast", Size = Vector3.new(1.4, 26, 1.4), CFrame = CFrame.new(at(2.2, 62, 16)) * CFrame.Angles(0.1, 0, 0.18), Color = Color3.fromRGB(80, 55, 32), Material = Enum.Material.Wood, Parent = model })
+		for _ = 1, 8 do
+			Part({ Name = "Dune", Shape = Enum.PartType.Ball, Size = Vector3.new(rng:NextNumber(14, 26), 7, rng:NextNumber(14, 26)), Position = at(rng:NextNumber(0, math.pi * 2), rng:NextNumber(20, r - 20), -1.5), Color = island.Color, Material = Enum.Material.Sand, CanCollide = false, Parent = model })
+		end
+	elseif island.Id == "Volcano" then
+		-- the volcano: stacked cones of rock with glowing lava on top
+		Part({ Name = "Cone1", Shape = Enum.PartType.Cylinder, Size = Vector3.new(26, 70, 70), CFrame = CFrame.new(c + Vector3.new(0, 13, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(60, 45, 45), Material = Enum.Material.Basalt, Parent = model })
+		Part({ Name = "Cone2", Shape = Enum.PartType.Cylinder, Size = Vector3.new(22, 44, 44), CFrame = CFrame.new(c + Vector3.new(0, 35, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(55, 40, 40), Material = Enum.Material.Basalt, Parent = model })
+		local lava = Part({ Name = "Crater", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2, 26, 26), CFrame = CFrame.new(c + Vector3.new(0, 47, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(255, 110, 20), Material = Enum.Material.Neon, CanCollide = false, Tags = { "Pulse" }, Parent = model })
+		BuildKit.Light(lava, Color3.fromRGB(255, 120, 30), 60, 3)
+		for i = 1, 6 do
+			local angle = i / 6 * math.pi * 2 + 0.4
+			Part({ Name = "LavaStream", Size = Vector3.new(5, 0.4, 34), CFrame = CFrame.new(at(angle, 48, 0.2)) * CFrame.Angles(0, -angle + math.pi / 2, 0), Color = Color3.fromRGB(255, 100, 20), Material = Enum.Material.Neon, CanCollide = false, Parent = model })
+		end
+		for _ = 1, 12 do
+			local size = rng:NextNumber(5, 12)
+			Part({ Name = "Rock", Shape = Enum.PartType.Ball, Size = Vector3.one * size, Position = at(rng:NextNumber(0, math.pi * 2), rng:NextNumber(60, r - 8), size / 3), Color = Color3.fromRGB(70, 60, 60), Material = Enum.Material.Rock, Parent = model })
+		end
+	else
+		for _ = 1, 14 do
+			local height = rng:NextNumber(8, 22)
+			Part({ Name = "IceSpike", Size = Vector3.new(rng:NextNumber(3, 6), height, rng:NextNumber(3, 6)), CFrame = CFrame.new(at(rng:NextNumber(0, math.pi * 2), rng:NextNumber(35, r - 10), height / 2)) * CFrame.Angles(rng:NextNumber(-0.2, 0.2), rng:NextNumber(0, 3), rng:NextNumber(-0.2, 0.2)), Color = Color3.fromRGB(170, 220, 255), Material = Enum.Material.Ice, Transparency = 0.25, Parent = model })
+		end
+		for i = 1, 3 do
+			local angle = i / 3 * math.pi * 2 + 1
+			local igloo = at(angle, 62, 0)
+			Part({ Name = "Igloo", Shape = Enum.PartType.Ball, Size = Vector3.one * 22, Position = igloo, Color = Color3.fromRGB(240, 248, 255), Material = Enum.Material.Snow, Parent = model })
+			Part({ Name = "IglooDoor", Size = Vector3.new(6, 7, 8), CFrame = CFrame.new(igloo + Vector3.new(math.cos(angle + math.pi) * 10, 3.5, math.sin(angle + math.pi) * 10)) * CFrame.Angles(0, -angle, 0), Color = Color3.fromRGB(230, 240, 250), Material = Enum.Material.Snow, Parent = model })
+		end
+		Part({ Name = "FrozenPond", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.6, 40, 40), CFrame = CFrame.new(at(0.5, 20, 0.3)) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(150, 205, 255), Material = Enum.Material.Ice, Parent = model })
+	end
+
+	-- the treasure chests, spread around
+	for i = 1, island.Chests do
+		local angle = (i / island.Chests) * math.pi * 2 + 0.7
+		chest(model, island, i, at(angle, r * 0.72, 0))
+	end
+
+	-- the dock where you arrive, with a sign and the pad back
+	local spawnPosition = at(-math.pi / 2, 16, 0)
+	Part({ Name = "Dock", Size = Vector3.new(22, 1, 22), Position = spawnPosition + Vector3.new(0, 0.5, 0), Color = Color3.fromRGB(110, 85, 55), Material = Enum.Material.WoodPlanks, Parent = model })
+	local sign = Part({ Name = "WelcomeSign", Size = Vector3.new(0.6, 8, 16), CFrame = CFrame.new(spawnPosition + Vector3.new(0, 5, 11)) * CFrame.Angles(0, math.rad(90), 0), Color = Color3.fromRGB(90, 70, 50), Material = Enum.Material.WoodPlanks, Parent = model })
+	BuildKit.SurfaceText(sign, Enum.NormalId.Front, island.Icon .. " " .. island.Name .. "\n" .. island.Text, { PixelsPerStud = 16 })
+	local back = Part({ Name = "ReturnPad", Size = Vector3.new(7, 0.6, 7), Position = spawnPosition + Vector3.new(7, 1.3, 4), Color = Color3.fromRGB(70, 200, 100), Material = Enum.Material.Neon, Tags = { "Pulse" }, Parent = model })
+	BuildKit.Billboard(back, "🏠 Back to the main island", { Offset = Vector3.new(0, 4, 0), MaxDistance = 70, Size = UDim2.fromOffset(220, 34) })
+	table.insert(WorldBuilder.ReturnPads, { Island = island.Id, Part = back })
+	WorldBuilder.Islands[island.Id] = { Center = c, Spawn = spawnPosition + Vector3.new(-3, 4, 0) }
+end
+
+local function buildIslands(world: Folder)
+	if not Config.Islands.Enabled then
+		return
+	end
+	for index, island in Config.Islands.List do
+		buildIsland(world, island, Random.new(9000 + index))
+	end
+end
+
 local function scatterTrees(world: Folder, rng: Random)
 	local model = BuildKit.Model("Trees", world)
 	local placed, tries = 0, 0
@@ -736,6 +828,7 @@ function WorldBuilder:Init()
 	buildForest(world, rng)
 	buildGraveyard(world, rng)
 	buildEdge(world)
+	buildIslands(world)
 	scatterTrees(world, rng)
 
 	for _, pad in WorldBuilder.LaunchPads do

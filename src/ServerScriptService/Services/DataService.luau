@@ -51,6 +51,7 @@ local TEMPLATE = {
 	Gifts = { Day = 0, Index = 1, Played = 0 }, -- playtime gifts (see GiftService)
 	Shield = { Start = 0 }, -- when the personal shield was last activated
 	Pets = { Owned = {}, Equipped = {}, NextUid = 1, Hatched = 0 }, -- see PetService
+	Chests = {}, -- island chest id -> when you last opened it (see IslandService)
 	Settings = { MusicVolume = Config.Music.DefaultVolume, SFX = true, LowGraphics = false, Guide = true, AutoBuild = true },
 }
 

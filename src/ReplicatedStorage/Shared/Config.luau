@@ -536,6 +536,25 @@ Config.Gifts = {
 }
 
 ---------------------------------------------------------------------------
+-- Islands beyond the world's edge, reached from the Travel panel (and a pad
+-- on each island brings you back). Each has treasure chests: opening one pays
+-- the bigger of IncomeSeconds of income or MinCash x (1 + rebirths), then that
+-- chest is closed for Cooldown seconds FOR YOU (saved, so rejoining doesn't
+-- reopen it). Rebirths = rebirths needed to travel there.
+---------------------------------------------------------------------------
+Config.Islands = {
+	Enabled = true,
+	TravelDelay = 5, -- seconds between trips (anti-spam)
+	Cooldown = 30 * 60, -- a chest stays closed this long after you open it
+	Plaza = Vector3.new(0, 4, 24), -- the main island's spawn plaza
+	List = {
+		{ Id = "Treasure", Name = "Treasure Isle", Icon = "🏝️", Position = Vector3.new(-1500, 0, 500), Radius = 110, Rebirths = 0, Chests = 4, IncomeSeconds = 120, MinCash = 3_000, Color = Color3.fromRGB(235, 210, 140), Material = Enum.Material.Sand, Text = "Pirates buried their gold here!" },
+		{ Id = "Volcano", Name = "Volcano Isle", Icon = "🌋", Position = Vector3.new(1500, 0, -600), Radius = 110, Rebirths = 1, Chests = 4, IncomeSeconds = 300, MinCash = 12_000, Color = Color3.fromRGB(70, 55, 55), Material = Enum.Material.Slate, Text = "Hot loot - mind the lava!" },
+		{ Id = "Frost", Name = "Frost Isle", Icon = "❄️", Position = Vector3.new(-300, 0, -1550), Radius = 110, Rebirths = 3, Chests = 4, IncomeSeconds = 600, MinCash = 40_000, Color = Color3.fromRGB(225, 240, 255), Material = Enum.Material.Snow, Text = "Frozen chests full of cash." },
+	},
+}
+
+---------------------------------------------------------------------------
 -- Pets: hatch eggs with cash, equip pets (they follow you) for a permanent
 -- income bonus. Each equipped pet adds its rarity's Bonus (+x) to your
 -- income multiplier. Slots = MaxEquipped + 1 for every SlotRebirths reached.

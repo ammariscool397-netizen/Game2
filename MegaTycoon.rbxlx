@@ -950,6 +950,25 @@ Config.Gifts = {
 }
 
 ---------------------------------------------------------------------------
+-- Islands beyond the world's edge, reached from the Travel panel (and a pad
+-- on each island brings you back). Each has treasure chests: opening one pays
+-- the bigger of IncomeSeconds of income or MinCash x (1 + rebirths), then that
+-- chest is closed for Cooldown seconds FOR YOU (saved, so rejoining doesn't
+-- reopen it). Rebirths = rebirths needed to travel there.
+---------------------------------------------------------------------------
+Config.Islands = {
+	Enabled = true,
+	TravelDelay = 5, -- seconds between trips (anti-spam)
+	Cooldown = 30 * 60, -- a chest stays closed this long after you open it
+	Plaza = Vector3.new(0, 4, 24), -- the main island's spawn plaza
+	List = {
+		{ Id = "Treasure", Name = "Treasure Isle", Icon = "🏝️", Position = Vector3.new(-1500, 0, 500), Radius = 110, Rebirths = 0, Chests = 4, IncomeSeconds = 120, MinCash = 3_000, Color = Color3.fromRGB(235, 210, 140), Material = Enum.Material.Sand, Text = "Pirates buried their gold here!" },
+		{ Id = "Volcano", Name = "Volcano Isle", Icon = "🌋", Position = Vector3.new(1500, 0, -600), Radius = 110, Rebirths = 1, Chests = 4, IncomeSeconds = 300, MinCash = 12_000, Color = Color3.fromRGB(70, 55, 55), Material = Enum.Material.Slate, Text = "Hot loot - mind the lava!" },
+		{ Id = "Frost", Name = "Frost Isle", Icon = "❄️", Position = Vector3.new(-300, 0, -1550), Radius = 110, Rebirths = 3, Chests = 4, IncomeSeconds = 600, MinCash = 40_000, Color = Color3.fromRGB(225, 240, 255), Material = Enum.Material.Snow, Text = "Frozen chests full of cash." },
+	},
+}
+
+---------------------------------------------------------------------------
 -- Pets: hatch eggs with cash, equip pets (they follow you) for a permanent
 -- income bonus. Each equipped pet adds its rarity's Bonus (+x) to your
 -- income multiplier. Slots = MaxEquipped + 1 for every SlotRebirths reached.
@@ -1190,6 +1209,7 @@ local FUNCTIONS = {
 	"ClaimGift", -- () -> ok, message
 	"SpinWheel", -- () -> ok, segment index (0 if none), message
 	"ActivateShield", -- () -> ok, message
+	"Travel", -- (island id or "Plaza") -> ok, message
 	"PetAction", -- (action, arg) -> ok, message   (Hatch eggId | Equip uid | Unequip uid | Sell uid | EquipBest | Refresh)
 }
 
@@ -2377,6 +2397,7 @@ local ORDER = {
 	"WheelService",
 	"ShieldService",
 	"PetService",
+	"IslandService",
 	"DisasterService",
 	"AdminService",
 	"AntiCheatService",
@@ -4350,6 +4371,7 @@ local TEMPLATE = {
 	Gifts = { Day = 0, Index = 1, Played = 0 }, -- playtime gifts (see GiftService)
 	Shield = { Start = 0 }, -- when the personal shield was last activated
 	Pets = { Owned = {}, Equipped = {}, NextUid = 1, Hatched = 0 }, -- see PetService
+	Chests = {}, -- island chest id -> when you last opened it (see IslandService)
 	Settings = { MusicVolume = Config.Music.DefaultVolume, SFX = true, LowGraphics = false, Guide = true, AutoBuild = true },
 }
 
@@ -6008,6 +6030,188 @@ return GiftService
       </Item>
       <Item class="ModuleScript" referent="21">
         <Properties>
+          <string name="Name">IslandService</string>
+          <string name="Source"><![CDATA[--[[
+	IslandService - the far islands (see Config.Islands): travelling there and
+	the treasure chests. Each chest closes for Cooldown seconds after YOU open
+	it; the time is saved with your data, so rejoining doesn't reopen it.
+	Players get attributes the Travel panel shows:
+	  ChestsReady_<island>  chests you can open now
+	  ChestNext_<island>    when your next closed chest opens (epoch, 0 = none)
+]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local Remotes = require(Shared.Remotes)
+local BuildKit = require(script.Parent.BuildKit)
+
+local IC = Config.Islands
+
+local IslandService = {}
+local S
+
+local islandById = {}
+for _, island in IC.List do
+	islandById[island.Id] = island
+end
+
+local lastTravel: { [Player]: number } = {}
+local lastChestNote: { [Player]: { [string]: number } } = {}
+
+function IslandService:_unlocked(player: Player, island): boolean
+	local data = S.DataService:Get(player)
+	return data ~= nil and data.Rebirths >= island.Rebirths
+end
+
+-- (ready now, the earliest time a closed chest opens or 0)
+function IslandService:_status(player: Player, islandId: string): (number, number)
+	local data = S.DataService:Get(player)
+	local ready, nextAt = 0, 0
+	if not data then
+		return 0, 0
+	end
+	for _, entry in S.WorldBuilder.Chests do
+		if entry.Island == islandId then
+			local openAt = (data.Chests[entry.Id] or 0) + IC.Cooldown
+			if os.time() >= openAt then
+				ready += 1
+			elseif nextAt == 0 or openAt < nextAt then
+				nextAt = openAt
+			end
+		end
+	end
+	return ready, nextAt
+end
+
+function IslandService:_sync(player: Player)
+	local total = 0
+	for _, island in IC.List do
+		local ready, nextAt = self:_status(player, island.Id)
+		player:SetAttribute("ChestsReady_" .. island.Id, ready)
+		player:SetAttribute("ChestNext_" .. island.Id, nextAt)
+		if self:_unlocked(player, island) then
+			total += ready
+		end
+	end
+	player:SetAttribute("ChestsReady", total)
+end
+
+function IslandService:OpenChest(player: Player, entry)
+	local data = S.DataService:Get(player)
+	if not data then
+		return
+	end
+	local island = islandById[entry.Island]
+	local openAt = (data.Chests[entry.Id] or 0) + IC.Cooldown
+	if os.time() < openAt then
+		-- say it once in a while, not every touch
+		local notes = lastChestNote[player] or {}
+		lastChestNote[player] = notes
+		if not notes[entry.Id] or os.clock() - notes[entry.Id] > 6 then
+			notes[entry.Id] = os.clock()
+			Remotes.Notify:FireClient(player, { Text = "🔒 This chest opens again in " .. Util.FormatTime(openAt - os.time()), Type = "info" })
+		end
+		return
+	end
+	data.Chests[entry.Id] = os.time()
+	local wallet = S.DataService:GetWallet(player)
+	local rebirths = wallet and wallet.Rebirths or 0
+	local cash = math.floor(math.max(island.MinCash * (1 + rebirths), S.TycoonService:GetIncome(player) * island.IncomeSeconds))
+	S.DataService:AddCash(player, cash, false)
+	Remotes.VFX:FireClient(player, "CashBurst", { Amount = cash })
+	Remotes.VFX:FireClient(player, "PurchaseSound", {})
+	Remotes.Notify:FireClient(player, { Text = "💰 " .. island.Name .. " chest: +" .. Util.Money(cash) .. "!", Type = "success" })
+	self:_sync(player)
+end
+
+-- ("Plaza" or an island id) -> ok, message
+function IslandService:Travel(player: Player, destination: any): (boolean, string)
+	local data = S.DataService:Get(player)
+	local character = player.Character
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not data or not character or not humanoid or humanoid.Health <= 0 then
+		return false, "You can't travel right now."
+	end
+	if player:GetAttribute("InMinigame") then
+		return false, "Finish the minigame first!"
+	end
+	if lastTravel[player] and os.clock() - lastTravel[player] < IC.TravelDelay then
+		return false, "Slow down - wait a moment between trips."
+	end
+	local target, text
+	if destination == "Plaza" then
+		target, text = IC.Plaza, "🏠 Back on the main island!"
+	else
+		local island = type(destination) == "string" and islandById[destination]
+		local info = island and S.WorldBuilder.Islands[destination]
+		if not island or not info then
+			return false, "Unknown destination."
+		end
+		if not self:_unlocked(player, island) then
+			return false, island.Name .. " unlocks at " .. island.Rebirths .. " rebirths."
+		end
+		target, text = info.Spawn, island.Icon .. " Welcome to " .. island.Name .. "!"
+	end
+	lastTravel[player] = os.clock()
+	character:PivotTo(CFrame.new(target))
+	return true, text
+end
+
+function IslandService:Init(services)
+	S = services
+	Remotes.Travel.OnServerInvoke = function(player, destination)
+		if not IC.Enabled then
+			return false, "Travel is turned off."
+		end
+		return self:Travel(player, destination)
+	end
+	-- the chests
+	for _, entry in S.WorldBuilder.Chests do
+		entry.Part.Touched:Connect(function(hit)
+			local player = BuildKit.PlayerFromHit(hit)
+			if player and BuildKit.IsNear(player, entry.Part) then
+				self:OpenChest(player, entry)
+			end
+		end)
+	end
+	-- the pads back to the plaza
+	for _, pad in S.WorldBuilder.ReturnPads do
+		pad.Part.Touched:Connect(function(hit)
+			local player = BuildKit.PlayerFromHit(hit)
+			if player and BuildKit.IsNear(player, pad.Part) then
+				self:Travel(player, "Plaza")
+			end
+		end)
+	end
+	S.DataService.PlayerLoaded:Connect(function(player)
+		self:_sync(player)
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		lastTravel[player], lastChestNote[player] = nil, nil
+	end)
+end
+
+-- the "chests ready" numbers change as the cooldowns run out
+function IslandService:Start()
+	while true do
+		task.wait(5)
+		for _, player in Players:GetPlayers() do
+			if S.DataService:Get(player) then
+				Util.Try("Islands", self._sync, self, player)
+			end
+		end
+	end
+end
+
+return IslandService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="22">
+        <Properties>
           <string name="Name">LeaderboardService</string>
           <string name="Source"><![CDATA[--[[
 	LeaderboardService - global "Top Earners" board in the lobby
@@ -6131,7 +6335,7 @@ return LeaderboardService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="22">
+      <Item class="ModuleScript" referent="23">
         <Properties>
           <string name="Name">MinigameService</string>
           <string name="Source"><![CDATA[--[[
@@ -6872,7 +7076,7 @@ return MinigameService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="23">
+      <Item class="ModuleScript" referent="24">
         <Properties>
           <string name="Name">MonetizationService</string>
           <string name="Source"><![CDATA[--[[
@@ -7237,7 +7441,7 @@ return MonetizationService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="24">
+      <Item class="ModuleScript" referent="25">
         <Properties>
           <string name="Name">ObbyService</string>
           <string name="Source"><![CDATA[--[[
@@ -7565,7 +7769,7 @@ return ObbyService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="25">
+      <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">PetService</string>
           <string name="Source"><![CDATA[--[[
@@ -7879,7 +8083,7 @@ return PetService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">QuestService</string>
           <string name="Source"><![CDATA[--[[
@@ -8221,7 +8425,7 @@ return QuestService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">RewardService</string>
           <string name="Source"><![CDATA[--[[
@@ -8348,7 +8552,7 @@ return RewardService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">SecretService</string>
           <string name="Source"><![CDATA[--[[
@@ -8501,7 +8705,7 @@ return SecretService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">ShieldService</string>
           <string name="Source"><![CDATA[--[[
@@ -8611,7 +8815,7 @@ return ShieldService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">TycoonBuilder</string>
           <string name="Source"><![CDATA[--[[
@@ -9436,7 +9640,7 @@ return TycoonBuilder
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">TycoonService</string>
           <string name="Source"><![CDATA[--[[
@@ -10664,7 +10868,7 @@ return TycoonService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">WheelService</string>
           <string name="Source"><![CDATA[--[[
@@ -10781,7 +10985,7 @@ return WheelService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">WorldBuilder</string>
           <string name="Source"><![CDATA[--[[
@@ -10818,6 +11022,9 @@ WorldBuilder.LeaderboardBody = nil :: Frame?
 WorldBuilder.SecretSpots = {} :: { [string]: Vector3 }
 WorldBuilder.LaunchPads = {}
 WorldBuilder.Shelter = nil -- public bunker { CFrame, Size, Door }
+WorldBuilder.Islands = {} :: { [string]: { Center: Vector3, Spawn: Vector3 } } -- the far islands (Config.Islands)
+WorldBuilder.Chests = {} :: { { Id: string, Island: string, Part: BasePart } } -- their treasure chests
+WorldBuilder.ReturnPads = {} :: { { Island: string, Part: BasePart } } -- pads that bring you back
 
 local PLAZA_RADIUS = 70
 local MAP_HALF = 1000
@@ -11472,6 +11679,95 @@ local function buildEdge(world: Folder)
 	WorldBuilder.SecretSpots.Edge = EDGE + Vector3.new(14, 2, 14)
 end
 
+---------------------------------------------------------------------------
+-- Far islands (Config.Islands): a round island, scenery in the island's
+-- style, treasure chests, a spawn dock and a pad back to the plaza
+---------------------------------------------------------------------------
+local function chest(parent: Instance, island, index: number, position: Vector3)
+	local gold = Color3.fromRGB(255, 205, 60)
+	local model = BuildKit.Model("Chest" .. index, parent)
+	local body = Part({ Name = "Body", Size = Vector3.new(4.4, 2.6, 3), Position = position + Vector3.new(0, 1.3, 0), Color = Color3.fromRGB(120, 78, 40), Material = Enum.Material.Wood, Parent = model })
+	Part({ Name = "Lid", Size = Vector3.new(4.6, 1.2, 3.2), Position = position + Vector3.new(0, 3.2, 0), Color = gold, Material = Enum.Material.Neon, CanCollide = false, Parent = model })
+	BuildKit.Light(body, gold, 16, 2)
+	BuildKit.Billboard(body, "💰 TREASURE CHEST", { Offset = Vector3.new(0, 4.5, 0), MaxDistance = 90, Color = gold, Size = UDim2.fromOffset(190, 36) })
+	table.insert(WorldBuilder.Chests, { Id = island.Id .. "_" .. index, Island = island.Id, Part = body })
+end
+
+local function buildIsland(world: Folder, island, rng: Random)
+	local model = BuildKit.Model("Island_" .. island.Id, world)
+	local c = island.Position
+	local r = island.Radius
+	local function at(angle: number, distance: number, y: number?): Vector3
+		return c + Vector3.new(math.cos(angle) * distance, y or 0, math.sin(angle) * distance)
+	end
+	-- the ground: a thick disc whose top is at y = 0
+	Part({ Name = "Ground", Shape = Enum.PartType.Cylinder, Size = Vector3.new(8, r * 2, r * 2), CFrame = CFrame.new(c + Vector3.new(0, -4, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color = island.Color, Material = island.Material, Parent = model })
+	Part({ Name = "Cliff", Shape = Enum.PartType.Cylinder, Size = Vector3.new(30, r * 1.7, r * 1.7), CFrame = CFrame.new(c + Vector3.new(0, -23, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(90, 85, 80), Material = Enum.Material.Rock, CanCollide = false, Parent = model })
+
+	-- scenery
+	if island.Id == "Treasure" then
+		for i = 1, 14 do
+			tree(model, at(rng:NextNumber(0, math.pi * 2), rng:NextNumber(30, r - 14)), rng:NextNumber(0.9, 1.5), rng)
+		end
+		Part({ Name = "ShipHull", Size = Vector3.new(34, 9, 12), CFrame = CFrame.new(at(2.2, 62, 3.5)) * CFrame.Angles(0.12, 0.6, 0.2), Color = Color3.fromRGB(95, 62, 35), Material = Enum.Material.WoodPlanks, Parent = model })
+		Part({ Name = "ShipMast", Size = Vector3.new(1.4, 26, 1.4), CFrame = CFrame.new(at(2.2, 62, 16)) * CFrame.Angles(0.1, 0, 0.18), Color = Color3.fromRGB(80, 55, 32), Material = Enum.Material.Wood, Parent = model })
+		for _ = 1, 8 do
+			Part({ Name = "Dune", Shape = Enum.PartType.Ball, Size = Vector3.new(rng:NextNumber(14, 26), 7, rng:NextNumber(14, 26)), Position = at(rng:NextNumber(0, math.pi * 2), rng:NextNumber(20, r - 20), -1.5), Color = island.Color, Material = Enum.Material.Sand, CanCollide = false, Parent = model })
+		end
+	elseif island.Id == "Volcano" then
+		-- the volcano: stacked cones of rock with glowing lava on top
+		Part({ Name = "Cone1", Shape = Enum.PartType.Cylinder, Size = Vector3.new(26, 70, 70), CFrame = CFrame.new(c + Vector3.new(0, 13, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(60, 45, 45), Material = Enum.Material.Basalt, Parent = model })
+		Part({ Name = "Cone2", Shape = Enum.PartType.Cylinder, Size = Vector3.new(22, 44, 44), CFrame = CFrame.new(c + Vector3.new(0, 35, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(55, 40, 40), Material = Enum.Material.Basalt, Parent = model })
+		local lava = Part({ Name = "Crater", Shape = Enum.PartType.Cylinder, Size = Vector3.new(2, 26, 26), CFrame = CFrame.new(c + Vector3.new(0, 47, 0)) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(255, 110, 20), Material = Enum.Material.Neon, CanCollide = false, Tags = { "Pulse" }, Parent = model })
+		BuildKit.Light(lava, Color3.fromRGB(255, 120, 30), 60, 3)
+		for i = 1, 6 do
+			local angle = i / 6 * math.pi * 2 + 0.4
+			Part({ Name = "LavaStream", Size = Vector3.new(5, 0.4, 34), CFrame = CFrame.new(at(angle, 48, 0.2)) * CFrame.Angles(0, -angle + math.pi / 2, 0), Color = Color3.fromRGB(255, 100, 20), Material = Enum.Material.Neon, CanCollide = false, Parent = model })
+		end
+		for _ = 1, 12 do
+			local size = rng:NextNumber(5, 12)
+			Part({ Name = "Rock", Shape = Enum.PartType.Ball, Size = Vector3.one * size, Position = at(rng:NextNumber(0, math.pi * 2), rng:NextNumber(60, r - 8), size / 3), Color = Color3.fromRGB(70, 60, 60), Material = Enum.Material.Rock, Parent = model })
+		end
+	else
+		for _ = 1, 14 do
+			local height = rng:NextNumber(8, 22)
+			Part({ Name = "IceSpike", Size = Vector3.new(rng:NextNumber(3, 6), height, rng:NextNumber(3, 6)), CFrame = CFrame.new(at(rng:NextNumber(0, math.pi * 2), rng:NextNumber(35, r - 10), height / 2)) * CFrame.Angles(rng:NextNumber(-0.2, 0.2), rng:NextNumber(0, 3), rng:NextNumber(-0.2, 0.2)), Color = Color3.fromRGB(170, 220, 255), Material = Enum.Material.Ice, Transparency = 0.25, Parent = model })
+		end
+		for i = 1, 3 do
+			local angle = i / 3 * math.pi * 2 + 1
+			local igloo = at(angle, 62, 0)
+			Part({ Name = "Igloo", Shape = Enum.PartType.Ball, Size = Vector3.one * 22, Position = igloo, Color = Color3.fromRGB(240, 248, 255), Material = Enum.Material.Snow, Parent = model })
+			Part({ Name = "IglooDoor", Size = Vector3.new(6, 7, 8), CFrame = CFrame.new(igloo + Vector3.new(math.cos(angle + math.pi) * 10, 3.5, math.sin(angle + math.pi) * 10)) * CFrame.Angles(0, -angle, 0), Color = Color3.fromRGB(230, 240, 250), Material = Enum.Material.Snow, Parent = model })
+		end
+		Part({ Name = "FrozenPond", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.6, 40, 40), CFrame = CFrame.new(at(0.5, 20, 0.3)) * CFrame.Angles(0, 0, math.rad(90)), Color = Color3.fromRGB(150, 205, 255), Material = Enum.Material.Ice, Parent = model })
+	end
+
+	-- the treasure chests, spread around
+	for i = 1, island.Chests do
+		local angle = (i / island.Chests) * math.pi * 2 + 0.7
+		chest(model, island, i, at(angle, r * 0.72, 0))
+	end
+
+	-- the dock where you arrive, with a sign and the pad back
+	local spawnPosition = at(-math.pi / 2, 16, 0)
+	Part({ Name = "Dock", Size = Vector3.new(22, 1, 22), Position = spawnPosition + Vector3.new(0, 0.5, 0), Color = Color3.fromRGB(110, 85, 55), Material = Enum.Material.WoodPlanks, Parent = model })
+	local sign = Part({ Name = "WelcomeSign", Size = Vector3.new(0.6, 8, 16), CFrame = CFrame.new(spawnPosition + Vector3.new(0, 5, 11)) * CFrame.Angles(0, math.rad(90), 0), Color = Color3.fromRGB(90, 70, 50), Material = Enum.Material.WoodPlanks, Parent = model })
+	BuildKit.SurfaceText(sign, Enum.NormalId.Front, island.Icon .. " " .. island.Name .. "\n" .. island.Text, { PixelsPerStud = 16 })
+	local back = Part({ Name = "ReturnPad", Size = Vector3.new(7, 0.6, 7), Position = spawnPosition + Vector3.new(7, 1.3, 4), Color = Color3.fromRGB(70, 200, 100), Material = Enum.Material.Neon, Tags = { "Pulse" }, Parent = model })
+	BuildKit.Billboard(back, "🏠 Back to the main island", { Offset = Vector3.new(0, 4, 0), MaxDistance = 70, Size = UDim2.fromOffset(220, 34) })
+	table.insert(WorldBuilder.ReturnPads, { Island = island.Id, Part = back })
+	WorldBuilder.Islands[island.Id] = { Center = c, Spawn = spawnPosition + Vector3.new(-3, 4, 0) }
+end
+
+local function buildIslands(world: Folder)
+	if not Config.Islands.Enabled then
+		return
+	end
+	for index, island in Config.Islands.List do
+		buildIsland(world, island, Random.new(9000 + index))
+	end
+end
+
 local function scatterTrees(world: Folder, rng: Random)
 	local model = BuildKit.Model("Trees", world)
 	local placed, tries = 0, 0
@@ -11522,6 +11818,7 @@ function WorldBuilder:Init()
 	buildForest(world, rng)
 	buildGraveyard(world, rng)
 	buildEdge(world)
+	buildIslands(world)
 	scatterTrees(world, rng)
 
 	for _, pad in WorldBuilder.LaunchPads do
@@ -11561,22 +11858,22 @@ return WorldBuilder
       </Item>
     </Item>
   </Item>
-  <Item class="SoundService" referent="34">
+  <Item class="SoundService" referent="35">
     <Properties>
       <string name="Name">SoundService</string>
     </Properties>
   </Item>
-  <Item class="StarterPlayer" referent="35">
+  <Item class="StarterPlayer" referent="36">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <float name="CharacterJumpPower">50</float>
       <float name="CharacterWalkSpeed">16</float>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="36">
+    <Item class="StarterPlayerScripts" referent="37">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="37">
+      <Item class="LocalScript" referent="38">
         <Properties>
           <string name="Name">Client</string>
           <string name="Source"><![CDATA[--[[
@@ -11602,6 +11899,7 @@ local ORDER = {
 	"Wheel",
 	"Shield",
 	"Pets",
+	"Travel",
 	"Guide",
 	"DropVisuals",
 	"Admin",
@@ -11646,11 +11944,11 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="38">
+      <Item class="Folder" referent="39">
         <Properties>
           <string name="Name">Controllers</string>
         </Properties>
-        <Item class="ModuleScript" referent="39">
+        <Item class="ModuleScript" referent="40">
           <Properties>
             <string name="Name">Admin</string>
             <string name="Source"><![CDATA[--[[
@@ -12249,7 +12547,7 @@ return Admin
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="40">
+        <Item class="ModuleScript" referent="41">
           <Properties>
             <string name="Name">Animator</string>
             <string name="Source"><![CDATA[--[[
@@ -12456,7 +12754,7 @@ return Animator
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="41">
+        <Item class="ModuleScript" referent="42">
           <Properties>
             <string name="Name">Build</string>
             <string name="Source"><![CDATA[--[[
@@ -12910,7 +13208,7 @@ return Build
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="42">
+        <Item class="ModuleScript" referent="43">
           <Properties>
             <string name="Name">ChatTags</string>
             <string name="Source"><![CDATA[--[[ ChatTags - [Owner] / [Admin] / [VIP] / rebirth tags in the chat ]]
@@ -12970,7 +13268,7 @@ return ChatTags
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="43">
+        <Item class="ModuleScript" referent="44">
           <Properties>
             <string name="Name">Disasters</string>
             <string name="Source"><![CDATA[--[[
@@ -13867,7 +14165,7 @@ return Disasters
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="44">
+        <Item class="ModuleScript" referent="45">
           <Properties>
             <string name="Name">DropVisuals</string>
             <string name="Source"><![CDATA[--[[
@@ -14142,7 +14440,7 @@ return DropVisuals
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="45">
+        <Item class="ModuleScript" referent="46">
           <Properties>
             <string name="Name">Duo</string>
             <string name="Source"><![CDATA[--[[ Duo (client) - invite players to build one tower together + invite popups ]]
@@ -14341,7 +14639,7 @@ return Duo
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="46">
+        <Item class="ModuleScript" referent="47">
           <Properties>
             <string name="Name">Gifts</string>
             <string name="Source"><![CDATA[--[[ Gifts (client) - the playtime gift button (bottom right) ]]
@@ -14440,7 +14738,7 @@ return Gifts
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">Guide</string>
             <string name="Source"><![CDATA[--[[
@@ -14621,7 +14919,7 @@ return Guide
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="49">
           <Properties>
             <string name="Name">HUD</string>
             <string name="Source"><![CDATA[--[[ HUD - cash counter, income, multiplier/boost info, floor indicator,
@@ -14817,6 +15115,7 @@ function HUD:Init(controllers)
 		{ "Daily", "🎁", "DAILY", Color3.fromRGB(255, 90, 120) },
 		{ "Wheel", "🎰", "WHEEL", Color3.fromRGB(255, 120, 60) },
 		{ "Pets", "🐾", "PETS", Color3.fromRGB(255, 150, 200) },
+		{ "Travel", "🧭", "TRAVEL", Color3.fromRGB(60, 200, 190) },
 		{ "Shield", "🛡️", "SHIELD", Color3.fromRGB(70, 170, 255) },
 		{ "Codes", "🎟️", "CODES", Color3.fromRGB(0, 200, 160) },
 		{ "Home", "🏠", "HOME", Color3.fromRGB(70, 200, 100) },
@@ -14952,7 +15251,7 @@ return HUD
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">Minigame</string>
             <string name="Source"><![CDATA[--[[ Minigame (client) - join popup, countdown, in-game HUD and results ]]
@@ -15187,7 +15486,7 @@ return Minigame
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">Music</string>
             <string name="Source"><![CDATA[--[[
@@ -15407,7 +15706,7 @@ return Music
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">Notifications</string>
             <string name="Source"><![CDATA[--[[ Notifications - toast messages (top right) + big announcement banners ]]
@@ -15597,7 +15896,7 @@ return Notifications
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">Panels</string>
             <string name="Source"><![CDATA[--[[ Panels - Rebirth, Daily Rewards, Codes and Settings menus ]]
@@ -16019,7 +16318,7 @@ return Panels
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">Pets</string>
             <string name="Source"><![CDATA[--[[
@@ -16284,7 +16583,7 @@ return Pets
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">Quests</string>
             <string name="Source"><![CDATA[--[[ Quests (client) - the quest tracker in the bottom-right corner ]]
@@ -16460,7 +16759,7 @@ return Quests
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">Shield</string>
             <string name="Source"><![CDATA[--[[
@@ -16576,7 +16875,7 @@ return Shield
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">Shop</string>
             <string name="Source"><![CDATA[--[[ Shop - Robux panel with Game Passes and Developer Products ]]
@@ -16743,7 +17042,122 @@ return Shop
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="58">
+          <Properties>
+            <string name="Name">Travel</string>
+            <string name="Source"><![CDATA[--[[
+	Travel (client) - the Travel panel: go to the far islands (and back to the
+	plaza) and see how many treasure chests are ready on each.
+]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local UIKit = require(Shared.UIKit)
+local Remotes = require(Shared.Remotes)
+
+local player = Players.LocalPlayer
+local Theme = UIKit.Theme
+local IC = Config.Islands
+
+local Travel = {}
+local C
+
+local rows: { [string]: { Status: TextLabel, Button: TextButton } } = {}
+
+local function refresh()
+	local rebirths = player:GetAttribute("Rebirths") or 0
+	for _, island in IC.List do
+		local row = rows[island.Id]
+		if row then
+			local locked = rebirths < island.Rebirths
+			local ready = player:GetAttribute("ChestsReady_" .. island.Id) or 0
+			local nextAt = player:GetAttribute("ChestNext_" .. island.Id) or 0
+			if locked then
+				row.Status.Text = "🔒 Unlocks at " .. island.Rebirths .. " rebirths"
+				row.Status.TextColor3 = Theme.SubText
+			elseif ready > 0 then
+				row.Status.Text = "💰 " .. ready .. "/" .. island.Chests .. " chests ready!"
+				row.Status.TextColor3 = Color3.fromRGB(150, 255, 160)
+			else
+				row.Status.Text = "Next chest in " .. Util.Clock(math.max(0, nextAt - Util.ServerNow()))
+				row.Status.TextColor3 = Theme.SubText
+			end
+			row.Button.BackgroundColor3 = locked and Color3.fromRGB(90, 90, 110) or Theme.Green
+		end
+	end
+	if C.HUD and C.HUD.SetBadge then
+		C.HUD:SetBadge("Travel", (player:GetAttribute("ChestsReady") or 0) > 0, tostring(player:GetAttribute("ChestsReady") or 0))
+	end
+end
+
+local function go(destination: string)
+	local ok, message = Remotes.Travel:InvokeServer(destination)
+	C.Notifications:Toast(tostring(message), ok and "success" or "error")
+	if ok then
+		C.UI:Close()
+	end
+end
+
+function Travel:Init(controllers)
+	C = controllers
+	local _, content = C.UI:MakePanel("Travel", "🧭 TRAVEL", Color3.fromRGB(60, 200, 190), 620, 460)
+	UIKit.List(content, 10)
+	UIKit.new("TextLabel", {
+		Text = "Islands beyond the edge of the world, full of treasure chests. Each chest reopens 30 minutes after you open it - even if you leave the game.",
+		Size = UDim2.new(1, -20, 0, 54),
+		BackgroundTransparency = 1,
+		TextWrapped = true,
+		TextSize = 16,
+		Font = Theme.BodyFont,
+		TextColor3 = Theme.SubText,
+		LayoutOrder = 0,
+		ZIndex = 7,
+		Parent = content,
+	})
+	local function row(order: number, id: string, title: string)
+		local frame = UIKit.new("Frame", { Name = "Dest" .. id, Size = UDim2.new(1, -10, 0, 66), BackgroundColor3 = Theme.Panel, LayoutOrder = order, ZIndex = 7, Parent = content })
+		UIKit.Corner(frame, 10)
+		UIKit.Label({ Text = title, Size = UDim2.new(1, -170, 0, 28), Position = UDim2.fromOffset(12, 6), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 8, Parent = frame })
+		local status = UIKit.Label({ Text = "", Size = UDim2.new(1, -170, 0, 20), Position = UDim2.fromOffset(12, 38), TextXAlignment = Enum.TextXAlignment.Left, Font = Theme.BodyFont, Stroke = false, ZIndex = 8, Parent = frame })
+		local button = UIKit.Button({
+			Name = "Go" .. id,
+			Text = "GO ▶",
+			Color = Theme.Green,
+			Size = UDim2.fromOffset(130, 44),
+			Position = UDim2.new(1, -142, 0, 11),
+			ZIndex = 8,
+			Parent = frame,
+			Callback = function()
+				go(id)
+			end,
+		})
+		rows[id] = { Status = status, Button = button }
+	end
+	row(1, "Plaza", "🏠 Main Island")
+	rows.Plaza.Status.Text = "The spawn plaza"
+	for i, island in IC.List do
+		row(i + 1, island.Id, island.Icon .. " " .. island.Name)
+	end
+	player:GetAttributeChangedSignal("ChestsReady"):Connect(refresh)
+	player:GetAttributeChangedSignal("Rebirths"):Connect(refresh)
+	refresh()
+end
+
+function Travel:Start()
+	while true do
+		task.wait(1)
+		Util.Try("Travel", refresh)
+	end
+end
+
+return Travel
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">UI</string>
             <string name="Source"><![CDATA[--[[ UI - owns the main ScreenGui and the "one panel at a time" manager ]]
@@ -16882,7 +17296,7 @@ return UI
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="60">
           <Properties>
             <string name="Name">VFX</string>
             <string name="Source"><![CDATA[--[[
@@ -17425,7 +17839,7 @@ return VFX
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="59">
+        <Item class="ModuleScript" referent="61">
           <Properties>
             <string name="Name">Wheel</string>
             <string name="Source"><![CDATA[--[[
@@ -17608,13 +18022,13 @@ return Wheel
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="60">
+  <Item class="TextChatService" referent="62">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="61">
+  <Item class="Workspace" referent="63">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="Gravity">196.2</float>
