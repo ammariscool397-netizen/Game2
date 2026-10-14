@@ -8,6 +8,7 @@
 ]]
 local DataStoreService = game:GetService("DataStoreService")
 local Lighting = game:GetService("Lighting")
+local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -625,6 +626,7 @@ local function buildCommands()
 		explosion.BlastRadius = 8
 		explosion.DestroyJointRadiusPercent = 1
 		explosion.Parent = workspace
+		Debris:AddItem(explosion, 2)
 		Remotes.VFX:FireAllClients("Shockwave", { Position = root.Position, Color = Color3.fromRGB(255, 120, 0), Size = 40 })
 	end)
 	charCommand("giant", { "big" }, 2, "Make players huge", false, function(_, character)

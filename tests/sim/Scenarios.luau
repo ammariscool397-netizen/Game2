@@ -2614,4 +2614,95 @@ add({
 	end,
 })
 
+add({
+	Name = "disaster_cleanup",
+	Run = function(T, place)
+		local game, me = T.Boot(place)
+		T.Wait(6)
+		local ws = game:GetService("Workspace")
+		local fx = ws:FindFirstChild("DisasterFX")
+		for _, kind in { "nuke", "meteors", "tornado", "ufo", "earthquake" } do
+			T.Admin(me, ";" .. kind)
+			T.WaitFor(function()
+				return ws:GetAttribute("Disaster") ~= nil
+			end, 5, kind .. " start")
+			T.WaitFor(function()
+				return ws:GetAttribute("Disaster") == nil
+			end, 120, kind .. " end")
+			T.Wait(30)
+			local explosions = 0
+			for _, d in ws:GetChildren() do
+				if d:IsA("Explosion") then
+					explosions += 1
+				end
+			end
+			T.Check(#fx:GetChildren() == 0, kind .. ": every client effect cleaned up (" .. #fx:GetChildren() .. " left)")
+			T.Check(explosions == 0, kind .. ": no Explosion objects left (" .. explosions .. ")")
+			-- (collectibles live 30s after they drop; an abduction can drop one at the very end)
+			T.WaitFor(function()
+				return #ws:FindFirstChild("Disasters"):GetChildren() == 0
+			end, 15, kind .. ": server disaster objects cleaned up")
+		end
+	end,
+})
+
+-- Diagnostics: with every tower maxed from the start, nothing should keep
+-- piling up in the workspace. Prints what grew every 30 minutes. (Slow.)
+add({
+	Name = "leakprobe",
+	Slow = true,
+	MaxSeconds = 4 * 3600,
+	AllowedWarnings = { "DataStores unavailable", "Could not load data", "Took over a session lock" },
+	Run = function(T, place)
+		local game, me = T.Boot(place)
+		T.SetDt(2)
+		local ws = game:GetService("Workspace")
+		local TycoonService = T.Service("TycoonService")
+		local bots = {}
+		for i = 1, 4 do
+			table.insert(bots, T.AddPlayer("Bot" .. i))
+		end
+		T.Wait(10)
+		for _, p in game:GetService("Players"):GetPlayers() do
+			TycoonService:UnlockAll(p)
+		end
+		T.Wait(60)
+		local function census()
+			local byName = {}
+			for _, d in ws:GetDescendants() do
+				local key = d.ClassName .. ":" .. d.Name
+				byName[key] = (byName[key] or 0) + 1
+			end
+			return byName
+		end
+		local first = #ws:GetDescendants()
+		local last = census()
+		for step = 1, 6 do
+			T.Wait(1800)
+			for _, b in bots do
+				TycoonService:CollectVault(b)
+			end
+			local names = census()
+			local grew = {}
+			for k, v in names do
+				local d = v - (last[k] or 0)
+				if d > 20 then
+					table.insert(grew, { k, d })
+				end
+			end
+			table.sort(grew, function(a, b)
+				return a[2] > b[2]
+			end)
+			local parts = {}
+			for i = 1, math.min(6, #grew) do
+				table.insert(parts, "+" .. grew[i][2] .. " " .. grew[i][1])
+			end
+			print(("    t=%dmin total=%d  %s"):format(step * 30, #ws:GetDescendants(), table.concat(parts, ", ")))
+			last = names
+		end
+		local final = #ws:GetDescendants()
+		T.Check(final < first * 1.03 + 300, ("no growth with maxed towers (%d -> %d)"):format(first, final))
+	end,
+})
+
 return Scenarios

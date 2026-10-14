@@ -5,6 +5,7 @@
 
 	Games: CoinRush, FallingTiles, MeteorShower (configure in Config.Minigames)
 ]]
+local Debris = game:GetService("Debris")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
@@ -284,6 +285,7 @@ Games.MeteorShower = {
 				explosion.BlastPressure = 0
 				explosion.DestroyJointRadiusPercent = 0
 				explosion.Parent = workspace
+				Debris:AddItem(explosion, 2)
 				Remotes.VFX:FireAllClients("Shockwave", { Position = target, Color = Color3.fromRGB(255, 120, 0), Size = radius * 3 })
 				for p in ctx.Alive do
 					local root = getRoot(p)

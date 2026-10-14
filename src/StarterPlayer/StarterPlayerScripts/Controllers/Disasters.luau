@@ -363,6 +363,7 @@ local function nukeImpact(target: Vector3, shockSpeed: number)
 	boom.BlastPressure = 0
 	boom.DestroyJointRadiusPercent = 0
 	boom.Parent = workspace
+	Debris:AddItem(boom, 2)
 
 	-- fireball
 	local fireball = localPart({ Shape = Enum.PartType.Ball, Size = Vector3.one * 10, Position = target + Vector3.new(0, 10, 0), Color = Color3.fromRGB(255, 170, 60), Material = Enum.Material.Neon })
@@ -506,6 +507,7 @@ local function meteor(target: Vector3, delay: number, radius: number, shielded: 
 		boom.BlastPressure = 0
 		boom.DestroyJointRadiusPercent = 0
 		boom.Parent = workspace
+		Debris:AddItem(boom, 2)
 		if C.VFX then
 			C.VFX:Ring(target + Vector3.new(0, 1, 0), shielded and Color3.fromRGB(80, 200, 255) or Color3.fromRGB(255, 120, 0), radius * 3, 0.6)
 			C.VFX:Burst(target, Color3.fromRGB(255, 140, 40), 30, 1.5)

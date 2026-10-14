@@ -680,23 +680,24 @@ end, function(proxy, native, value)
 	end
 end)
 
+-- like Roblox: Destroy() fires Destroying, disconnects everything, locks the
+-- Parent and destroys every child too (so their Parent becomes nil as well)
 local function simDestroy(proxy)
 	local native = unwrap(proxy)
-	if destroyed[native:GetDebugId()] then
+	local id = native:GetDebugId()
+	if destroyed[id] then
 		return
 	end
 	fireIfExists(native, "Destroying")
-	local all = native:GetDescendants()
-	table.insert(all, 1, native)
-	for _, d in all do
-		local id = d:GetDebugId()
-		destroyed[id] = true
-		local bucket = instanceSignals[id]
-		if bucket then
-			for _, sig in bucket do
-				sig:DisconnectAll()
-			end
+	destroyed[id] = true
+	local bucket = instanceSignals[id]
+	if bucket then
+		for _, sig in bucket do
+			sig:DisconnectAll()
 		end
+	end
+	for _, child in native:GetChildren() do
+		simDestroy(child)
 	end
 	native.Parent = nil
 end
