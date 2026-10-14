@@ -28,6 +28,7 @@ local EVENTS = {
 	"DuoInvited", -- server -> client  { HostName, HostUserId, Timeout }
 	"QuestUpdate", -- server -> client  (quests, claimedCount)
 	"GiftUpdate", -- server -> client  { Index, ReadyIn, Total }
+	"WeeklyUpdate", -- server -> client  { Days, DayFlags, Claimed, ResetsIn }
 	"PetUpdate", -- server -> client  { Owned, Equipped, Slots, Eggs }
 }
 
@@ -43,6 +44,7 @@ local FUNCTIONS = {
 	"SpinWheel", -- () -> ok, segment index (0 if none), message
 	"ActivateShield", -- () -> ok, message
 	"Travel", -- (island id or "Plaza") -> ok, message
+	"ClaimWeekly", -- (milestone index) -> ok, message
 	"PetAction", -- (action, arg) -> ok, message   (Hatch eggId | Equip uid | Unequip uid | Sell uid | EquipBest | Refresh)
 }
 

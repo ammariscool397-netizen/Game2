@@ -294,7 +294,7 @@ function HUD:Refresh()
 
 	-- badges
 	local lastDaily = player:GetAttribute("LastDaily") or 0
-	self:SetBadge("Daily", now - lastDaily >= Config.Daily.Cooldown)
+	self:SetBadge("Daily", now - lastDaily >= Config.Daily.Cooldown or (player:GetAttribute("WeeklyReady") or 0) > 0)
 	local cost = player:GetAttribute("RebirthCost") or math.huge
 	self:SetBadge("Rebirth", (player:GetAttribute("Cash") or 0) >= cost and not player:GetAttribute("DuoHost"))
 	local found = player:GetAttribute("SecretsFound") or ""

@@ -3565,4 +3565,89 @@ add({
 	end,
 })
 
+---------------------------------------------------------------------------
+-- Weekly rewards
+---------------------------------------------------------------------------
+add({
+	Name = "weekly",
+	MaxSeconds = 900,
+	Run = function(T, place)
+		local game, me = T.Boot(place, { Name = "Weekly", UserId = 6700 })
+		T.Wait(6)
+		local Config = T.Shared("Config")
+		local WC = Config.Weekly
+		local DataService = T.Service("DataService")
+		local WeeklyService = T.Service("WeeklyService")
+		local data = DataService:Get(me)
+		local today = T.Engine.EpochBase // 86400 + math.floor(T.Engine.Now / 86400)
+		local function claim(index)
+			return T.Client(function()
+				return { T.Remote("ClaimWeekly"):InvokeServer(index) }
+			end)
+		end
+		local function state()
+			return WeeklyService:GetState(me)
+		end
+
+		-- today counts as the first day
+		T.Check(state().Days == 1 and data.Weekly.Days[tostring(today)] == true, "joining counts as a day")
+		T.Check(#state().DayFlags == 7, "seven day flags")
+		T.Check(claim(1)[1] == false, "not enough days for the first reward")
+		T.Check(claim(99)[1] == false and claim("x")[1] == false, "bad milestones are rejected")
+
+		-- three days: claim the first
+		data.Weekly.Days[tostring(today - 1)] = true
+		data.Weekly.Days[tostring(today - 2)] = true
+		WeeklyService:Refresh(me)
+		T.Wait(1)
+		T.Check(state().Days == 3 and me:GetAttribute("WeeklyReady") == 1, "3 days unlock the first reward (badge)")
+		-- (days before this week's Monday don't count, so keep the test inside one week)
+		local cash = data.Cash
+		local first = claim(1)
+		T.Check(first[1] == true and data.Cash > cash, "claiming pays (" .. tostring(first[2]) .. ")")
+		T.Check(claim(1)[1] == false, "once per week")
+		T.Check(claim(2)[1] == false, "the 5-day reward isn't unlocked")
+
+		-- all seven days: boost + a free pet
+		for i = 1, 7 do
+			data.Weekly.Days[tostring(data.Weekly.Week * 7 - 3 + i - 1)] = true
+		end
+		WeeklyService:Refresh(me)
+		local pets = #data.Pets.Owned
+		local boost = data.BoostEnd
+		T.Check(claim(2)[1] == true and data.BoostEnd > boost, "the 5-day reward gives a boost")
+		T.Check(claim(3)[1] == true and #data.Pets.Owned == pets + 1, "the 7-day reward gives a free pet")
+		T.Check(state().Ready == 0, "nothing left to claim")
+
+		-- the panel
+		T.Client(function()
+			T.Controller("UI"):Open("Daily")
+		end)
+		T.Wait(1.5)
+		local weeklyButton = T.FindButton(me.PlayerGui, "WEEKLY REWARDS")
+		T.Check(weeklyButton ~= nil, "a WEEKLY button in the daily panel")
+		T.Client(function()
+			T.Engine.Click(weeklyButton)
+		end)
+		T.Wait(1.5)
+		T.Check(T.FindText(me.PlayerGui, "You joined on 7 day") ~= nil, "the weekly panel shows the days")
+		T.Check(T.FindButton(me.PlayerGui, "CLAIMED") ~= nil, "claimed rewards say so")
+
+		-- saved across a rejoin
+		T.LeaveClient()
+		T.Wait(1)
+		me = T.StartClient("Weekly", { UserId = 6700 })
+		T.Wait(8)
+		data = DataService:Get(me)
+		T.Check(state().Days >= 7 and state().Claimed[3] == true, "days and claims are saved")
+		T.Check(claim(1)[1] == false, "rejoining doesn't reset the claims")
+
+		-- a new week starts over (today still counts)
+		data.Weekly.Week -= 1
+		WeeklyService:Refresh(me)
+		T.Check(state().Days == 1 and state().Claimed[1] == false, "a new week starts over")
+		T.Check(state().ResetsIn > 0 and state().ResetsIn <= 7 * 86400, "and says when it resets")
+	end,
+})
+
 return Scenarios

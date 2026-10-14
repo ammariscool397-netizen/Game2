@@ -950,6 +950,21 @@ Config.Gifts = {
 }
 
 ---------------------------------------------------------------------------
+-- Weekly rewards: the days you join in a (Monday-Sunday, UTC) week are
+-- counted, and each milestone can be claimed once per week. Saved, so it
+-- doesn't matter which server you play on. Cash = the bigger of IncomeMinutes
+-- of income or MinCash x (1 + rebirths). Pet = an egg's pet is given for free.
+---------------------------------------------------------------------------
+Config.Weekly = {
+	Enabled = true,
+	Milestones = {
+		{ Days = 3, IncomeMinutes = 10, MinCash = 20_000, Text = "💵 Cash" },
+		{ Days = 5, IncomeMinutes = 20, MinCash = 60_000, BoostSeconds = 30 * 60, Text = "💵 Cash + ⚡ 30 min 2x boost" },
+		{ Days = 7, IncomeMinutes = 45, MinCash = 200_000, BoostSeconds = 60 * 60, Egg = "Golden", Text = "💵 Big cash + ⚡ 1 hour 2x boost + 🌟 a free Golden pet" },
+	},
+}
+
+---------------------------------------------------------------------------
 -- Islands beyond the world's edge, reached from the Travel panel (and a pad
 -- on each island brings you back). Each has treasure chests: opening one pays
 -- the bigger of IncomeSeconds of income or MinCash x (1 + rebirths), then that
@@ -1195,6 +1210,7 @@ local EVENTS = {
 	"DuoInvited", -- server -> client  { HostName, HostUserId, Timeout }
 	"QuestUpdate", -- server -> client  (quests, claimedCount)
 	"GiftUpdate", -- server -> client  { Index, ReadyIn, Total }
+	"WeeklyUpdate", -- server -> client  { Days, DayFlags, Claimed, ResetsIn }
 	"PetUpdate", -- server -> client  { Owned, Equipped, Slots, Eggs }
 }
 
@@ -1210,6 +1226,7 @@ local FUNCTIONS = {
 	"SpinWheel", -- () -> ok, segment index (0 if none), message
 	"ActivateShield", -- () -> ok, message
 	"Travel", -- (island id or "Plaza") -> ok, message
+	"ClaimWeekly", -- (milestone index) -> ok, message
 	"PetAction", -- (action, arg) -> ok, message   (Hatch eggId | Equip uid | Unequip uid | Sell uid | EquipBest | Refresh)
 }
 
@@ -2398,6 +2415,7 @@ local ORDER = {
 	"ShieldService",
 	"PetService",
 	"IslandService",
+	"WeeklyService",
 	"DisasterService",
 	"AdminService",
 	"AntiCheatService",
@@ -4372,6 +4390,7 @@ local TEMPLATE = {
 	Shield = { Start = 0 }, -- when the personal shield was last activated
 	Pets = { Owned = {}, Equipped = {}, NextUid = 1, Hatched = 0 }, -- see PetService
 	Chests = {}, -- island chest id -> when you last opened it (see IslandService)
+	Weekly = { Week = 0, Days = {}, Claimed = {} }, -- days joined this week + milestones claimed (see WeeklyService)
 	Settings = { MusicVolume = Config.Music.DefaultVolume, SFX = true, LowGraphics = false, Guide = true, AutoBuild = true },
 }
 
@@ -10870,6 +10889,163 @@ return TycoonService
       </Item>
       <Item class="ModuleScript" referent="33">
         <Properties>
+          <string name="Name">WeeklyService</string>
+          <string name="Source"><![CDATA[--[[
+	WeeklyService - weekly rewards (see Config.Weekly). Every day you join
+	counts toward the week (Monday to Sunday, UTC); at 3, 5 and 7 days you can
+	claim a bigger reward, once per week. Everything is saved with the player.
+]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local Remotes = require(Shared.Remotes)
+
+local WC = Config.Weekly
+
+local WeeklyService = {}
+local S
+
+local function today(): number
+	return os.time() // 86400
+end
+
+-- weeks run Monday to Sunday (day 0 of the epoch was a Thursday)
+local function weekOf(day: number): number
+	return (day + 3) // 7
+end
+
+local function weekStart(week: number): number
+	return week * 7 - 3
+end
+
+local function count(map): number
+	local n = 0
+	for _ in map do
+		n += 1
+	end
+	return n
+end
+
+-- the saved week: starts over in a new week, and today counts as a day joined
+function WeeklyService:Refresh(player: Player)
+	local data = S.DataService:Get(player)
+	if not data then
+		return
+	end
+	local weekly = data.Weekly
+	local day = today()
+	if weekly.Week ~= weekOf(day) then
+		weekly.Week, weekly.Days, weekly.Claimed = weekOf(day), {}, {}
+	end
+	weekly.Days[tostring(day)] = true
+	self:_send(player)
+end
+
+function WeeklyService:GetState(player: Player)
+	local data = S.DataService:Get(player)
+	if not data then
+		return nil
+	end
+	local weekly = data.Weekly
+	local flags, claimed = {}, {}
+	for i = 0, 6 do
+		table.insert(flags, weekly.Days[tostring(weekStart(weekly.Week) + i)] == true)
+	end
+	local days = count(weekly.Days)
+	local ready = 0
+	for index, milestone in WC.Milestones do
+		claimed[index] = weekly.Claimed[tostring(index)] == true
+		if not claimed[index] and days >= milestone.Days then
+			ready += 1
+		end
+	end
+	return { Days = days, DayFlags = flags, Claimed = claimed, Ready = ready, ResetsIn = math.max(0, weekStart(weekly.Week + 1) * 86400 - os.time()) }
+end
+
+function WeeklyService:_send(player: Player)
+	local state = self:GetState(player)
+	if state and player.Parent then
+		player:SetAttribute("WeeklyReady", state.Ready)
+		Remotes.WeeklyUpdate:FireClient(player, state)
+	end
+end
+
+function WeeklyService:Claim(player: Player, index: any): (boolean, string)
+	local data = S.DataService:Get(player)
+	local milestone = type(index) == "number" and WC.Milestones[index]
+	if not data or not milestone then
+		return false, "That reward doesn't exist."
+	end
+	self:Refresh(player)
+	local state = self:GetState(player)
+	if state.Claimed[index] then
+		return false, "You already claimed that this week."
+	end
+	if state.Days < milestone.Days then
+		return false, "Join on " .. (milestone.Days - state.Days) .. " more day(s) this week to unlock it."
+	end
+	data.Weekly.Claimed[tostring(index)] = true
+	local wallet = S.DataService:GetWallet(player)
+	local rebirths = wallet and wallet.Rebirths or 0
+	local cash = math.floor(math.max(milestone.MinCash * (1 + rebirths), S.TycoonService:GetIncome(player) * milestone.IncomeMinutes * 60))
+	S.DataService:AddCash(player, cash, false)
+	local text = "📅 Weekly reward: +" .. Util.Money(cash)
+	if milestone.BoostSeconds then
+		S.DataService:AddBoost(player, milestone.BoostSeconds)
+		text ..= " & 2x Boost for " .. Util.FormatTime(milestone.BoostSeconds)
+	end
+	if milestone.Egg and S.PetService then
+		for _, egg in Config.Pets.Eggs do
+			if egg.Id == milestone.Egg then
+				local pet = S.PetService:_roll(egg)
+				S.PetService:Give(player, pet.Id, 1)
+				text ..= " & a " .. pet.Rarity .. " " .. pet.Name .. " " .. pet.Icon
+			end
+		end
+	end
+	Remotes.VFX:FireClient(player, "CashBurst", { Amount = cash })
+	Remotes.VFX:FireClient(player, "Confetti", {})
+	self:_send(player)
+	return true, text .. "!"
+end
+
+function WeeklyService:Init(services)
+	S = services
+	Remotes.ClaimWeekly.OnServerInvoke = function(player, index)
+		if not WC.Enabled then
+			return false, "Weekly rewards are turned off."
+		end
+		return self:Claim(player, index)
+	end
+	S.DataService.PlayerLoaded:Connect(function(player)
+		if WC.Enabled then
+			self:Refresh(player)
+		end
+	end)
+end
+
+-- a new day or week while you're playing
+function WeeklyService:Start()
+	if not WC.Enabled then
+		return
+	end
+	while true do
+		task.wait(60)
+		for _, player in Players:GetPlayers() do
+			Util.Try("Weekly", self.Refresh, self, player)
+		end
+	end
+end
+
+return WeeklyService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="34">
+        <Properties>
           <string name="Name">WheelService</string>
           <string name="Source"><![CDATA[--[[
 	WheelService - the Lucky Wheel (see Config.Wheel): a free spin every
@@ -10985,7 +11161,7 @@ return WheelService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">WorldBuilder</string>
           <string name="Source"><![CDATA[--[[
@@ -11858,22 +12034,22 @@ return WorldBuilder
       </Item>
     </Item>
   </Item>
-  <Item class="SoundService" referent="35">
+  <Item class="SoundService" referent="36">
     <Properties>
       <string name="Name">SoundService</string>
     </Properties>
   </Item>
-  <Item class="StarterPlayer" referent="36">
+  <Item class="StarterPlayer" referent="37">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <float name="CharacterJumpPower">50</float>
       <float name="CharacterWalkSpeed">16</float>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="37">
+    <Item class="StarterPlayerScripts" referent="38">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="38">
+      <Item class="LocalScript" referent="39">
         <Properties>
           <string name="Name">Client</string>
           <string name="Source"><![CDATA[--[[
@@ -11900,6 +12076,7 @@ local ORDER = {
 	"Shield",
 	"Pets",
 	"Travel",
+	"Weekly",
 	"Guide",
 	"DropVisuals",
 	"Admin",
@@ -11944,11 +12121,11 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="39">
+      <Item class="Folder" referent="40">
         <Properties>
           <string name="Name">Controllers</string>
         </Properties>
-        <Item class="ModuleScript" referent="40">
+        <Item class="ModuleScript" referent="41">
           <Properties>
             <string name="Name">Admin</string>
             <string name="Source"><![CDATA[--[[
@@ -12547,7 +12724,7 @@ return Admin
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="41">
+        <Item class="ModuleScript" referent="42">
           <Properties>
             <string name="Name">Animator</string>
             <string name="Source"><![CDATA[--[[
@@ -12754,7 +12931,7 @@ return Animator
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="42">
+        <Item class="ModuleScript" referent="43">
           <Properties>
             <string name="Name">Build</string>
             <string name="Source"><![CDATA[--[[
@@ -13208,7 +13385,7 @@ return Build
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="43">
+        <Item class="ModuleScript" referent="44">
           <Properties>
             <string name="Name">ChatTags</string>
             <string name="Source"><![CDATA[--[[ ChatTags - [Owner] / [Admin] / [VIP] / rebirth tags in the chat ]]
@@ -13268,7 +13445,7 @@ return ChatTags
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="44">
+        <Item class="ModuleScript" referent="45">
           <Properties>
             <string name="Name">Disasters</string>
             <string name="Source"><![CDATA[--[[
@@ -14165,7 +14342,7 @@ return Disasters
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="45">
+        <Item class="ModuleScript" referent="46">
           <Properties>
             <string name="Name">DropVisuals</string>
             <string name="Source"><![CDATA[--[[
@@ -14440,7 +14617,7 @@ return DropVisuals
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="46">
+        <Item class="ModuleScript" referent="47">
           <Properties>
             <string name="Name">Duo</string>
             <string name="Source"><![CDATA[--[[ Duo (client) - invite players to build one tower together + invite popups ]]
@@ -14639,7 +14816,7 @@ return Duo
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">Gifts</string>
             <string name="Source"><![CDATA[--[[ Gifts (client) - the playtime gift button (bottom right) ]]
@@ -14738,7 +14915,7 @@ return Gifts
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="49">
           <Properties>
             <string name="Name">Guide</string>
             <string name="Source"><![CDATA[--[[
@@ -14919,7 +15096,7 @@ return Guide
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">HUD</string>
             <string name="Source"><![CDATA[--[[ HUD - cash counter, income, multiplier/boost info, floor indicator,
@@ -15218,7 +15395,7 @@ function HUD:Refresh()
 
 	-- badges
 	local lastDaily = player:GetAttribute("LastDaily") or 0
-	self:SetBadge("Daily", now - lastDaily >= Config.Daily.Cooldown)
+	self:SetBadge("Daily", now - lastDaily >= Config.Daily.Cooldown or (player:GetAttribute("WeeklyReady") or 0) > 0)
 	local cost = player:GetAttribute("RebirthCost") or math.huge
 	self:SetBadge("Rebirth", (player:GetAttribute("Cash") or 0) >= cost and not player:GetAttribute("DuoHost"))
 	local found = player:GetAttribute("SecretsFound") or ""
@@ -15251,7 +15428,7 @@ return HUD
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">Minigame</string>
             <string name="Source"><![CDATA[--[[ Minigame (client) - join popup, countdown, in-game HUD and results ]]
@@ -15486,7 +15663,7 @@ return Minigame
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">Music</string>
             <string name="Source"><![CDATA[--[[
@@ -15706,7 +15883,7 @@ return Music
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">Notifications</string>
             <string name="Source"><![CDATA[--[[ Notifications - toast messages (top right) + big announcement banners ]]
@@ -15896,7 +16073,7 @@ return Notifications
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">Panels</string>
             <string name="Source"><![CDATA[--[[ Panels - Rebirth, Daily Rewards, Codes and Settings menus ]]
@@ -16038,6 +16215,19 @@ local function buildDaily()
 		UIKit.Label({ Text = Util.Money(amount), Size = UDim2.new(1, -8, 0, 26), Position = UDim2.fromOffset(4, 100), TextColor3 = Color3.fromRGB(120, 255, 150), ZIndex = 8, Parent = cardFrame })
 		cards[day] = { Frame = cardFrame, Stroke = stroke }
 	end
+	UIKit.Button({
+		Name = "WeeklyButton",
+		Text = "📅 WEEKLY REWARDS ▶",
+		Color = Theme.Purple,
+		Size = UDim2.fromOffset(260, 40),
+		Position = UDim2.new(0.5, 0, 0, 322),
+		AnchorPoint = Vector2.new(0.5, 0),
+		ZIndex = 7,
+		Parent = content,
+		Callback = function()
+			C.UI:Open("Weekly")
+		end,
+	})
 	local status = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 30), Position = UDim2.fromOffset(0, 184), Font = Theme.BodyFont, ZIndex = 7, Parent = content })
 	UIKit.Label({
 		Text = "Rewards scale with your rebirths. VIP gets double!",
@@ -16318,7 +16508,7 @@ return Panels
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">Pets</string>
             <string name="Source"><![CDATA[--[[
@@ -16583,7 +16773,7 @@ return Pets
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">Quests</string>
             <string name="Source"><![CDATA[--[[ Quests (client) - the quest tracker in the bottom-right corner ]]
@@ -16759,7 +16949,7 @@ return Quests
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">Shield</string>
             <string name="Source"><![CDATA[--[[
@@ -16875,7 +17065,7 @@ return Shield
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">Shop</string>
             <string name="Source"><![CDATA[--[[ Shop - Robux panel with Game Passes and Developer Products ]]
@@ -17042,7 +17232,7 @@ return Shop
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">Travel</string>
             <string name="Source"><![CDATA[--[[
@@ -17157,7 +17347,7 @@ return Travel
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="59">
+        <Item class="ModuleScript" referent="60">
           <Properties>
             <string name="Name">UI</string>
             <string name="Source"><![CDATA[--[[ UI - owns the main ScreenGui and the "one panel at a time" manager ]]
@@ -17296,7 +17486,7 @@ return UI
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="60">
+        <Item class="ModuleScript" referent="61">
           <Properties>
             <string name="Name">VFX</string>
             <string name="Source"><![CDATA[--[[
@@ -17839,7 +18029,121 @@ return VFX
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="61">
+        <Item class="ModuleScript" referent="62">
+          <Properties>
+            <string name="Name">Weekly</string>
+            <string name="Source"><![CDATA[--[[
+	Weekly (client) - the weekly rewards panel (opened from the Daily panel):
+	the days you joined this week and the milestones you can claim.
+]]
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local UIKit = require(Shared.UIKit)
+local Remotes = require(Shared.Remotes)
+
+local Theme = UIKit.Theme
+local WC = Config.Weekly
+local DAY_NAMES = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" }
+
+local Weekly = {}
+Weekly.State = nil :: any
+local C
+
+local summary: TextLabel
+local dayLabels: { TextLabel } = {}
+local cards: { [number]: { Frame: Frame, Button: TextButton } } = {}
+local resetClock = 0
+
+local function render()
+	local state = Weekly.State
+	if not state then
+		return
+	end
+	summary.Text = "You joined on " .. state.Days .. " day(s) this week  •  resets in " .. Util.FormatTime(math.max(0, state.ResetsIn - (os.clock() - resetClock)))
+	for i, label in dayLabels do
+		local joined = state.DayFlags[i]
+		label.Text = (joined and "✅ " or "▫️ ") .. DAY_NAMES[i]
+		label.TextColor3 = joined and Color3.fromRGB(150, 255, 160) or Theme.SubText
+	end
+	for index, milestone in WC.Milestones do
+		local card = cards[index]
+		if card then
+			local claimed = state.Claimed[index]
+			local unlocked = state.Days >= milestone.Days
+			card.Button.Text = claimed and "CLAIMED ✔" or (unlocked and "CLAIM" or ("🔒 " .. milestone.Days .. " days"))
+			card.Button.BackgroundColor3 = (unlocked and not claimed) and Theme.Green or Color3.fromRGB(90, 90, 110)
+			card.Frame.BackgroundColor3 = (unlocked and not claimed) and Color3.fromRGB(40, 70, 45) or Theme.Panel
+		end
+	end
+end
+
+function Weekly:Init(controllers)
+	C = controllers
+	local _, content = C.UI:MakePanel("Weekly", "📅 WEEKLY REWARDS", Theme.Purple, 700, 480)
+	UIKit.List(content, 10)
+	summary = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 30), Font = Theme.BodyFont, LayoutOrder = 1, ZIndex = 7, Parent = content })
+	local week = UIKit.new("Frame", { Name = "Days", Size = UDim2.new(1, 0, 0, 34), BackgroundTransparency = 1, LayoutOrder = 2, ZIndex = 7, Parent = content })
+	UIKit.List(week, 4, Enum.FillDirection.Horizontal, Enum.HorizontalAlignment.Center)
+	for i = 1, 7 do
+		dayLabels[i] = UIKit.Label({ Text = DAY_NAMES[i], Size = UDim2.new(1 / 7, -4, 1, 0), Font = Theme.BodyFont, LayoutOrder = i, ZIndex = 8, Parent = week })
+	end
+	for index, milestone in WC.Milestones do
+		local frame = UIKit.new("Frame", { Name = "Milestone" .. index, Size = UDim2.new(1, -10, 0, 78), BackgroundColor3 = Theme.Panel, LayoutOrder = 2 + index, ZIndex = 7, Parent = content })
+		UIKit.Corner(frame, 10)
+		UIKit.Label({ Text = "Join " .. milestone.Days .. " days", Size = UDim2.new(1, -180, 0, 28), Position = UDim2.fromOffset(12, 6), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 8, Parent = frame })
+		UIKit.new("TextLabel", {
+			Text = milestone.Text,
+			Size = UDim2.new(1, -180, 0, 36),
+			Position = UDim2.fromOffset(12, 36),
+			BackgroundTransparency = 1,
+			TextWrapped = true,
+			TextSize = 14,
+			TextXAlignment = Enum.TextXAlignment.Left,
+			TextYAlignment = Enum.TextYAlignment.Top,
+			Font = Theme.BodyFont,
+			TextColor3 = Theme.SubText,
+			ZIndex = 8,
+			Parent = frame,
+		})
+		local button = UIKit.Button({
+			Name = "ClaimWeekly" .. index,
+			Text = "CLAIM",
+			Color = Theme.Green,
+			Size = UDim2.fromOffset(150, 48),
+			Position = UDim2.new(1, -162, 0, 15),
+			ZIndex = 8,
+			Parent = frame,
+			Callback = function()
+				local ok, message = Remotes.ClaimWeekly:InvokeServer(index)
+				C.Notifications:Toast(tostring(message), ok and "success" or "error")
+			end,
+		})
+		cards[index] = { Frame = frame, Button = button }
+	end
+	Remotes.WeeklyUpdate.OnClientEvent:Connect(function(state)
+		if type(state) == "table" then
+			Weekly.State = state
+			resetClock = os.clock()
+			render()
+		end
+	end)
+end
+
+function Weekly:Start()
+	while true do
+		task.wait(1)
+		Util.Try("Weekly", render)
+	end
+end
+
+return Weekly
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">Wheel</string>
             <string name="Source"><![CDATA[--[[
@@ -18022,13 +18326,13 @@ return Wheel
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="62">
+  <Item class="TextChatService" referent="64">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="63">
+  <Item class="Workspace" referent="65">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="Gravity">196.2</float>

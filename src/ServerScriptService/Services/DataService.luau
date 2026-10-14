@@ -52,6 +52,7 @@ local TEMPLATE = {
 	Shield = { Start = 0 }, -- when the personal shield was last activated
 	Pets = { Owned = {}, Equipped = {}, NextUid = 1, Hatched = 0 }, -- see PetService
 	Chests = {}, -- island chest id -> when you last opened it (see IslandService)
+	Weekly = { Week = 0, Days = {}, Claimed = {} }, -- days joined this week + milestones claimed (see WeeklyService)
 	Settings = { MusicVolume = Config.Music.DefaultVolume, SFX = true, LowGraphics = false, Guide = true, AutoBuild = true },
 }
 

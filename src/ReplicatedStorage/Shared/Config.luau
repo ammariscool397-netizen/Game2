@@ -536,6 +536,21 @@ Config.Gifts = {
 }
 
 ---------------------------------------------------------------------------
+-- Weekly rewards: the days you join in a (Monday-Sunday, UTC) week are
+-- counted, and each milestone can be claimed once per week. Saved, so it
+-- doesn't matter which server you play on. Cash = the bigger of IncomeMinutes
+-- of income or MinCash x (1 + rebirths). Pet = an egg's pet is given for free.
+---------------------------------------------------------------------------
+Config.Weekly = {
+	Enabled = true,
+	Milestones = {
+		{ Days = 3, IncomeMinutes = 10, MinCash = 20_000, Text = "💵 Cash" },
+		{ Days = 5, IncomeMinutes = 20, MinCash = 60_000, BoostSeconds = 30 * 60, Text = "💵 Cash + ⚡ 30 min 2x boost" },
+		{ Days = 7, IncomeMinutes = 45, MinCash = 200_000, BoostSeconds = 60 * 60, Egg = "Golden", Text = "💵 Big cash + ⚡ 1 hour 2x boost + 🌟 a free Golden pet" },
+	},
+}
+
+---------------------------------------------------------------------------
 -- Islands beyond the world's edge, reached from the Travel panel (and a pad
 -- on each island brings you back). Each has treasure chests: opening one pays
 -- the bigger of IncomeSeconds of income or MinCash x (1 + rebirths), then that

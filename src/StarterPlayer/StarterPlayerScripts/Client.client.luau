@@ -22,6 +22,7 @@ local ORDER = {
 	"Shield",
 	"Pets",
 	"Travel",
+	"Weekly",
 	"Guide",
 	"DropVisuals",
 	"Admin",

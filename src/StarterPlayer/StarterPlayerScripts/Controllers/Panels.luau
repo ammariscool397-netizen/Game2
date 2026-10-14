@@ -137,6 +137,19 @@ local function buildDaily()
 		UIKit.Label({ Text = Util.Money(amount), Size = UDim2.new(1, -8, 0, 26), Position = UDim2.fromOffset(4, 100), TextColor3 = Color3.fromRGB(120, 255, 150), ZIndex = 8, Parent = cardFrame })
 		cards[day] = { Frame = cardFrame, Stroke = stroke }
 	end
+	UIKit.Button({
+		Name = "WeeklyButton",
+		Text = "📅 WEEKLY REWARDS ▶",
+		Color = Theme.Purple,
+		Size = UDim2.fromOffset(260, 40),
+		Position = UDim2.new(0.5, 0, 0, 322),
+		AnchorPoint = Vector2.new(0.5, 0),
+		ZIndex = 7,
+		Parent = content,
+		Callback = function()
+			C.UI:Open("Weekly")
+		end,
+	})
 	local status = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 30), Position = UDim2.fromOffset(0, 184), Font = Theme.BodyFont, ZIndex = 7, Parent = content })
 	UIKit.Label({
 		Text = "Rewards scale with your rebirths. VIP gets double!",

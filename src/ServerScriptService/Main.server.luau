@@ -21,6 +21,7 @@ local ORDER = {
 	"ShieldService",
 	"PetService",
 	"IslandService",
+	"WeeklyService",
 	"DisasterService",
 	"AdminService",
 	"AntiCheatService",
