@@ -15,6 +15,8 @@ local ROBUX = utf8.char(0xE002)
 
 local Shop = {}
 local C
+local openGiftPicker: (string, string, string) -> ()
+
 
 local function sorted(map)
 	local list = {}
@@ -59,7 +61,7 @@ local function card(parent: Instance, order: number, data, isPass: boolean, key:
 	local button = UIKit.Button({
 		Text = ROBUX .. " " .. tostring(data.PriceHint or "?"),
 		Color = Theme.Green,
-		Size = UDim2.new(1, -24, 0, 42),
+		Size = Config.CanGift(isPass and "Pass" or "Product", key) and UDim2.new(1, -84, 0, 42) or UDim2.new(1, -24, 0, 42),
 		Position = UDim2.new(0, 12, 1, -52),
 		ZIndex = 7,
 		Parent = frame,
@@ -74,6 +76,20 @@ local function card(parent: Instance, order: number, data, isPass: boolean, key:
 			end
 		end,
 	})
+
+	if Config.CanGift(isPass and "Pass" or "Product", key) then
+		UIKit.Button({
+			Text = "🎁",
+			Color = Theme.Purple,
+			Size = UDim2.fromOffset(52, 42),
+			Position = UDim2.new(1, -64, 1, -52),
+			ZIndex = 7,
+			Parent = frame,
+			Callback = function()
+				openGiftPicker(isPass and "Pass" or "Product", key, data.Name)
+			end,
+		})
+	end
 
 	-- real price from Roblox if configured
 	if data.Id and data.Id ~= 0 then
@@ -101,6 +117,55 @@ end
 function Shop:Init(controllers)
 	C = controllers
 	local _, content = C.UI:MakePanel("Shop", "🛒 SHOP", Theme.Accent, 820, 560)
+
+	-- gift picker: choose who gets it (the server checks everything again)
+	local picker = UIKit.new("Frame", {
+		Name = "GiftPicker",
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundColor3 = Theme.Panel,
+		BackgroundTransparency = 0.04,
+		Visible = false,
+		ZIndex = 30,
+		Parent = content,
+	})
+	UIKit.Corner(picker, 14)
+	local pickerTitle = UIKit.Label({ Text = "", Size = UDim2.new(1, -20, 0, 34), Position = UDim2.fromOffset(10, 8), ZIndex = 31, Parent = picker })
+	local pickerList = UIKit.Scroll({ Size = UDim2.new(1, -20, 1, -110), Position = UDim2.fromOffset(10, 50), Parent = picker })
+	pickerList.ZIndex = 31
+	UIKit.List(pickerList, 6)
+	UIKit.Button({ Text = "CANCEL", Color = Theme.Red, Size = UDim2.fromOffset(160, 40), Position = UDim2.new(0.5, 0, 1, -50), AnchorPoint = Vector2.new(0.5, 0), ZIndex = 31, Parent = picker, Callback = function()
+		picker.Visible = false
+	end })
+	openGiftPicker = function(kind: string, key: string, itemName: string)
+		pickerTitle.Text = "🎁 Gift " .. itemName .. " to..."
+		for _, child in pickerList:GetChildren() do
+			if child:IsA("GuiObject") then
+				child:Destroy()
+			end
+		end
+		local others = 0
+		for _, other in Players:GetPlayers() do
+			if other ~= player then
+				others += 1
+				UIKit.Button({
+					Text = other.DisplayName .. "  (@" .. other.Name .. ")",
+					Color = Theme.PanelLight,
+					Size = UDim2.new(1, -10, 0, 40),
+					LayoutOrder = others,
+					ZIndex = 32,
+					Parent = pickerList,
+					Callback = function()
+						picker.Visible = false
+						Remotes.GiftItem:FireServer(kind, key, other.UserId)
+					end,
+				})
+			end
+		end
+		if others == 0 then
+			UIKit.Label({ Text = "Nobody else is in your server right now.", Size = UDim2.new(1, -10, 0, 40), Font = Theme.BodyFont, TextColor3 = Theme.SubText, ZIndex = 32, Parent = pickerList })
+		end
+		picker.Visible = true
+	end
 
 	local tabs = UIKit.new("Frame", { Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, ZIndex = 6, Parent = content })
 	UIKit.List(tabs, 10, Enum.FillDirection.Horizontal, Enum.HorizontalAlignment.Center)

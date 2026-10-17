@@ -21,6 +21,10 @@ local Theme = UIKit.Theme
 local Admin = {}
 local C
 
+local function hasAccess(): boolean
+	return (player:GetAttribute("AdminRank") or 0) > 0 or (player:GetAttribute("AdminPerms") or "") ~= ""
+end
+
 local commandBox: TextBox
 local resultLabel: TextLabel
 local pages: { [string]: ScrollingFrame } = {}
@@ -395,6 +399,184 @@ local function fillAntiCheat()
 	end
 end
 
+-- Staff tab: pick a player (even offline), tick permissions, set a glowing title, give passes
+local staffName = ""
+local staffColor = "#FFD700"
+local staffText = ""
+
+local function fillStaff()
+	local page = pages.Staff
+	clear(page)
+	local data = Remotes.AdminData:InvokeServer("staff")
+	if not data then
+		UIKit.Label({ Text = "Head Admins and Owners only.", Size = UDim2.new(1, -10, 0, 30), Font = Theme.BodyFont, ZIndex = 8, Parent = page })
+		return
+	end
+	local order = 0
+	local function header(text: string)
+		order += 1
+		UIKit.Label({ Text = text, Size = UDim2.new(1, -10, 0, 28), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = Theme.Accent, LayoutOrder = order, ZIndex = 8, Parent = page })
+	end
+	local function refresh()
+		task.wait(0.4)
+		fillStaff()
+	end
+
+	-- 1. who
+	header("👤 Player (type a name, or pick one)")
+	order += 1
+	local pick = UIKit.new("Frame", { Size = UDim2.new(1, -10, 0, 44), BackgroundTransparency = 1, LayoutOrder = order, ZIndex = 7, Parent = page })
+	local nameBox = UIKit.TextBox({ Placeholder = "Username or UserId...", Text = staffName, Size = UDim2.new(1, -170, 0, 40), ZIndex = 8, Parent = pick })
+	UIKit.Button({ Text = "SELECT", Color = Theme.Accent, Size = UDim2.fromOffset(150, 40), Position = UDim2.new(1, -155, 0, 0), ZIndex = 8, Parent = pick, Callback = function()
+		staffName = nameBox.Text
+		fillStaff()
+	end })
+	order += 1
+	local chips = UIKit.new("Frame", { Size = UDim2.new(1, -10, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = order, ZIndex = 7, Parent = page })
+	local chipGrid = UIKit.new("UIGridLayout", { CellSize = UDim2.fromOffset(150, 34), CellPadding = UDim2.fromOffset(6, 6), SortOrder = Enum.SortOrder.LayoutOrder, Parent = chips })
+	chipGrid.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	for i, other in Players:GetPlayers() do
+		UIKit.Button({ Text = other.DisplayName, Color = other.Name == staffName and Theme.Green or Theme.PanelLight, Size = UDim2.fromOffset(150, 34), LayoutOrder = i, ZIndex = 8, Parent = chips, Callback = function()
+			staffName = other.Name
+			fillStaff()
+		end })
+	end
+
+	-- 2. the selected player
+	local info = staffName ~= "" and Remotes.AdminData:InvokeServer("staffplayer", staffName) or nil
+	if staffName ~= "" and not info then
+		order += 1
+		UIKit.Label({ Text = "No player found called '" .. staffName .. "'.", Size = UDim2.new(1, -10, 0, 26), Font = Theme.BodyFont, TextColor3 = Theme.Red, LayoutOrder = order, ZIndex = 8, Parent = page })
+	end
+	if info then
+		header("⚙️ " .. info.Name .. (info.Online and "  (online)" or "  (offline)"))
+
+		header("✅ Permissions" .. (data.CanGrant and "" or "  (the Owner ticks these)"))
+		for i, group in Config.Admin.Permissions do
+			order += 1
+			local frame = rowFrame(page, i, 50)
+			frame.LayoutOrder = order
+			local on = info.Groups[group.Id] == true
+			UIKit.Label({ Text = group.Icon .. " " .. group.Name, Size = UDim2.new(0.34, 0, 0, 22), Position = UDim2.fromOffset(58, 4), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = on and Theme.Green or Theme.Text, ZIndex = 8, Parent = frame })
+			UIKit.new("TextLabel", {
+				Text = group.Desc,
+				Size = UDim2.new(1, -70, 0, 20),
+				Position = UDim2.fromOffset(58, 27),
+				BackgroundTransparency = 1,
+				TextWrapped = true,
+				TextSize = 12,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Font = Theme.BodyFont,
+				TextColor3 = Theme.SubText,
+				ZIndex = 8,
+				Parent = frame,
+			})
+			local tick = UIKit.Button({ Text = on and "☑" or "☐", Color = on and Theme.Green or Theme.PanelLight, Size = UDim2.fromOffset(40, 36), Position = UDim2.fromOffset(8, 7), ZIndex = 8, Parent = frame, Callback = function()
+				if not data.CanGrant then
+					C.Notifications:Toast("Only the Owner can change permissions.", "error", 3)
+					return
+				end
+				run((on and "takeperm " or "giveperm ") .. info.Name .. " " .. group.Id)
+				refresh()
+			end })
+			tick.TextSize = 26
+		end
+
+		header("🏷️ Glowing title" .. (info.Title and ("  -  now: " .. info.Title.Text) or ""))
+		order += 1
+		local titleRow = UIKit.new("Frame", { Size = UDim2.new(1, -10, 0, 44), BackgroundTransparency = 1, LayoutOrder = order, ZIndex = 7, Parent = page })
+		local textBox = UIKit.TextBox({ Placeholder = "Title text (max " .. Config.Admin.MaxTitleLength .. " letters)...", Text = staffText, Size = UDim2.new(1, -310, 0, 40), ZIndex = 8, Parent = titleRow })
+		textBox.FocusLost:Connect(function()
+			staffText = textBox.Text
+		end)
+		UIKit.Button({ Text = "SET TITLE", Color = Theme.Green, Size = UDim2.fromOffset(145, 40), Position = UDim2.new(1, -300, 0, 0), ZIndex = 8, Parent = titleRow, Callback = function()
+			staffText = textBox.Text
+			if staffText == "" then
+				C.Notifications:Toast("Write the title text first.", "error", 3)
+				return
+			end
+			run("title " .. info.Name .. " " .. staffColor .. " " .. staffText)
+			refresh()
+		end })
+		UIKit.Button({ Text = "CLEAR", Color = Theme.Red, Size = UDim2.fromOffset(145, 40), Position = UDim2.new(1, -150, 0, 0), ZIndex = 8, Parent = titleRow, Callback = function()
+			run("cleartitle " .. info.Name)
+			refresh()
+		end })
+		order += 1
+		local swatches = UIKit.new("Frame", { Size = UDim2.new(1, -10, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = order, ZIndex = 7, Parent = page })
+		local swatchGrid = UIKit.new("UIGridLayout", { CellSize = UDim2.fromOffset(96, 34), CellPadding = UDim2.fromOffset(6, 6), SortOrder = Enum.SortOrder.LayoutOrder, Parent = swatches })
+		swatchGrid.HorizontalAlignment = Enum.HorizontalAlignment.Left
+		for i, entry in Config.Admin.TitleColors do
+			local color = entry.Hex == "rainbow" and Color3.fromRGB(190, 90, 255) or Color3.fromHex(entry.Hex)
+			local chosen = staffColor == entry.Hex
+			local swatch = UIKit.Button({ Text = (chosen and "✔ " or "") .. entry.Name, Color = color, Size = UDim2.fromOffset(96, 34), LayoutOrder = i, ZIndex = 8, Parent = swatches, Callback = function()
+				staffColor = entry.Hex
+				fillStaff()
+			end })
+			if entry.Hex == "rainbow" then
+				UIKit.Gradient(swatch, Color3.fromRGB(255, 80, 80), Color3.fromRGB(80, 120, 255), 0)
+			end
+		end
+
+		header("🎁 Passes (click to give / remove)")
+		order += 1
+		local passes = UIKit.new("Frame", { Size = UDim2.new(1, -10, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = order, ZIndex = 7, Parent = page })
+		local passGrid = UIKit.new("UIGridLayout", { CellSize = UDim2.fromOffset(200, 38), CellPadding = UDim2.fromOffset(6, 6), SortOrder = Enum.SortOrder.LayoutOrder, Parent = passes })
+		passGrid.HorizontalAlignment = Enum.HorizontalAlignment.Left
+		local pending = {}
+		for _, key in info.Pending do
+			pending[key] = true
+		end
+		local list = {}
+		for key, pass in Config.GamePasses do
+			table.insert(list, { Key = key, Pass = pass })
+		end
+		table.sort(list, function(a, b)
+			return (a.Pass.Order or 0) < (b.Pass.Order or 0)
+		end)
+		for i, entry in list do
+			local owns = info.Passes[entry.Key] == true
+			local waiting = pending[entry.Key] == true
+			UIKit.Button({
+				Text = (owns and "✓ " or (waiting and "⏳ " or "")) .. entry.Pass.Icon .. " " .. entry.Pass.Name,
+				Color = owns and Theme.Green or (waiting and Theme.Accent or Theme.PanelLight),
+				Size = UDim2.fromOffset(200, 38),
+				LayoutOrder = i,
+				ZIndex = 8,
+				Parent = passes,
+				Callback = function()
+					if owns then
+						run("removepass " .. info.Name .. " " .. entry.Key)
+					else
+						run("givepass " .. info.Name .. " " .. entry.Key)
+					end
+					refresh()
+				end,
+			})
+		end
+		order += 1
+		UIKit.Label({ Text = "✓ owned now • ⏳ waiting for their next join (offline players)", Size = UDim2.new(1, -10, 0, 20), Font = Theme.BodyFont, TextColor3 = Theme.SubText, TextXAlignment = Enum.TextXAlignment.Left, LayoutOrder = order, ZIndex = 8, Parent = page })
+	end
+
+	-- 3. everyone who has permissions or a title
+	header("👥 Staff & titles (" .. #data.Overview .. ")")
+	if #data.Overview == 0 then
+		order += 1
+		UIKit.Label({ Text = "Nobody has permissions or a title yet.", Size = UDim2.new(1, -10, 0, 26), Font = Theme.BodyFont, TextColor3 = Theme.SubText, LayoutOrder = order, ZIndex = 8, Parent = page })
+	end
+	for i, entry in data.Overview do
+		order += 1
+		local frame = rowFrame(page, i, 52)
+		frame.LayoutOrder = order
+		UIKit.Label({ Text = entry.Name .. (entry.Title and ("   🏷️ " .. entry.Title.Text) or ""), Size = UDim2.new(1, -120, 0, 24), Position = UDim2.fromOffset(10, 4), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 8, Parent = frame })
+		UIKit.Label({ Text = #entry.Groups > 0 and table.concat(entry.Groups, ", ") or "no permissions", Size = UDim2.new(1, -120, 0, 18), Position = UDim2.fromOffset(10, 29), TextXAlignment = Enum.TextXAlignment.Left, Font = Theme.BodyFont, TextColor3 = Theme.SubText, Stroke = false, ZIndex = 8, Parent = frame })
+		smallButton(frame, "OPEN", Theme.Accent, -102, 94, function()
+			staffName = entry.Name
+			fillStaff()
+		end).AnchorPoint = Vector2.new(0, 0.5)
+	end
+end
+
 local function buildServerPage()
 	local page = pages.Server
 	local order = 0
@@ -496,6 +678,8 @@ local function selectTab(name: string)
 		task.spawn(fillLogs)
 	elseif name == "Anti-Cheat" then
 		task.spawn(fillAntiCheat)
+	elseif name == "Staff" then
+		task.spawn(fillStaff)
 	end
 end
 
@@ -520,8 +704,8 @@ local function buildPanel()
 	-- tabs
 	local tabs = UIKit.new("Frame", { Size = UDim2.new(1, 0, 0, 40), Position = UDim2.fromOffset(0, 74), BackgroundTransparency = 1, ZIndex = 6, Parent = content })
 	UIKit.List(tabs, 8, Enum.FillDirection.Horizontal, Enum.HorizontalAlignment.Left)
-	for i, name in { "Commands", "Players", "Server", "Logs", "Anti-Cheat" } do
-		tabButtons[name] = UIKit.Button({ Text = name:upper(), Color = Theme.PanelLight, Size = UDim2.fromOffset(i == 5 and 160 or 130, 38), LayoutOrder = i, ZIndex = 7, Parent = tabs, Callback = function()
+	for i, name in { "Commands", "Players", "Server", "Logs", "Anti-Cheat", "Staff" } do
+		tabButtons[name] = UIKit.Button({ Text = name:upper(), Color = Theme.PanelLight, Size = UDim2.fromOffset(i == 5 and 150 or (i == 6 and 110 or 124), 38), LayoutOrder = i, ZIndex = 7, Parent = tabs, Callback = function()
 			selectTab(name)
 		end })
 		local page = UIKit.Scroll({ Size = UDim2.new(1, 0, 1, -124), Position = UDim2.fromOffset(0, 122), Parent = content })
@@ -569,7 +753,7 @@ function Admin:Init(controllers)
 		if processed then
 			return
 		end
-		if input.KeyCode == Enum.KeyCode.F2 and (player:GetAttribute("AdminRank") or 0) > 0 then
+		if input.KeyCode == Enum.KeyCode.F2 and hasAccess() then
 			C.UI:Toggle("Admin")
 		end
 	end)
@@ -579,7 +763,7 @@ function Admin:Init(controllers)
 		TextChatService.SendingMessage:Connect(function(message: TextChatMessage)
 			local text = message.Text
 			local prefix = Config.Admin.Prefix
-			if text:sub(1, #prefix) == prefix and (player:GetAttribute("AdminRank") or 0) > 0 then
+			if text:sub(1, #prefix) == prefix and hasAccess() then
 				task.spawn(run, text)
 			end
 		end)

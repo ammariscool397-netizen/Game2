@@ -36,6 +36,20 @@ for key, product in Config.Products do
 	end
 end
 
+-- gift developer products -> what they gift
+local giftById: { [number]: { Kind: string, Key: string } } = {}
+for key, id in Config.GiftProducts do
+	if id ~= 0 then
+		local kind = passByKey[key] and "Pass" or (Config.Products[key] and "Product" or nil)
+		if kind and Config.CanGift(kind, key) then
+			giftById[id] = { Kind = kind, Key = key }
+		end
+	end
+end
+-- buyer UserId -> gift product id -> the gift they are paying for
+local pendingGifts: { [number]: { [number]: { Kind: string, Key: string, Target: number } } } = {}
+local lastGift: { [Player]: number } = {}
+
 local function canSimulate()
 	return RunService:IsStudio() and Config.Monetization.SimulateUnconfiguredInStudio
 end
@@ -74,6 +88,13 @@ function MonetizationService:Init(services)
 	end)
 	Remotes.BuyProduct.OnServerEvent:Connect(function(player, key)
 		self:PromptProduct(player, key)
+	end)
+	Remotes.GiftItem.OnServerEvent:Connect(function(player, kind, key, targetUserId)
+		self:PromptGift(player, kind, key, targetUserId)
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		lastGift[player] = nil
+		pendingGifts[player.UserId] = nil
 	end)
 
 	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, passId, purchased)
@@ -140,13 +161,14 @@ function MonetizationService:RefreshCharacter(player: Player)
 	end
 end
 
--- grant = also store in data (admin / simulated purchases)
-function MonetizationService:GrantPass(player: Player, key: string)
+-- grant = also store in data (admin / simulated purchases / gifts).
+-- `from` = who gave it (admins, gifts); without it the player is thanked for buying it.
+function MonetizationService:GrantPass(player: Player, key: string, from: string?)
 	local data = S.DataService:Get(player)
 	if data then
 		data.Passes[key] = true
 	end
-	self:_applyPass(player, key, true)
+	self:_applyPass(player, key, true, from)
 end
 
 function MonetizationService:RevokePass(player: Player, key: string)
@@ -161,7 +183,7 @@ function MonetizationService:RevokePass(player: Player, key: string)
 	end
 end
 
-function MonetizationService:_applyPass(player: Player, key: string, announce: boolean)
+function MonetizationService:_applyPass(player: Player, key: string, announce: boolean, from: string?)
 	if not passByKey[key] then
 		return
 	end
@@ -178,9 +200,11 @@ function MonetizationService:_applyPass(player: Player, key: string, announce: b
 	end
 	if announce then
 		local pass = passByKey[key]
-		Remotes.Notify:FireClient(player, { Text = "Thanks for buying " .. pass.Name .. "! " .. pass.Icon, Type = "success", Duration = 6 })
+		local text = from and ("🎁 " .. from .. " gave you " .. pass.Name .. "! " .. pass.Icon) or ("Thanks for buying " .. pass.Name .. "! " .. pass.Icon)
+		Remotes.Notify:FireClient(player, { Text = text, Type = "success", Duration = 6 })
 		Remotes.VFX:FireAllClients("Purchase", { Position = player.Character and player.Character:GetPivot().Position, Color = pass.Color, Big = true })
-		Remotes.Announce:FireAllClients({ Title = "🎉 " .. player.DisplayName .. " bought " .. pass.Name .. "!", Text = pass.Description, Color = pass.Color })
+		local title = from and ("🎁 " .. player.DisplayName .. " got " .. pass.Name .. " from " .. from .. "!") or ("🎉 " .. player.DisplayName .. " bought " .. pass.Name .. "!")
+		Remotes.Announce:FireAllClients({ Title = title, Text = pass.Description, Color = pass.Color })
 	end
 end
 
@@ -270,6 +294,55 @@ function MonetizationService:PromptProduct(player: Player, key: any)
 	MarketplaceService:PromptProductPurchase(player, product.Id)
 end
 
+-- "Gift" button: the buyer pays Robux, `target` (in this server) gets the item
+function MonetizationService:PromptGift(player: Player, kind: any, key: any, targetUserId: any)
+	if not Config.CanGift(kind, key) or type(targetUserId) ~= "number" then
+		return
+	end
+	local entry = kind == "Pass" and passByKey[key] or Config.Products[key]
+	local target = Players:GetPlayerByUserId(targetUserId)
+	if not target or target == player or not S.DataService:IsLoaded(target) then
+		Remotes.Notify:FireClient(player, { Text = "Pick another player who is in this server.", Type = "error" })
+		return
+	end
+	if lastGift[player] and os.clock() - lastGift[player] < 2 then
+		return
+	end
+	lastGift[player] = os.clock()
+	if kind == "Pass" and self:HasPass(target, key) then
+		Remotes.Notify:FireClient(player, { Text = target.DisplayName .. " already owns " .. entry.Name .. "!", Type = "info" })
+		return
+	end
+	local giftId = Config.GiftProducts[key] or 0
+	if giftId == 0 then
+		if canSimulate() then
+			Remotes.Notify:FireClient(player, { Text = "[Studio] Simulated gift of " .. entry.Name, Type = "info" })
+			self:_deliverGift(player, target, kind, key)
+		else
+			Remotes.Notify:FireClient(player, { Text = "Gifting this isn't available yet!", Type = "error" })
+		end
+		return
+	end
+	local pending = pendingGifts[player.UserId] or {}
+	pendingGifts[player.UserId] = pending
+	pending[giftId] = { Kind = kind, Key = key, Target = target.UserId }
+	MarketplaceService:PromptProductPurchase(player, giftId)
+end
+
+function MonetizationService:_deliverGift(buyer: Player, target: Player, kind: string, key: string): boolean
+	local entry = kind == "Pass" and passByKey[key] or Config.Products[key]
+	if kind == "Pass" then
+		self:GrantPass(target, key, buyer.DisplayName)
+	else
+		if not self:_grantProduct(target, key) then
+			return false
+		end
+		Remotes.Notify:FireClient(target, { Text = "🎁 " .. buyer.DisplayName .. " sent you " .. entry.Name .. "!", Type = "success", Duration = 6 })
+	end
+	Remotes.Notify:FireClient(buyer, { Text = "🎁 " .. target.DisplayName .. " got your gift: " .. entry.Name .. "!", Type = "success", Duration = 6 })
+	return true
+end
+
 function MonetizationService:_grantProduct(player: Player, key: string): boolean
 	local product = Config.Products[key]
 	local data = S.DataService:Get(player)
@@ -318,9 +391,34 @@ function MonetizationService:CashRain(byName: string)
 	end
 end
 
+-- a paid gift: to the chosen player; if they left, passes wait for their next join and
+-- anything else goes to the buyer (so the Robux are never wasted)
+function MonetizationService:_receiveGift(buyer: Player, productId: number, gift): boolean
+	local pending = pendingGifts[buyer.UserId] and pendingGifts[buyer.UserId][productId]
+	if pending then
+		pendingGifts[buyer.UserId][productId] = nil
+	end
+	local target = pending and Players:GetPlayerByUserId(pending.Target)
+	if target and target ~= buyer and S.DataService:IsLoaded(target) then
+		return self:_deliverGift(buyer, target, gift.Kind, gift.Key)
+	end
+	if pending and gift.Kind == "Pass" then
+		S.StaffService:QueuePass(pending.Target, gift.Key, buyer.DisplayName)
+		Remotes.Notify:FireClient(buyer, { Text = "🎁 They left - they'll get the pass when they next join!", Type = "info", Duration = 6 })
+		return true
+	end
+	Remotes.Notify:FireClient(buyer, { Text = "🎁 Your gift receiver left, so the " .. (gift.Kind == "Pass" and "pass" or "item") .. " is yours!", Type = "info", Duration = 8 })
+	if gift.Kind == "Pass" then
+		self:GrantPass(buyer, gift.Key)
+		return true
+	end
+	return self:_grantProduct(buyer, gift.Key)
+end
+
 function MonetizationService:_processReceipt(receipt)
+	local gift = giftById[receipt.ProductId]
 	local key = productKeyById[receipt.ProductId]
-	if not key then
+	if not key and not gift then
 		warn("[Monetization] Unknown product id " .. tostring(receipt.ProductId))
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
@@ -342,7 +440,12 @@ function MonetizationService:_processReceipt(receipt)
 		end
 	end
 
-	local granted = self:_grantProduct(player, key)
+	local granted
+	if gift then
+		granted = self:_receiveGift(player, receipt.ProductId, gift)
+	else
+		granted = self:_grantProduct(player, key)
+	end
 	if not granted then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end

@@ -361,6 +361,40 @@ Config.GamePasses = {
 	},
 }
 
+---------------------------------------------------------------------------
+-- Gifts. Players can buy a pass or a cash pack FOR another player in their
+-- server. Roblox only lets a game pass be bought by its own owner, so each gift
+-- is a Developer Product with the same price: create one per item on the
+-- Creator Dashboard (Monetization > Developer Products), name it e.g.
+-- "Gift: 2x Cash", and paste its ID below. 0 = gifting that item is off
+-- (in Studio it is simulated for free).
+---------------------------------------------------------------------------
+Config.GiftProducts = {
+	DoubleCash = 0,
+	AutoCollect = 0,
+	FastDroppers = 0,
+	VIP = 0,
+	SuperSpeed = 0,
+	AutoBuild = 0,
+	PetLuck = 0,
+	PetPower = 0,
+	PetSlot = 0,
+	OfflineBoost = 0,
+	Discount = 0,
+	IslandExpress = 0,
+	WheelPlus = 0,
+	ShieldPro = 0,
+	RebirthBoost = 0,
+	GiftBoost = 0,
+	-- cash packs and boosts
+	CashSmall = 0,
+	CashMedium = 0,
+	CashLarge = 0,
+	CashHuge = 0,
+	Boost = 0,
+	InstantRepair = 0,
+}
+
 -- Automatic server-wide cash events (a reason to stay in the server)
 Config.AutoEvents = {
 	Enabled = true,
@@ -488,6 +522,39 @@ Config.Admin = {
 		-- [255] = 4, [254] = 3, [200] = 2, [100] = 1,
 	},
 	BanDataStore = "MegaTycoon_Bans_v1",
+	StaffDataStore = "MegaTycoon_Staff_v1", -- saved permissions, titles and passes waiting for offline players
+	GrantRank = 4, -- rank needed to tick permissions (;giveperm / ;takeperm)
+	TitleRank = 3, -- rank needed to give titles (or the "Titles" permission)
+	MaxTitleLength = 24,
+	StaffRefreshSeconds = 60, -- how often a server re-reads the saved permissions and titles
+	-- Permissions you can tick for ANY player in the admin panel (Staff tab), even
+	-- without a rank. A ticked group lets them run its commands. Commands = names,
+	-- MaxRank = every command up to that rank. Owner-only commands can never be granted.
+	Permissions = {
+		{ Id = "Mod", Name = "Mod commands", Icon = "🛡️", Desc = "Every Mod command: teleport, bring, view, fly, noclip, speed, god...", MaxRank = 1 },
+		{ Id = "Moderation", Name = "Kick & ban", Icon = "🔨", Desc = "kick, ban, unban, strikes", Commands = { "kick", "ban", "unban", "strikes", "clearstrikes" } },
+		{ Id = "Disasters", Name = "Disasters", Icon = "☢️", Desc = "Start any disaster (nuke, tornado...), repair and wreck towers", Commands = { "nuke", "meteors", "tornado", "ufo", "earthquake", "disaster", "stopdisaster", "wreck", "repair" } },
+		{ Id = "Economy", Name = "Cash & progress", Icon = "💰", Desc = "givecash, rebirths, unlock floors, secrets, duo", Commands = { "givecash", "setcash", "takecash", "giverebirth", "rebirth", "unlockall", "unlockfloor", "givesecrets", "resetsecrets", "duo", "unduo" } },
+		{ Id = "Passes", Name = "Give passes & pets", Icon = "🎁", Desc = "givepass, removepass, givepet", Commands = { "givepass", "removepass", "givepet" } },
+		{ Id = "Events", Name = "Events & world", Icon = "🎉", Desc = "cash rain, 2x events, minigames, time, music, announcements", Commands = { "cashrain", "doublecash", "minigame", "time", "m", "music", "stopmusic", "confetti" } },
+		{ Id = "Fun", Name = "Fun effects", Icon = "✨", Desc = "explode, giant, tiny, sparkles, fire, invisible...", Commands = { "explode", "giant", "tiny", "normal", "sparkles", "fire", "smoke", "unfx", "invisible", "visible", "fling", "launch" } },
+		{ Id = "Titles", Name = "Give titles", Icon = "🏷️", Desc = "Set glowing titles above players' heads", Commands = { "title", "cleartitle" } },
+		{ Id = "AdminTools", Name = "All Admin commands", Icon = "⭐", Desc = "Everything an Admin can do (Mod + Admin ranks)", MaxRank = 2 },
+	},
+	-- colours offered for titles ("Rainbow" cycles through all colours)
+	TitleColors = {
+		{ Name = "Gold", Hex = "#FFD700" },
+		{ Name = "Red", Hex = "#FF4040" },
+		{ Name = "Pink", Hex = "#FF6EC7" },
+		{ Name = "Purple", Hex = "#B05CFF" },
+		{ Name = "Blue", Hex = "#4DA3FF" },
+		{ Name = "Cyan", Hex = "#35E8FF" },
+		{ Name = "Green", Hex = "#4CE06A" },
+		{ Name = "Lime", Hex = "#B8FF3A" },
+		{ Name = "Orange", Hex = "#FF9A2E" },
+		{ Name = "White", Hex = "#FFFFFF" },
+		{ Name = "Rainbow", Hex = "rainbow" },
+	},
 }
 
 ---------------------------------------------------------------------------
@@ -894,6 +961,17 @@ function Config.PetsBonus(pets: any): number
 		end
 	end
 	return total
+end
+
+-- can this pass ("Pass") or product ("Product") be gifted? Server events (nukes, cash rain) can't.
+function Config.CanGift(kind: any, key: any): boolean
+	if kind == "Pass" then
+		return type(key) == "string" and Config.GamePasses[key] ~= nil
+	elseif kind == "Product" then
+		local product = type(key) == "string" and Config.Products[key]
+		return product ~= nil and product ~= false and product.ServerEvent == nil
+	end
+	return false
 end
 
 return Config

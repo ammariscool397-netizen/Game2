@@ -30,6 +30,7 @@ local EVENTS = {
 	"GiftUpdate", -- server -> client  { Index, ReadyIn, Total }
 	"WeeklyUpdate", -- server -> client  { Days, DayFlags, Claimed, ResetsIn }
 	"PetUpdate", -- server -> client  { Owned, Equipped, Slots, Eggs }
+	"GiftItem", -- client -> server  ("Pass"|"Product", key, targetUserId)
 }
 
 local FUNCTIONS = {

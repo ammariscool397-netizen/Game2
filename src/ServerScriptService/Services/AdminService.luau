@@ -5,6 +5,10 @@
 	Player selectors: me, all, others, random, admins, nonadmins,
 	partial names ("rob" -> Roblox), or comma lists ("me,bob").
 	Amounts accept suffixes: 10k, 2.5m, 1b
+
+	Besides ranks, any player can be given permission GROUPS (Config.Admin.Permissions)
+	by the Owner (Staff tab or ;giveperm). They are saved by StaffService and show up
+	here as the player attribute "AdminPerms".
 ]]
 local DataStoreService = game:GetService("DataStoreService")
 local Lighting = game:GetService("Lighting")
@@ -70,6 +74,29 @@ end
 
 function AdminService:GetRank(player: Player): number
 	return tonumber(player:GetAttribute("AdminRank")) or 0
+end
+
+local function permsOf(player: Player): { string }
+	local perms = player:GetAttribute("AdminPerms")
+	return (type(perms) == "string" and perms ~= "") and (perms :: string):split(",") or {}
+end
+
+-- a rank or at least one ticked permission group
+function AdminService:HasAccess(player: Player): boolean
+	return self:GetRank(player) > 0 or #permsOf(player) > 0
+end
+
+-- may this player run the command (by rank, or through a ticked group)?
+function AdminService:CanRun(player: Player, command): boolean
+	if self:GetRank(player) >= command.Rank then
+		return true
+	end
+	for _, id in permsOf(player) do
+		if table.find(command.Groups or {}, id) then
+			return true
+		end
+	end
+	return false
 end
 
 local function filterBroadcast(text: string, from: Player): string?
@@ -218,7 +245,8 @@ local function eachTarget(executor: Player, selector: string?, harmful: boolean,
 	for _, target in targets do
 		-- staff can't be harmed by equal/lower ranks (the Owner can do anything,
 		-- which also lets Studio play-testers - all Owners - test on each other)
-		if harmful and target ~= executor and myRank < 4 and AdminService:GetRank(target) >= myRank then
+		local targetRank = AdminService:GetRank(target)
+		if harmful and target ~= executor and myRank < 4 and targetRank > 0 and targetRank >= myRank then
 			continue
 		end
 		local ok, err = pcall(fn, target)
@@ -248,6 +276,48 @@ local function charCommand(name, aliases, rank, desc, harmful, fn)
 			return name .. ": " .. namesOf(affected)
 		end,
 	})
+end
+
+-- a player in this server (selector or partial name) or any user by name / UserId
+local function findUser(executor: Player, token: string?): (number?, string?)
+	if not token or token == "" then
+		return nil, nil
+	end
+	local found = resolvePlayers(executor, token)
+	if found[1] then
+		return found[1].UserId, found[1].Name
+	end
+	return resolveUserId(token)
+end
+
+local function groupIdOf(text: string?): string?
+	for _, group in Config.Admin.Permissions do
+		if text and group.Id:lower() == text:lower() then
+			return group.Id
+		end
+	end
+	return nil
+end
+
+-- which permission groups each command belongs to (Owner-only commands never)
+local function assignGroups()
+	for _, group in Config.Admin.Permissions do
+		local names = {}
+		for _, name in group.Commands or {} do
+			names[name:lower()] = true
+		end
+		if group.Id == "Disasters" then
+			for _, def in Config.ExtraDisasters do
+				names[def.Name:lower()] = true
+			end
+		end
+		for _, def in commands do
+			if def.Rank < 4 and (names[def.Name:lower()] or (group.MaxRank ~= nil and def.Rank <= group.MaxRank)) then
+				def.Groups = def.Groups or {}
+				table.insert(def.Groups, group.Id)
+			end
+		end
+	end
 end
 
 local function buildCommands()
@@ -1020,8 +1090,8 @@ local function buildCommands()
 		Name = "givepass",
 		Aliases = { "pass" },
 		Rank = 3,
-		Args = "<player> <DoubleCash|AutoCollect|FastDroppers|VIP|SuperSpeed>",
-		Desc = "Give a game pass for free",
+		Args = "<player or name> <pass>",
+		Desc = "Give a game pass for free (works for offline players too; see Config.GamePasses)",
 		Run = function(executor, args)
 			local key
 			for k in Config.GamePasses do
@@ -1032,8 +1102,17 @@ local function buildCommands()
 			if not key then
 				return "Unknown pass"
 			end
+			if #resolvePlayers(executor, args[1]) == 0 then
+				-- not in this server: they get it the next time they join
+				local userId, name = resolveUserId(args[1])
+				if not userId then
+					return "Player not found"
+				end
+				S.StaffService:QueuePass(userId, key, executor.DisplayName)
+				return key .. " will be given to " .. tostring(name) .. " when they next join"
+			end
 			local affected = eachTarget(executor, args[1], false, function(target)
-				S.MonetizationService:GrantPass(target, key)
+				S.MonetizationService:GrantPass(target, key, target ~= executor and executor.DisplayName or nil)
 			end)
 			return "Gave " .. key .. " to " .. namesOf(affected)
 		end,
@@ -1082,6 +1161,118 @@ local function buildCommands()
 				S.MonetizationService:RevokePass(target, key)
 			end)
 			return "Removed " .. key .. " from " .. namesOf(affected)
+		end,
+	})
+
+	register({
+		Name = "title",
+		Aliases = { "settitle", "nick" },
+		Rank = Config.Admin.TitleRank,
+		Args = "<player> <color|#hex|rainbow> <text>",
+		Desc = "Give a glowing title above a player's head (saved)",
+		Run = function(executor, args)
+			local userId, name = findUser(executor, args[1])
+			if not userId or not name then
+				return "Player not found"
+			end
+			local color = S.StaffService:ParseColor(args[2])
+			if not color then
+				return "Pick a colour: gold, red, pink, purple, blue, cyan, green, lime, orange, white, rainbow or #RRGGBB"
+			end
+			local text = S.StaffService:CleanTitle(restText(args, 3))
+			if not text then
+				return "Write the title text after the colour"
+			end
+			S.StaffService:SetTitle(userId, name, text, color, executor.Name)
+			return name .. " now has the title \"" .. text .. "\""
+		end,
+	})
+	register({
+		Name = "cleartitle",
+		Aliases = { "removetitle" },
+		Rank = Config.Admin.TitleRank,
+		Args = "<player>",
+		Desc = "Remove a player's title",
+		Run = function(executor, args)
+			local userId, name = findUser(executor, args[1])
+			if not userId then
+				return "Player not found"
+			end
+			return S.StaffService:ClearTitle(userId) and ("Removed the title of " .. tostring(name)) or (tostring(name) .. " had no title")
+		end,
+	})
+	register({
+		Name = "giveperm",
+		Aliases = { "addperm" },
+		Rank = Config.Admin.GrantRank,
+		Args = "<player> <group|all>",
+		Desc = "Tick a permission group for a player (groups: see the Staff tab)",
+		Run = function(executor, args)
+			local userId, name = findUser(executor, args[1])
+			if not userId or not name then
+				return "Player not found"
+			end
+			local ids = {}
+			if args[2] and args[2]:lower() == "all" then
+				for _, group in Config.Admin.Permissions do
+					table.insert(ids, group.Id)
+				end
+			elseif groupIdOf(args[2]) then
+				table.insert(ids, groupIdOf(args[2]) :: string)
+			else
+				local names = {}
+				for _, group in Config.Admin.Permissions do
+					table.insert(names, group.Id)
+				end
+				return "Unknown group. Groups: " .. table.concat(names, ", ")
+			end
+			for _, id in ids do
+				S.StaffService:SetGroup(userId, name, id, true, executor.Name)
+			end
+			return "Gave " .. name .. ": " .. table.concat(ids, ", ")
+		end,
+	})
+	register({
+		Name = "takeperm",
+		Aliases = { "removeperm" },
+		Rank = Config.Admin.GrantRank,
+		Args = "<player> <group|all>",
+		Desc = "Untick a permission group for a player",
+		Run = function(executor, args)
+			local userId, name = findUser(executor, args[1])
+			if not userId or not name then
+				return "Player not found"
+			end
+			if args[2] and args[2]:lower() == "all" then
+				S.StaffService:ClearGroups(userId)
+				return "Removed every permission of " .. name
+			end
+			local id = groupIdOf(args[2])
+			if not id then
+				return "Unknown group"
+			end
+			S.StaffService:SetGroup(userId, name, id, false, executor.Name)
+			return "Removed " .. id .. " from " .. name
+		end,
+	})
+	register({
+		Name = "perms",
+		Aliases = { "permissions" },
+		Rank = Config.Admin.GrantRank,
+		Args = "<player>",
+		Desc = "Show a player's permission groups and title",
+		Run = function(executor, args)
+			local userId, name = findUser(executor, args[1])
+			if not userId or not name then
+				return "Player not found"
+			end
+			local info = S.StaffService:GetInfo(userId, name)
+			local groups = {}
+			for id in info.Groups do
+				table.insert(groups, id)
+			end
+			table.sort(groups)
+			return name .. ": " .. (#groups > 0 and table.concat(groups, ", ") or "no permissions") .. (info.Title and (" • title \"" .. info.Title.Text .. "\"") or "")
 		end,
 	})
 
@@ -1188,9 +1379,8 @@ function AdminService:Execute(executor: Player, text: string): (boolean, string)
 	if not command then
 		return false, "Unknown command '" .. name .. "'. Try " .. prefix .. "cmds"
 	end
-	local rank = self:GetRank(executor)
-	if rank < command.Rank then
-		return false, "You need " .. Config.RankNames[command.Rank] .. " for that"
+	if not self:CanRun(executor, command) then
+		return false, "You need " .. Config.RankNames[command.Rank] .. " (or that permission) for that"
 	end
 	local ok, result = pcall(command.Run, executor, args)
 	table.insert(logs, 1, { Time = os.time(), By = executor.Name, Text = prefix .. text })
@@ -1207,6 +1397,7 @@ end
 function AdminService:Init(services)
 	S = services
 	buildCommands()
+	assignGroups()
 
 	local function onPlayer(player: Player)
 		task.spawn(function()
@@ -1220,7 +1411,7 @@ function AdminService:Init(services)
 				return
 			end
 			local prefix = Config.Admin.Prefix
-			if message:sub(1, #prefix) ~= prefix or self:GetRank(player) <= 0 then
+			if message:sub(1, #prefix) ~= prefix or not self:HasAccess(player) then
 				return
 			end
 			local ok, result = self:Execute(player, message)
@@ -1239,7 +1430,7 @@ function AdminService:Init(services)
 	end)
 
 	Remotes.AdminCommand.OnServerInvoke = function(player, text)
-		if self:GetRank(player) <= 0 then
+		if not self:HasAccess(player) then
 			if S.AntiCheatService then
 				S.AntiCheatService:Flag(player, "AdminRemote", "Called the AdminCommand remote without an admin rank")
 			end
@@ -1248,9 +1439,9 @@ function AdminService:Init(services)
 		return self:Execute(player, text)
 	end
 
-	Remotes.AdminData.OnServerInvoke = function(player, what)
+	Remotes.AdminData.OnServerInvoke = function(player, what, arg)
 		local rank = self:GetRank(player)
-		if rank <= 0 then
+		if not self:HasAccess(player) then
 			if S.AntiCheatService then
 				S.AntiCheatService:Flag(player, "AdminRemote", "Called the AdminData remote without an admin rank")
 			end
@@ -1262,9 +1453,21 @@ function AdminService:Init(services)
 		elseif what == "commands" then
 			local list = {}
 			for _, c in commands do
-				table.insert(list, { Name = c.Name, Aliases = c.Aliases, Rank = c.Rank, Args = c.Args, Desc = c.Desc, Allowed = rank >= c.Rank })
+				table.insert(list, { Name = c.Name, Aliases = c.Aliases, Rank = c.Rank, Args = c.Args, Desc = c.Desc, Allowed = self:CanRun(player, c) })
 			end
 			return list
+		elseif what == "staff" then
+			-- the Staff tab: the groups, who has what, and the colours (rank GrantRank/TitleRank and up)
+			if rank < Config.Admin.TitleRank then
+				return nil
+			end
+			return { Overview = S.StaffService:GetOverview(), CanGrant = rank >= Config.Admin.GrantRank }
+		elseif what == "staffplayer" then
+			if rank < Config.Admin.TitleRank then
+				return nil
+			end
+			local userId, name = findUser(player, type(arg) == "string" and arg or nil)
+			return userId and name and S.StaffService:GetInfo(userId, name) or nil
 		elseif what == "logs" then
 			return logs
 		elseif what == "players" then

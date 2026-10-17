@@ -775,6 +775,40 @@ Config.GamePasses = {
 	},
 }
 
+---------------------------------------------------------------------------
+-- Gifts. Players can buy a pass or a cash pack FOR another player in their
+-- server. Roblox only lets a game pass be bought by its own owner, so each gift
+-- is a Developer Product with the same price: create one per item on the
+-- Creator Dashboard (Monetization > Developer Products), name it e.g.
+-- "Gift: 2x Cash", and paste its ID below. 0 = gifting that item is off
+-- (in Studio it is simulated for free).
+---------------------------------------------------------------------------
+Config.GiftProducts = {
+	DoubleCash = 0,
+	AutoCollect = 0,
+	FastDroppers = 0,
+	VIP = 0,
+	SuperSpeed = 0,
+	AutoBuild = 0,
+	PetLuck = 0,
+	PetPower = 0,
+	PetSlot = 0,
+	OfflineBoost = 0,
+	Discount = 0,
+	IslandExpress = 0,
+	WheelPlus = 0,
+	ShieldPro = 0,
+	RebirthBoost = 0,
+	GiftBoost = 0,
+	-- cash packs and boosts
+	CashSmall = 0,
+	CashMedium = 0,
+	CashLarge = 0,
+	CashHuge = 0,
+	Boost = 0,
+	InstantRepair = 0,
+}
+
 -- Automatic server-wide cash events (a reason to stay in the server)
 Config.AutoEvents = {
 	Enabled = true,
@@ -902,6 +936,39 @@ Config.Admin = {
 		-- [255] = 4, [254] = 3, [200] = 2, [100] = 1,
 	},
 	BanDataStore = "MegaTycoon_Bans_v1",
+	StaffDataStore = "MegaTycoon_Staff_v1", -- saved permissions, titles and passes waiting for offline players
+	GrantRank = 4, -- rank needed to tick permissions (;giveperm / ;takeperm)
+	TitleRank = 3, -- rank needed to give titles (or the "Titles" permission)
+	MaxTitleLength = 24,
+	StaffRefreshSeconds = 60, -- how often a server re-reads the saved permissions and titles
+	-- Permissions you can tick for ANY player in the admin panel (Staff tab), even
+	-- without a rank. A ticked group lets them run its commands. Commands = names,
+	-- MaxRank = every command up to that rank. Owner-only commands can never be granted.
+	Permissions = {
+		{ Id = "Mod", Name = "Mod commands", Icon = "🛡️", Desc = "Every Mod command: teleport, bring, view, fly, noclip, speed, god...", MaxRank = 1 },
+		{ Id = "Moderation", Name = "Kick & ban", Icon = "🔨", Desc = "kick, ban, unban, strikes", Commands = { "kick", "ban", "unban", "strikes", "clearstrikes" } },
+		{ Id = "Disasters", Name = "Disasters", Icon = "☢️", Desc = "Start any disaster (nuke, tornado...), repair and wreck towers", Commands = { "nuke", "meteors", "tornado", "ufo", "earthquake", "disaster", "stopdisaster", "wreck", "repair" } },
+		{ Id = "Economy", Name = "Cash & progress", Icon = "💰", Desc = "givecash, rebirths, unlock floors, secrets, duo", Commands = { "givecash", "setcash", "takecash", "giverebirth", "rebirth", "unlockall", "unlockfloor", "givesecrets", "resetsecrets", "duo", "unduo" } },
+		{ Id = "Passes", Name = "Give passes & pets", Icon = "🎁", Desc = "givepass, removepass, givepet", Commands = { "givepass", "removepass", "givepet" } },
+		{ Id = "Events", Name = "Events & world", Icon = "🎉", Desc = "cash rain, 2x events, minigames, time, music, announcements", Commands = { "cashrain", "doublecash", "minigame", "time", "m", "music", "stopmusic", "confetti" } },
+		{ Id = "Fun", Name = "Fun effects", Icon = "✨", Desc = "explode, giant, tiny, sparkles, fire, invisible...", Commands = { "explode", "giant", "tiny", "normal", "sparkles", "fire", "smoke", "unfx", "invisible", "visible", "fling", "launch" } },
+		{ Id = "Titles", Name = "Give titles", Icon = "🏷️", Desc = "Set glowing titles above players' heads", Commands = { "title", "cleartitle" } },
+		{ Id = "AdminTools", Name = "All Admin commands", Icon = "⭐", Desc = "Everything an Admin can do (Mod + Admin ranks)", MaxRank = 2 },
+	},
+	-- colours offered for titles ("Rainbow" cycles through all colours)
+	TitleColors = {
+		{ Name = "Gold", Hex = "#FFD700" },
+		{ Name = "Red", Hex = "#FF4040" },
+		{ Name = "Pink", Hex = "#FF6EC7" },
+		{ Name = "Purple", Hex = "#B05CFF" },
+		{ Name = "Blue", Hex = "#4DA3FF" },
+		{ Name = "Cyan", Hex = "#35E8FF" },
+		{ Name = "Green", Hex = "#4CE06A" },
+		{ Name = "Lime", Hex = "#B8FF3A" },
+		{ Name = "Orange", Hex = "#FF9A2E" },
+		{ Name = "White", Hex = "#FFFFFF" },
+		{ Name = "Rainbow", Hex = "rainbow" },
+	},
 }
 
 ---------------------------------------------------------------------------
@@ -1310,6 +1377,17 @@ function Config.PetsBonus(pets: any): number
 	return total
 end
 
+-- can this pass ("Pass") or product ("Product") be gifted? Server events (nukes, cash rain) can't.
+function Config.CanGift(kind: any, key: any): boolean
+	if kind == "Pass" then
+		return type(key) == "string" and Config.GamePasses[key] ~= nil
+	elseif kind == "Product" then
+		local product = type(key) == "string" and Config.Products[key]
+		return product ~= nil and product ~= false and product.ServerEvent == nil
+	end
+	return false
+end
+
 return Config
 ]]></string>
         </Properties>
@@ -1349,6 +1427,7 @@ local EVENTS = {
 	"GiftUpdate", -- server -> client  { Index, ReadyIn, Total }
 	"WeeklyUpdate", -- server -> client  { Days, DayFlags, Claimed, ResetsIn }
 	"PetUpdate", -- server -> client  { Owned, Equipped, Slots, Eggs }
+	"GiftItem", -- client -> server  ("Pass"|"Product", key, targetUserId)
 }
 
 local FUNCTIONS = {
@@ -2570,6 +2649,7 @@ local ORDER = {
 	"WeeklyService",
 	"DisasterService",
 	"AdminService",
+	"StaffService",
 	"AntiCheatService",
 	"MinigameService",
 	"RewardService",
@@ -2630,6 +2710,10 @@ print("[MegaTycoon] Server started - v" .. require(game:GetService("ReplicatedSt
 	Player selectors: me, all, others, random, admins, nonadmins,
 	partial names ("rob" -> Roblox), or comma lists ("me,bob").
 	Amounts accept suffixes: 10k, 2.5m, 1b
+
+	Besides ranks, any player can be given permission GROUPS (Config.Admin.Permissions)
+	by the Owner (Staff tab or ;giveperm). They are saved by StaffService and show up
+	here as the player attribute "AdminPerms".
 ]]
 local DataStoreService = game:GetService("DataStoreService")
 local Lighting = game:GetService("Lighting")
@@ -2695,6 +2779,29 @@ end
 
 function AdminService:GetRank(player: Player): number
 	return tonumber(player:GetAttribute("AdminRank")) or 0
+end
+
+local function permsOf(player: Player): { string }
+	local perms = player:GetAttribute("AdminPerms")
+	return (type(perms) == "string" and perms ~= "") and (perms :: string):split(",") or {}
+end
+
+-- a rank or at least one ticked permission group
+function AdminService:HasAccess(player: Player): boolean
+	return self:GetRank(player) > 0 or #permsOf(player) > 0
+end
+
+-- may this player run the command (by rank, or through a ticked group)?
+function AdminService:CanRun(player: Player, command): boolean
+	if self:GetRank(player) >= command.Rank then
+		return true
+	end
+	for _, id in permsOf(player) do
+		if table.find(command.Groups or {}, id) then
+			return true
+		end
+	end
+	return false
 end
 
 local function filterBroadcast(text: string, from: Player): string?
@@ -2843,7 +2950,8 @@ local function eachTarget(executor: Player, selector: string?, harmful: boolean,
 	for _, target in targets do
 		-- staff can't be harmed by equal/lower ranks (the Owner can do anything,
 		-- which also lets Studio play-testers - all Owners - test on each other)
-		if harmful and target ~= executor and myRank < 4 and AdminService:GetRank(target) >= myRank then
+		local targetRank = AdminService:GetRank(target)
+		if harmful and target ~= executor and myRank < 4 and targetRank > 0 and targetRank >= myRank then
 			continue
 		end
 		local ok, err = pcall(fn, target)
@@ -2873,6 +2981,48 @@ local function charCommand(name, aliases, rank, desc, harmful, fn)
 			return name .. ": " .. namesOf(affected)
 		end,
 	})
+end
+
+-- a player in this server (selector or partial name) or any user by name / UserId
+local function findUser(executor: Player, token: string?): (number?, string?)
+	if not token or token == "" then
+		return nil, nil
+	end
+	local found = resolvePlayers(executor, token)
+	if found[1] then
+		return found[1].UserId, found[1].Name
+	end
+	return resolveUserId(token)
+end
+
+local function groupIdOf(text: string?): string?
+	for _, group in Config.Admin.Permissions do
+		if text and group.Id:lower() == text:lower() then
+			return group.Id
+		end
+	end
+	return nil
+end
+
+-- which permission groups each command belongs to (Owner-only commands never)
+local function assignGroups()
+	for _, group in Config.Admin.Permissions do
+		local names = {}
+		for _, name in group.Commands or {} do
+			names[name:lower()] = true
+		end
+		if group.Id == "Disasters" then
+			for _, def in Config.ExtraDisasters do
+				names[def.Name:lower()] = true
+			end
+		end
+		for _, def in commands do
+			if def.Rank < 4 and (names[def.Name:lower()] or (group.MaxRank ~= nil and def.Rank <= group.MaxRank)) then
+				def.Groups = def.Groups or {}
+				table.insert(def.Groups, group.Id)
+			end
+		end
+	end
 end
 
 local function buildCommands()
@@ -3645,8 +3795,8 @@ local function buildCommands()
 		Name = "givepass",
 		Aliases = { "pass" },
 		Rank = 3,
-		Args = "<player> <DoubleCash|AutoCollect|FastDroppers|VIP|SuperSpeed>",
-		Desc = "Give a game pass for free",
+		Args = "<player or name> <pass>",
+		Desc = "Give a game pass for free (works for offline players too; see Config.GamePasses)",
 		Run = function(executor, args)
 			local key
 			for k in Config.GamePasses do
@@ -3657,8 +3807,17 @@ local function buildCommands()
 			if not key then
 				return "Unknown pass"
 			end
+			if #resolvePlayers(executor, args[1]) == 0 then
+				-- not in this server: they get it the next time they join
+				local userId, name = resolveUserId(args[1])
+				if not userId then
+					return "Player not found"
+				end
+				S.StaffService:QueuePass(userId, key, executor.DisplayName)
+				return key .. " will be given to " .. tostring(name) .. " when they next join"
+			end
 			local affected = eachTarget(executor, args[1], false, function(target)
-				S.MonetizationService:GrantPass(target, key)
+				S.MonetizationService:GrantPass(target, key, target ~= executor and executor.DisplayName or nil)
 			end)
 			return "Gave " .. key .. " to " .. namesOf(affected)
 		end,
@@ -3707,6 +3866,118 @@ local function buildCommands()
 				S.MonetizationService:RevokePass(target, key)
 			end)
 			return "Removed " .. key .. " from " .. namesOf(affected)
+		end,
+	})
+
+	register({
+		Name = "title",
+		Aliases = { "settitle", "nick" },
+		Rank = Config.Admin.TitleRank,
+		Args = "<player> <color|#hex|rainbow> <text>",
+		Desc = "Give a glowing title above a player's head (saved)",
+		Run = function(executor, args)
+			local userId, name = findUser(executor, args[1])
+			if not userId or not name then
+				return "Player not found"
+			end
+			local color = S.StaffService:ParseColor(args[2])
+			if not color then
+				return "Pick a colour: gold, red, pink, purple, blue, cyan, green, lime, orange, white, rainbow or #RRGGBB"
+			end
+			local text = S.StaffService:CleanTitle(restText(args, 3))
+			if not text then
+				return "Write the title text after the colour"
+			end
+			S.StaffService:SetTitle(userId, name, text, color, executor.Name)
+			return name .. " now has the title \"" .. text .. "\""
+		end,
+	})
+	register({
+		Name = "cleartitle",
+		Aliases = { "removetitle" },
+		Rank = Config.Admin.TitleRank,
+		Args = "<player>",
+		Desc = "Remove a player's title",
+		Run = function(executor, args)
+			local userId, name = findUser(executor, args[1])
+			if not userId then
+				return "Player not found"
+			end
+			return S.StaffService:ClearTitle(userId) and ("Removed the title of " .. tostring(name)) or (tostring(name) .. " had no title")
+		end,
+	})
+	register({
+		Name = "giveperm",
+		Aliases = { "addperm" },
+		Rank = Config.Admin.GrantRank,
+		Args = "<player> <group|all>",
+		Desc = "Tick a permission group for a player (groups: see the Staff tab)",
+		Run = function(executor, args)
+			local userId, name = findUser(executor, args[1])
+			if not userId or not name then
+				return "Player not found"
+			end
+			local ids = {}
+			if args[2] and args[2]:lower() == "all" then
+				for _, group in Config.Admin.Permissions do
+					table.insert(ids, group.Id)
+				end
+			elseif groupIdOf(args[2]) then
+				table.insert(ids, groupIdOf(args[2]) :: string)
+			else
+				local names = {}
+				for _, group in Config.Admin.Permissions do
+					table.insert(names, group.Id)
+				end
+				return "Unknown group. Groups: " .. table.concat(names, ", ")
+			end
+			for _, id in ids do
+				S.StaffService:SetGroup(userId, name, id, true, executor.Name)
+			end
+			return "Gave " .. name .. ": " .. table.concat(ids, ", ")
+		end,
+	})
+	register({
+		Name = "takeperm",
+		Aliases = { "removeperm" },
+		Rank = Config.Admin.GrantRank,
+		Args = "<player> <group|all>",
+		Desc = "Untick a permission group for a player",
+		Run = function(executor, args)
+			local userId, name = findUser(executor, args[1])
+			if not userId or not name then
+				return "Player not found"
+			end
+			if args[2] and args[2]:lower() == "all" then
+				S.StaffService:ClearGroups(userId)
+				return "Removed every permission of " .. name
+			end
+			local id = groupIdOf(args[2])
+			if not id then
+				return "Unknown group"
+			end
+			S.StaffService:SetGroup(userId, name, id, false, executor.Name)
+			return "Removed " .. id .. " from " .. name
+		end,
+	})
+	register({
+		Name = "perms",
+		Aliases = { "permissions" },
+		Rank = Config.Admin.GrantRank,
+		Args = "<player>",
+		Desc = "Show a player's permission groups and title",
+		Run = function(executor, args)
+			local userId, name = findUser(executor, args[1])
+			if not userId or not name then
+				return "Player not found"
+			end
+			local info = S.StaffService:GetInfo(userId, name)
+			local groups = {}
+			for id in info.Groups do
+				table.insert(groups, id)
+			end
+			table.sort(groups)
+			return name .. ": " .. (#groups > 0 and table.concat(groups, ", ") or "no permissions") .. (info.Title and (" • title \"" .. info.Title.Text .. "\"") or "")
 		end,
 	})
 
@@ -3813,9 +4084,8 @@ function AdminService:Execute(executor: Player, text: string): (boolean, string)
 	if not command then
 		return false, "Unknown command '" .. name .. "'. Try " .. prefix .. "cmds"
 	end
-	local rank = self:GetRank(executor)
-	if rank < command.Rank then
-		return false, "You need " .. Config.RankNames[command.Rank] .. " for that"
+	if not self:CanRun(executor, command) then
+		return false, "You need " .. Config.RankNames[command.Rank] .. " (or that permission) for that"
 	end
 	local ok, result = pcall(command.Run, executor, args)
 	table.insert(logs, 1, { Time = os.time(), By = executor.Name, Text = prefix .. text })
@@ -3832,6 +4102,7 @@ end
 function AdminService:Init(services)
 	S = services
 	buildCommands()
+	assignGroups()
 
 	local function onPlayer(player: Player)
 		task.spawn(function()
@@ -3845,7 +4116,7 @@ function AdminService:Init(services)
 				return
 			end
 			local prefix = Config.Admin.Prefix
-			if message:sub(1, #prefix) ~= prefix or self:GetRank(player) <= 0 then
+			if message:sub(1, #prefix) ~= prefix or not self:HasAccess(player) then
 				return
 			end
 			local ok, result = self:Execute(player, message)
@@ -3864,7 +4135,7 @@ function AdminService:Init(services)
 	end)
 
 	Remotes.AdminCommand.OnServerInvoke = function(player, text)
-		if self:GetRank(player) <= 0 then
+		if not self:HasAccess(player) then
 			if S.AntiCheatService then
 				S.AntiCheatService:Flag(player, "AdminRemote", "Called the AdminCommand remote without an admin rank")
 			end
@@ -3873,9 +4144,9 @@ function AdminService:Init(services)
 		return self:Execute(player, text)
 	end
 
-	Remotes.AdminData.OnServerInvoke = function(player, what)
+	Remotes.AdminData.OnServerInvoke = function(player, what, arg)
 		local rank = self:GetRank(player)
-		if rank <= 0 then
+		if not self:HasAccess(player) then
 			if S.AntiCheatService then
 				S.AntiCheatService:Flag(player, "AdminRemote", "Called the AdminData remote without an admin rank")
 			end
@@ -3887,9 +4158,21 @@ function AdminService:Init(services)
 		elseif what == "commands" then
 			local list = {}
 			for _, c in commands do
-				table.insert(list, { Name = c.Name, Aliases = c.Aliases, Rank = c.Rank, Args = c.Args, Desc = c.Desc, Allowed = rank >= c.Rank })
+				table.insert(list, { Name = c.Name, Aliases = c.Aliases, Rank = c.Rank, Args = c.Args, Desc = c.Desc, Allowed = self:CanRun(player, c) })
 			end
 			return list
+		elseif what == "staff" then
+			-- the Staff tab: the groups, who has what, and the colours (rank GrantRank/TitleRank and up)
+			if rank < Config.Admin.TitleRank then
+				return nil
+			end
+			return { Overview = S.StaffService:GetOverview(), CanGrant = rank >= Config.Admin.GrantRank }
+		elseif what == "staffplayer" then
+			if rank < Config.Admin.TitleRank then
+				return nil
+			end
+			local userId, name = findUser(player, type(arg) == "string" and arg or nil)
+			return userId and name and S.StaffService:GetInfo(userId, name) or nil
 		elseif what == "logs" then
 			return logs
 		elseif what == "players" then
@@ -7694,6 +7977,20 @@ for key, product in Config.Products do
 	end
 end
 
+-- gift developer products -> what they gift
+local giftById: { [number]: { Kind: string, Key: string } } = {}
+for key, id in Config.GiftProducts do
+	if id ~= 0 then
+		local kind = passByKey[key] and "Pass" or (Config.Products[key] and "Product" or nil)
+		if kind and Config.CanGift(kind, key) then
+			giftById[id] = { Kind = kind, Key = key }
+		end
+	end
+end
+-- buyer UserId -> gift product id -> the gift they are paying for
+local pendingGifts: { [number]: { [number]: { Kind: string, Key: string, Target: number } } } = {}
+local lastGift: { [Player]: number } = {}
+
 local function canSimulate()
 	return RunService:IsStudio() and Config.Monetization.SimulateUnconfiguredInStudio
 end
@@ -7732,6 +8029,13 @@ function MonetizationService:Init(services)
 	end)
 	Remotes.BuyProduct.OnServerEvent:Connect(function(player, key)
 		self:PromptProduct(player, key)
+	end)
+	Remotes.GiftItem.OnServerEvent:Connect(function(player, kind, key, targetUserId)
+		self:PromptGift(player, kind, key, targetUserId)
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		lastGift[player] = nil
+		pendingGifts[player.UserId] = nil
 	end)
 
 	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player, passId, purchased)
@@ -7798,13 +8102,14 @@ function MonetizationService:RefreshCharacter(player: Player)
 	end
 end
 
--- grant = also store in data (admin / simulated purchases)
-function MonetizationService:GrantPass(player: Player, key: string)
+-- grant = also store in data (admin / simulated purchases / gifts).
+-- `from` = who gave it (admins, gifts); without it the player is thanked for buying it.
+function MonetizationService:GrantPass(player: Player, key: string, from: string?)
 	local data = S.DataService:Get(player)
 	if data then
 		data.Passes[key] = true
 	end
-	self:_applyPass(player, key, true)
+	self:_applyPass(player, key, true, from)
 end
 
 function MonetizationService:RevokePass(player: Player, key: string)
@@ -7819,7 +8124,7 @@ function MonetizationService:RevokePass(player: Player, key: string)
 	end
 end
 
-function MonetizationService:_applyPass(player: Player, key: string, announce: boolean)
+function MonetizationService:_applyPass(player: Player, key: string, announce: boolean, from: string?)
 	if not passByKey[key] then
 		return
 	end
@@ -7836,9 +8141,11 @@ function MonetizationService:_applyPass(player: Player, key: string, announce: b
 	end
 	if announce then
 		local pass = passByKey[key]
-		Remotes.Notify:FireClient(player, { Text = "Thanks for buying " .. pass.Name .. "! " .. pass.Icon, Type = "success", Duration = 6 })
+		local text = from and ("🎁 " .. from .. " gave you " .. pass.Name .. "! " .. pass.Icon) or ("Thanks for buying " .. pass.Name .. "! " .. pass.Icon)
+		Remotes.Notify:FireClient(player, { Text = text, Type = "success", Duration = 6 })
 		Remotes.VFX:FireAllClients("Purchase", { Position = player.Character and player.Character:GetPivot().Position, Color = pass.Color, Big = true })
-		Remotes.Announce:FireAllClients({ Title = "🎉 " .. player.DisplayName .. " bought " .. pass.Name .. "!", Text = pass.Description, Color = pass.Color })
+		local title = from and ("🎁 " .. player.DisplayName .. " got " .. pass.Name .. " from " .. from .. "!") or ("🎉 " .. player.DisplayName .. " bought " .. pass.Name .. "!")
+		Remotes.Announce:FireAllClients({ Title = title, Text = pass.Description, Color = pass.Color })
 	end
 end
 
@@ -7928,6 +8235,55 @@ function MonetizationService:PromptProduct(player: Player, key: any)
 	MarketplaceService:PromptProductPurchase(player, product.Id)
 end
 
+-- "Gift" button: the buyer pays Robux, `target` (in this server) gets the item
+function MonetizationService:PromptGift(player: Player, kind: any, key: any, targetUserId: any)
+	if not Config.CanGift(kind, key) or type(targetUserId) ~= "number" then
+		return
+	end
+	local entry = kind == "Pass" and passByKey[key] or Config.Products[key]
+	local target = Players:GetPlayerByUserId(targetUserId)
+	if not target or target == player or not S.DataService:IsLoaded(target) then
+		Remotes.Notify:FireClient(player, { Text = "Pick another player who is in this server.", Type = "error" })
+		return
+	end
+	if lastGift[player] and os.clock() - lastGift[player] < 2 then
+		return
+	end
+	lastGift[player] = os.clock()
+	if kind == "Pass" and self:HasPass(target, key) then
+		Remotes.Notify:FireClient(player, { Text = target.DisplayName .. " already owns " .. entry.Name .. "!", Type = "info" })
+		return
+	end
+	local giftId = Config.GiftProducts[key] or 0
+	if giftId == 0 then
+		if canSimulate() then
+			Remotes.Notify:FireClient(player, { Text = "[Studio] Simulated gift of " .. entry.Name, Type = "info" })
+			self:_deliverGift(player, target, kind, key)
+		else
+			Remotes.Notify:FireClient(player, { Text = "Gifting this isn't available yet!", Type = "error" })
+		end
+		return
+	end
+	local pending = pendingGifts[player.UserId] or {}
+	pendingGifts[player.UserId] = pending
+	pending[giftId] = { Kind = kind, Key = key, Target = target.UserId }
+	MarketplaceService:PromptProductPurchase(player, giftId)
+end
+
+function MonetizationService:_deliverGift(buyer: Player, target: Player, kind: string, key: string): boolean
+	local entry = kind == "Pass" and passByKey[key] or Config.Products[key]
+	if kind == "Pass" then
+		self:GrantPass(target, key, buyer.DisplayName)
+	else
+		if not self:_grantProduct(target, key) then
+			return false
+		end
+		Remotes.Notify:FireClient(target, { Text = "🎁 " .. buyer.DisplayName .. " sent you " .. entry.Name .. "!", Type = "success", Duration = 6 })
+	end
+	Remotes.Notify:FireClient(buyer, { Text = "🎁 " .. target.DisplayName .. " got your gift: " .. entry.Name .. "!", Type = "success", Duration = 6 })
+	return true
+end
+
 function MonetizationService:_grantProduct(player: Player, key: string): boolean
 	local product = Config.Products[key]
 	local data = S.DataService:Get(player)
@@ -7976,9 +8332,34 @@ function MonetizationService:CashRain(byName: string)
 	end
 end
 
+-- a paid gift: to the chosen player; if they left, passes wait for their next join and
+-- anything else goes to the buyer (so the Robux are never wasted)
+function MonetizationService:_receiveGift(buyer: Player, productId: number, gift): boolean
+	local pending = pendingGifts[buyer.UserId] and pendingGifts[buyer.UserId][productId]
+	if pending then
+		pendingGifts[buyer.UserId][productId] = nil
+	end
+	local target = pending and Players:GetPlayerByUserId(pending.Target)
+	if target and target ~= buyer and S.DataService:IsLoaded(target) then
+		return self:_deliverGift(buyer, target, gift.Kind, gift.Key)
+	end
+	if pending and gift.Kind == "Pass" then
+		S.StaffService:QueuePass(pending.Target, gift.Key, buyer.DisplayName)
+		Remotes.Notify:FireClient(buyer, { Text = "🎁 They left - they'll get the pass when they next join!", Type = "info", Duration = 6 })
+		return true
+	end
+	Remotes.Notify:FireClient(buyer, { Text = "🎁 Your gift receiver left, so the " .. (gift.Kind == "Pass" and "pass" or "item") .. " is yours!", Type = "info", Duration = 8 })
+	if gift.Kind == "Pass" then
+		self:GrantPass(buyer, gift.Key)
+		return true
+	end
+	return self:_grantProduct(buyer, gift.Key)
+end
+
 function MonetizationService:_processReceipt(receipt)
+	local gift = giftById[receipt.ProductId]
 	local key = productKeyById[receipt.ProductId]
-	if not key then
+	if not key and not gift then
 		warn("[Monetization] Unknown product id " .. tostring(receipt.ProductId))
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
@@ -8000,7 +8381,12 @@ function MonetizationService:_processReceipt(receipt)
 		end
 	end
 
-	local granted = self:_grantProduct(player, key)
+	local granted
+	if gift then
+		granted = self:_receiveGift(player, receipt.ProductId, gift)
+	else
+		granted = self:_grantProduct(player, key)
+	end
 	if not granted then
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
@@ -9413,6 +9799,415 @@ return ShieldService
       </Item>
       <Item class="ModuleScript" referent="31">
         <Properties>
+          <string name="Name">StaffService</string>
+          <string name="Source"><![CDATA[--[[
+	StaffService - per-player admin permissions, glowing titles, and passes
+	waiting for players who are offline.
+
+	Everything is saved in one DataStore registry (shared by all servers, re-read
+	every Config.Admin.StaffRefreshSeconds):
+	  Perms[userId]   = { Name, Groups = { [groupId] = true }, By, Time }
+	  Titles[userId]  = { Name, Text, Color = "#RRGGBB" | "rainbow", By, Time }
+	  Pending[userId] = { { Key, From, Time } }   passes to hand over on the next join
+
+	A player with ticked permission groups gets the player attribute "AdminPerms"
+	("Moderation,Disasters"); AdminService lets them run those groups' commands.
+	A title is a glowing billboard above the head, also shown in chat.
+]]
+local CollectionService = game:GetService("CollectionService")
+local DataStoreService = game:GetService("DataStoreService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+
+local AC = Config.Admin
+
+local StaffService = {}
+local S
+
+local store: DataStore? = nil
+pcall(function()
+	store = DataStoreService:GetDataStore(AC.StaffDataStore)
+end)
+
+local registry: { Perms: { [string]: any }, Titles: { [string]: any }, Pending: { [string]: any } } = { Perms = {}, Titles = {}, Pending = {} }
+local loaded = false
+
+local groupById: { [string]: any } = {}
+for _, group in AC.Permissions do
+	groupById[group.Id] = group
+end
+StaffService.Groups = groupById
+
+local colorByName: { [string]: string } = {}
+for _, entry in AC.TitleColors do
+	colorByName[entry.Name:lower()] = entry.Hex
+end
+
+---------------------------------------------------------------------------
+-- Saved registry
+---------------------------------------------------------------------------
+local function normalize(reg: any)
+	reg.Perms = reg.Perms or {}
+	reg.Titles = reg.Titles or {}
+	reg.Pending = reg.Pending or {}
+	return reg
+end
+
+-- applies `mutate` to the saved registry (atomically across servers) and caches the result
+function StaffService:_commit(mutate: (any) -> ()): boolean
+	local dataStore = store
+	if dataStore then
+		local ok, result = pcall(function()
+			return dataStore:UpdateAsync("Registry", function(old)
+				local reg = normalize(type(old) == "table" and old or {})
+				mutate(reg)
+				return reg
+			end)
+		end)
+		if ok and type(result) == "table" then
+			registry = normalize(result)
+			return true
+		end
+		warn("[Staff] could not save the registry: " .. tostring(result))
+	end
+	mutate(registry)
+	return false
+end
+
+function StaffService:Refresh()
+	local dataStore = store
+	if not dataStore then
+		return
+	end
+	local ok, result = pcall(function()
+		return dataStore:GetAsync("Registry")
+	end)
+	if ok and type(result) == "table" then
+		registry = normalize(result)
+		for _, player in Players:GetPlayers() do
+			self:Apply(player)
+		end
+	end
+end
+
+---------------------------------------------------------------------------
+-- Reading
+---------------------------------------------------------------------------
+function StaffService:GetGroups(userId: number): { [string]: boolean }
+	local entry = registry.Perms[tostring(userId)]
+	return entry and entry.Groups or {}
+end
+
+function StaffService:GetTitle(userId: number)
+	return registry.Titles[tostring(userId)]
+end
+
+-- everyone with permissions or a title (for the admin panel)
+function StaffService:GetOverview()
+	local seen, list = {}, {}
+	local function add(key: string, name: string)
+		if seen[key] then
+			return
+		end
+		seen[key] = true
+		local groups = {}
+		for id in (registry.Perms[key] and registry.Perms[key].Groups or {}) do
+			table.insert(groups, id)
+		end
+		table.sort(groups)
+		local title = registry.Titles[key]
+		table.insert(list, {
+			UserId = tonumber(key) or 0,
+			Name = name,
+			Groups = groups,
+			Title = title and { Text = title.Text, Color = title.Color } or nil,
+		})
+	end
+	for key, entry in registry.Perms do
+		add(key, entry.Name)
+	end
+	for key, entry in registry.Titles do
+		add(key, entry.Name)
+	end
+	table.sort(list, function(a, b)
+		return a.Name:lower() < b.Name:lower()
+	end)
+	return list
+end
+
+-- the saved state of one user (online or not)
+function StaffService:GetInfo(userId: number, name: string)
+	local groups = {}
+	for id in self:GetGroups(userId) do
+		groups[id] = true
+	end
+	local title = self:GetTitle(userId)
+	local online = Players:GetPlayerByUserId(userId)
+	local passes = {}
+	if online then
+		for key in Config.GamePasses do
+			if online:GetAttribute("Pass_" .. key) then
+				passes[key] = true
+			end
+		end
+	end
+	local pending = {}
+	for _, entry in registry.Pending[tostring(userId)] or {} do
+		table.insert(pending, entry.Key)
+	end
+	return {
+		UserId = userId,
+		Name = name,
+		Online = online ~= nil,
+		Groups = groups,
+		Title = title and { Text = title.Text, Color = title.Color } or nil,
+		Passes = passes,
+		Pending = pending,
+	}
+end
+
+---------------------------------------------------------------------------
+-- Writing
+---------------------------------------------------------------------------
+function StaffService:SetGroup(userId: number, name: string, groupId: string, enabled: boolean, by: string): boolean
+	if not groupById[groupId] then
+		return false
+	end
+	local key = tostring(userId)
+	self:_commit(function(reg)
+		local entry = reg.Perms[key] or { Groups = {} }
+		entry.Name, entry.By, entry.Time = name, by, os.time()
+		entry.Groups[groupId] = enabled and true or nil
+		if next(entry.Groups) == nil then
+			reg.Perms[key] = nil
+		else
+			reg.Perms[key] = entry
+		end
+	end)
+	local player = Players:GetPlayerByUserId(userId)
+	if player then
+		self:Apply(player)
+	end
+	return true
+end
+
+function StaffService:ClearGroups(userId: number)
+	self:_commit(function(reg)
+		reg.Perms[tostring(userId)] = nil
+	end)
+	local player = Players:GetPlayerByUserId(userId)
+	if player then
+		self:Apply(player)
+	end
+end
+
+-- "#RRGGBB", "rainbow", or a colour name from Config.Admin.TitleColors -> stored form, or nil
+function StaffService:ParseColor(input: string?): string?
+	if not input then
+		return nil
+	end
+	local text = (input :: string):lower()
+	if colorByName[text] then
+		return colorByName[text]
+	end
+	if text == "rainbow" then
+		return "rainbow"
+	end
+	local hex = text:match("^#?(%x%x%x%x%x%x)$")
+	return hex and ("#" .. hex:upper()) or nil
+end
+
+-- cleans the text of a title; nil if nothing is left
+function StaffService:CleanTitle(input: string?): string?
+	if type(input) ~= "string" then
+		return nil
+	end
+	local text: string = (input :: string):gsub("[<>%c]", ""):gsub("^%s+", ""):gsub("%s+$", "")
+	local length = utf8.len(text)
+	if not length or length == 0 then
+		return nil
+	end
+	if length > AC.MaxTitleLength then
+		text = text:sub(1, (utf8.offset(text, AC.MaxTitleLength + 1) or #text + 1) - 1)
+	end
+	return text
+end
+
+function StaffService:SetTitle(userId: number, name: string, text: string, color: string, by: string)
+	self:_commit(function(reg)
+		reg.Titles[tostring(userId)] = { Name = name, Text = text, Color = color, By = by, Time = os.time() }
+	end)
+	local player = Players:GetPlayerByUserId(userId)
+	if player then
+		self:Apply(player)
+	end
+end
+
+function StaffService:ClearTitle(userId: number): boolean
+	local had = false
+	self:_commit(function(reg)
+		had = reg.Titles[tostring(userId)] ~= nil
+		reg.Titles[tostring(userId)] = nil
+	end)
+	local player = Players:GetPlayerByUserId(userId)
+	if player then
+		self:Apply(player)
+	end
+	return had
+end
+
+-- a pass for a player who is not here: handed over when they next join
+function StaffService:QueuePass(userId: number, key: string, from: string)
+	self:_commit(function(reg)
+		local list = reg.Pending[tostring(userId)] or {}
+		for _, entry in list do
+			if entry.Key == key then
+				return
+			end
+		end
+		table.insert(list, { Key = key, From = from, Time = os.time() })
+		reg.Pending[tostring(userId)] = list
+	end)
+end
+
+function StaffService:_deliverPending(player: Player)
+	local list = registry.Pending[tostring(player.UserId)]
+	if not list or #list == 0 then
+		return
+	end
+	local keys = {}
+	self:_commit(function(reg)
+		keys = reg.Pending[tostring(player.UserId)] or {}
+		reg.Pending[tostring(player.UserId)] = nil
+	end)
+	for _, entry in keys do
+		if Config.GamePasses[entry.Key] then
+			S.MonetizationService:GrantPass(player, entry.Key, entry.From)
+		end
+	end
+end
+
+---------------------------------------------------------------------------
+-- Applying to a player
+---------------------------------------------------------------------------
+local function addTitleTag(player: Player, character: Model, title)
+	local head = character:WaitForChild("Head", 10) :: BasePart?
+	if not head then
+		return
+	end
+	local old = head:FindFirstChild("StaffTitle")
+	if old then
+		if title and old:GetAttribute("Text") == title.Text and old:GetAttribute("Color") == title.Color then
+			return -- unchanged (the registry is re-read every minute)
+		end
+		old:Destroy()
+	end
+	if not title then
+		return
+	end
+	local color = title.Color
+	local tag = Instance.new("BillboardGui")
+	tag.Name = "StaffTitle"
+	tag:SetAttribute("Text", title.Text)
+	tag:SetAttribute("Color", title.Color)
+	tag.Size = UDim2.fromOffset(240, 34)
+	tag.StudsOffset = Vector3.new(0, 4.9, 0)
+	tag.MaxDistance = 120
+	tag.LightInfluence = 0
+	local label = Instance.new("TextLabel")
+	label.Name = "Label"
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.TextScaled = true
+	label.Font = Enum.Font.FredokaOne
+	label.Text = title.Text
+	local rainbow = color == "rainbow"
+	label.TextColor3 = rainbow and Color3.new(1, 1, 1) or (Color3.fromHex(color))
+	local stroke = Instance.new("UIStroke")
+	stroke.Name = "Glow"
+	stroke.Thickness = 3
+	stroke.Color = label.TextColor3
+	stroke.Transparency = 0.45
+	stroke.Parent = label
+	label:SetAttribute("Rainbow", rainbow)
+	CollectionService:AddTag(label, "GlowTitle")
+	label.Parent = tag
+	tag.Parent = head
+end
+
+-- (re)applies permissions and the title to a player
+function StaffService:Apply(player: Player)
+	local groups = {}
+	for id in self:GetGroups(player.UserId) do
+		if groupById[id] then
+			table.insert(groups, id)
+		end
+	end
+	table.sort(groups)
+	player:SetAttribute("AdminPerms", table.concat(groups, ","))
+	local title = self:GetTitle(player.UserId)
+	player:SetAttribute("TitleText", title and title.Text or nil)
+	player:SetAttribute("TitleColor", title and title.Color or nil)
+	if player.Character then
+		task.spawn(addTitleTag, player, player.Character, title)
+	end
+end
+
+function StaffService:Init(services)
+	S = services
+
+	local function onPlayer(player: Player)
+		player.CharacterAdded:Connect(function(character)
+			local title = self:GetTitle(player.UserId)
+			if title then
+				addTitleTag(player, character, title)
+			end
+		end)
+		task.spawn(function()
+			local waited = 0
+			while not loaded and waited < 10 do
+				waited += task.wait(0.25)
+			end
+			if player.Parent then
+				self:Apply(player)
+			end
+		end)
+	end
+	Players.PlayerAdded:Connect(onPlayer)
+	for _, player in Players:GetPlayers() do
+		onPlayer(player)
+	end
+
+	S.DataService.PlayerLoaded:Connect(function(player)
+		Util.Try("Staff pending passes", self._deliverPending, self, player)
+	end)
+
+	task.spawn(function()
+		self:Refresh()
+		loaded = true
+	end)
+	if not store then
+		loaded = true
+	end
+end
+
+function StaffService:Start()
+	while true do
+		task.wait(AC.StaffRefreshSeconds)
+		Util.Try("Staff refresh", self.Refresh, self)
+	end
+end
+
+return StaffService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="32">
+        <Properties>
           <string name="Name">TycoonBuilder</string>
           <string name="Source"><![CDATA[--[[
 	TycoonBuilder - procedural geometry for plots, 8-floor towers, buttons,
@@ -10246,7 +11041,7 @@ return TycoonBuilder
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">TycoonService</string>
           <string name="Source"><![CDATA[--[[
@@ -11493,7 +12288,7 @@ return TycoonService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">WeeklyService</string>
           <string name="Source"><![CDATA[--[[
@@ -11653,7 +12448,7 @@ return WeeklyService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">WheelService</string>
           <string name="Source"><![CDATA[--[[
@@ -11774,7 +12569,7 @@ return WheelService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">WorldBuilder</string>
           <string name="Source"><![CDATA[--[[
@@ -12647,22 +13442,22 @@ return WorldBuilder
       </Item>
     </Item>
   </Item>
-  <Item class="SoundService" referent="36">
+  <Item class="SoundService" referent="37">
     <Properties>
       <string name="Name">SoundService</string>
     </Properties>
   </Item>
-  <Item class="StarterPlayer" referent="37">
+  <Item class="StarterPlayer" referent="38">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <float name="CharacterJumpPower">50</float>
       <float name="CharacterWalkSpeed">16</float>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="38">
+    <Item class="StarterPlayerScripts" referent="39">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="39">
+      <Item class="LocalScript" referent="40">
         <Properties>
           <string name="Name">Client</string>
           <string name="Source"><![CDATA[--[[
@@ -12734,11 +13529,11 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="40">
+      <Item class="Folder" referent="41">
         <Properties>
           <string name="Name">Controllers</string>
         </Properties>
-        <Item class="ModuleScript" referent="41">
+        <Item class="ModuleScript" referent="42">
           <Properties>
             <string name="Name">Admin</string>
             <string name="Source"><![CDATA[--[[
@@ -12763,6 +13558,10 @@ local Theme = UIKit.Theme
 
 local Admin = {}
 local C
+
+local function hasAccess(): boolean
+	return (player:GetAttribute("AdminRank") or 0) > 0 or (player:GetAttribute("AdminPerms") or "") ~= ""
+end
 
 local commandBox: TextBox
 local resultLabel: TextLabel
@@ -13138,6 +13937,184 @@ local function fillAntiCheat()
 	end
 end
 
+-- Staff tab: pick a player (even offline), tick permissions, set a glowing title, give passes
+local staffName = ""
+local staffColor = "#FFD700"
+local staffText = ""
+
+local function fillStaff()
+	local page = pages.Staff
+	clear(page)
+	local data = Remotes.AdminData:InvokeServer("staff")
+	if not data then
+		UIKit.Label({ Text = "Head Admins and Owners only.", Size = UDim2.new(1, -10, 0, 30), Font = Theme.BodyFont, ZIndex = 8, Parent = page })
+		return
+	end
+	local order = 0
+	local function header(text: string)
+		order += 1
+		UIKit.Label({ Text = text, Size = UDim2.new(1, -10, 0, 28), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = Theme.Accent, LayoutOrder = order, ZIndex = 8, Parent = page })
+	end
+	local function refresh()
+		task.wait(0.4)
+		fillStaff()
+	end
+
+	-- 1. who
+	header("👤 Player (type a name, or pick one)")
+	order += 1
+	local pick = UIKit.new("Frame", { Size = UDim2.new(1, -10, 0, 44), BackgroundTransparency = 1, LayoutOrder = order, ZIndex = 7, Parent = page })
+	local nameBox = UIKit.TextBox({ Placeholder = "Username or UserId...", Text = staffName, Size = UDim2.new(1, -170, 0, 40), ZIndex = 8, Parent = pick })
+	UIKit.Button({ Text = "SELECT", Color = Theme.Accent, Size = UDim2.fromOffset(150, 40), Position = UDim2.new(1, -155, 0, 0), ZIndex = 8, Parent = pick, Callback = function()
+		staffName = nameBox.Text
+		fillStaff()
+	end })
+	order += 1
+	local chips = UIKit.new("Frame", { Size = UDim2.new(1, -10, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = order, ZIndex = 7, Parent = page })
+	local chipGrid = UIKit.new("UIGridLayout", { CellSize = UDim2.fromOffset(150, 34), CellPadding = UDim2.fromOffset(6, 6), SortOrder = Enum.SortOrder.LayoutOrder, Parent = chips })
+	chipGrid.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	for i, other in Players:GetPlayers() do
+		UIKit.Button({ Text = other.DisplayName, Color = other.Name == staffName and Theme.Green or Theme.PanelLight, Size = UDim2.fromOffset(150, 34), LayoutOrder = i, ZIndex = 8, Parent = chips, Callback = function()
+			staffName = other.Name
+			fillStaff()
+		end })
+	end
+
+	-- 2. the selected player
+	local info = staffName ~= "" and Remotes.AdminData:InvokeServer("staffplayer", staffName) or nil
+	if staffName ~= "" and not info then
+		order += 1
+		UIKit.Label({ Text = "No player found called '" .. staffName .. "'.", Size = UDim2.new(1, -10, 0, 26), Font = Theme.BodyFont, TextColor3 = Theme.Red, LayoutOrder = order, ZIndex = 8, Parent = page })
+	end
+	if info then
+		header("⚙️ " .. info.Name .. (info.Online and "  (online)" or "  (offline)"))
+
+		header("✅ Permissions" .. (data.CanGrant and "" or "  (the Owner ticks these)"))
+		for i, group in Config.Admin.Permissions do
+			order += 1
+			local frame = rowFrame(page, i, 50)
+			frame.LayoutOrder = order
+			local on = info.Groups[group.Id] == true
+			UIKit.Label({ Text = group.Icon .. " " .. group.Name, Size = UDim2.new(0.34, 0, 0, 22), Position = UDim2.fromOffset(58, 4), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = on and Theme.Green or Theme.Text, ZIndex = 8, Parent = frame })
+			UIKit.new("TextLabel", {
+				Text = group.Desc,
+				Size = UDim2.new(1, -70, 0, 20),
+				Position = UDim2.fromOffset(58, 27),
+				BackgroundTransparency = 1,
+				TextWrapped = true,
+				TextSize = 12,
+				TextXAlignment = Enum.TextXAlignment.Left,
+				Font = Theme.BodyFont,
+				TextColor3 = Theme.SubText,
+				ZIndex = 8,
+				Parent = frame,
+			})
+			local tick = UIKit.Button({ Text = on and "☑" or "☐", Color = on and Theme.Green or Theme.PanelLight, Size = UDim2.fromOffset(40, 36), Position = UDim2.fromOffset(8, 7), ZIndex = 8, Parent = frame, Callback = function()
+				if not data.CanGrant then
+					C.Notifications:Toast("Only the Owner can change permissions.", "error", 3)
+					return
+				end
+				run((on and "takeperm " or "giveperm ") .. info.Name .. " " .. group.Id)
+				refresh()
+			end })
+			tick.TextSize = 26
+		end
+
+		header("🏷️ Glowing title" .. (info.Title and ("  -  now: " .. info.Title.Text) or ""))
+		order += 1
+		local titleRow = UIKit.new("Frame", { Size = UDim2.new(1, -10, 0, 44), BackgroundTransparency = 1, LayoutOrder = order, ZIndex = 7, Parent = page })
+		local textBox = UIKit.TextBox({ Placeholder = "Title text (max " .. Config.Admin.MaxTitleLength .. " letters)...", Text = staffText, Size = UDim2.new(1, -310, 0, 40), ZIndex = 8, Parent = titleRow })
+		textBox.FocusLost:Connect(function()
+			staffText = textBox.Text
+		end)
+		UIKit.Button({ Text = "SET TITLE", Color = Theme.Green, Size = UDim2.fromOffset(145, 40), Position = UDim2.new(1, -300, 0, 0), ZIndex = 8, Parent = titleRow, Callback = function()
+			staffText = textBox.Text
+			if staffText == "" then
+				C.Notifications:Toast("Write the title text first.", "error", 3)
+				return
+			end
+			run("title " .. info.Name .. " " .. staffColor .. " " .. staffText)
+			refresh()
+		end })
+		UIKit.Button({ Text = "CLEAR", Color = Theme.Red, Size = UDim2.fromOffset(145, 40), Position = UDim2.new(1, -150, 0, 0), ZIndex = 8, Parent = titleRow, Callback = function()
+			run("cleartitle " .. info.Name)
+			refresh()
+		end })
+		order += 1
+		local swatches = UIKit.new("Frame", { Size = UDim2.new(1, -10, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = order, ZIndex = 7, Parent = page })
+		local swatchGrid = UIKit.new("UIGridLayout", { CellSize = UDim2.fromOffset(96, 34), CellPadding = UDim2.fromOffset(6, 6), SortOrder = Enum.SortOrder.LayoutOrder, Parent = swatches })
+		swatchGrid.HorizontalAlignment = Enum.HorizontalAlignment.Left
+		for i, entry in Config.Admin.TitleColors do
+			local color = entry.Hex == "rainbow" and Color3.fromRGB(190, 90, 255) or Color3.fromHex(entry.Hex)
+			local chosen = staffColor == entry.Hex
+			local swatch = UIKit.Button({ Text = (chosen and "✔ " or "") .. entry.Name, Color = color, Size = UDim2.fromOffset(96, 34), LayoutOrder = i, ZIndex = 8, Parent = swatches, Callback = function()
+				staffColor = entry.Hex
+				fillStaff()
+			end })
+			if entry.Hex == "rainbow" then
+				UIKit.Gradient(swatch, Color3.fromRGB(255, 80, 80), Color3.fromRGB(80, 120, 255), 0)
+			end
+		end
+
+		header("🎁 Passes (click to give / remove)")
+		order += 1
+		local passes = UIKit.new("Frame", { Size = UDim2.new(1, -10, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = order, ZIndex = 7, Parent = page })
+		local passGrid = UIKit.new("UIGridLayout", { CellSize = UDim2.fromOffset(200, 38), CellPadding = UDim2.fromOffset(6, 6), SortOrder = Enum.SortOrder.LayoutOrder, Parent = passes })
+		passGrid.HorizontalAlignment = Enum.HorizontalAlignment.Left
+		local pending = {}
+		for _, key in info.Pending do
+			pending[key] = true
+		end
+		local list = {}
+		for key, pass in Config.GamePasses do
+			table.insert(list, { Key = key, Pass = pass })
+		end
+		table.sort(list, function(a, b)
+			return (a.Pass.Order or 0) < (b.Pass.Order or 0)
+		end)
+		for i, entry in list do
+			local owns = info.Passes[entry.Key] == true
+			local waiting = pending[entry.Key] == true
+			UIKit.Button({
+				Text = (owns and "✓ " or (waiting and "⏳ " or "")) .. entry.Pass.Icon .. " " .. entry.Pass.Name,
+				Color = owns and Theme.Green or (waiting and Theme.Accent or Theme.PanelLight),
+				Size = UDim2.fromOffset(200, 38),
+				LayoutOrder = i,
+				ZIndex = 8,
+				Parent = passes,
+				Callback = function()
+					if owns then
+						run("removepass " .. info.Name .. " " .. entry.Key)
+					else
+						run("givepass " .. info.Name .. " " .. entry.Key)
+					end
+					refresh()
+				end,
+			})
+		end
+		order += 1
+		UIKit.Label({ Text = "✓ owned now • ⏳ waiting for their next join (offline players)", Size = UDim2.new(1, -10, 0, 20), Font = Theme.BodyFont, TextColor3 = Theme.SubText, TextXAlignment = Enum.TextXAlignment.Left, LayoutOrder = order, ZIndex = 8, Parent = page })
+	end
+
+	-- 3. everyone who has permissions or a title
+	header("👥 Staff & titles (" .. #data.Overview .. ")")
+	if #data.Overview == 0 then
+		order += 1
+		UIKit.Label({ Text = "Nobody has permissions or a title yet.", Size = UDim2.new(1, -10, 0, 26), Font = Theme.BodyFont, TextColor3 = Theme.SubText, LayoutOrder = order, ZIndex = 8, Parent = page })
+	end
+	for i, entry in data.Overview do
+		order += 1
+		local frame = rowFrame(page, i, 52)
+		frame.LayoutOrder = order
+		UIKit.Label({ Text = entry.Name .. (entry.Title and ("   🏷️ " .. entry.Title.Text) or ""), Size = UDim2.new(1, -120, 0, 24), Position = UDim2.fromOffset(10, 4), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 8, Parent = frame })
+		UIKit.Label({ Text = #entry.Groups > 0 and table.concat(entry.Groups, ", ") or "no permissions", Size = UDim2.new(1, -120, 0, 18), Position = UDim2.fromOffset(10, 29), TextXAlignment = Enum.TextXAlignment.Left, Font = Theme.BodyFont, TextColor3 = Theme.SubText, Stroke = false, ZIndex = 8, Parent = frame })
+		smallButton(frame, "OPEN", Theme.Accent, -102, 94, function()
+			staffName = entry.Name
+			fillStaff()
+		end).AnchorPoint = Vector2.new(0, 0.5)
+	end
+end
+
 local function buildServerPage()
 	local page = pages.Server
 	local order = 0
@@ -13239,6 +14216,8 @@ local function selectTab(name: string)
 		task.spawn(fillLogs)
 	elseif name == "Anti-Cheat" then
 		task.spawn(fillAntiCheat)
+	elseif name == "Staff" then
+		task.spawn(fillStaff)
 	end
 end
 
@@ -13263,8 +14242,8 @@ local function buildPanel()
 	-- tabs
 	local tabs = UIKit.new("Frame", { Size = UDim2.new(1, 0, 0, 40), Position = UDim2.fromOffset(0, 74), BackgroundTransparency = 1, ZIndex = 6, Parent = content })
 	UIKit.List(tabs, 8, Enum.FillDirection.Horizontal, Enum.HorizontalAlignment.Left)
-	for i, name in { "Commands", "Players", "Server", "Logs", "Anti-Cheat" } do
-		tabButtons[name] = UIKit.Button({ Text = name:upper(), Color = Theme.PanelLight, Size = UDim2.fromOffset(i == 5 and 160 or 130, 38), LayoutOrder = i, ZIndex = 7, Parent = tabs, Callback = function()
+	for i, name in { "Commands", "Players", "Server", "Logs", "Anti-Cheat", "Staff" } do
+		tabButtons[name] = UIKit.Button({ Text = name:upper(), Color = Theme.PanelLight, Size = UDim2.fromOffset(i == 5 and 150 or (i == 6 and 110 or 124), 38), LayoutOrder = i, ZIndex = 7, Parent = tabs, Callback = function()
 			selectTab(name)
 		end })
 		local page = UIKit.Scroll({ Size = UDim2.new(1, 0, 1, -124), Position = UDim2.fromOffset(0, 122), Parent = content })
@@ -13312,7 +14291,7 @@ function Admin:Init(controllers)
 		if processed then
 			return
 		end
-		if input.KeyCode == Enum.KeyCode.F2 and (player:GetAttribute("AdminRank") or 0) > 0 then
+		if input.KeyCode == Enum.KeyCode.F2 and hasAccess() then
 			C.UI:Toggle("Admin")
 		end
 	end)
@@ -13322,7 +14301,7 @@ function Admin:Init(controllers)
 		TextChatService.SendingMessage:Connect(function(message: TextChatMessage)
 			local text = message.Text
 			local prefix = Config.Admin.Prefix
-			if text:sub(1, #prefix) == prefix and (player:GetAttribute("AdminRank") or 0) > 0 then
+			if text:sub(1, #prefix) == prefix and hasAccess() then
 				task.spawn(run, text)
 			end
 		end)
@@ -13337,7 +14316,7 @@ return Admin
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="42">
+        <Item class="ModuleScript" referent="43">
           <Properties>
             <string name="Name">Animator</string>
             <string name="Source"><![CDATA[--[[
@@ -13544,7 +14523,7 @@ return Animator
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="43">
+        <Item class="ModuleScript" referent="44">
           <Properties>
             <string name="Name">Build</string>
             <string name="Source"><![CDATA[--[[
@@ -13998,7 +14977,7 @@ return Build
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="44">
+        <Item class="ModuleScript" referent="45">
           <Properties>
             <string name="Name">ChatTags</string>
             <string name="Source"><![CDATA[--[[ ChatTags - [Owner] / [Admin] / [VIP] / rebirth tags in the chat ]]
@@ -14009,6 +14988,30 @@ local TextChatService = game:GetService("TextChatService")
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
 
 local ChatTags = {}
+
+-- the glow of titles above heads: the outline pulses, "rainbow" titles cycle colours
+function ChatTags:Start()
+	local CollectionService = game:GetService("CollectionService")
+	local RunService = game:GetService("RunService")
+	RunService.Heartbeat:Connect(function()
+		local t = os.clock()
+		for _, label in CollectionService:GetTagged("GlowTitle") do
+			if label:IsA("TextLabel") then
+				local stroke = label:FindFirstChildOfClass("UIStroke")
+				if stroke then
+					stroke.Transparency = 0.25 + 0.3 * (0.5 + 0.5 * math.sin(t * 3))
+				end
+				if label:GetAttribute("Rainbow") then
+					local color = Color3.fromHSV((t * 0.25) % 1, 0.75, 1)
+					label.TextColor3 = color
+					if stroke then
+						stroke.Color = color
+					end
+				end
+			end
+		end
+	end)
+end
 
 local RANK_COLORS = {
 	[1] = "#4FC3F7",
@@ -14039,6 +15042,12 @@ function ChatTags:Init()
 		if sender:GetAttribute("Pass_VIP") then
 			table.insert(tags, "<font color='#FFD700'>[👑 VIP]</font>")
 		end
+		local titleText = sender:GetAttribute("TitleText")
+		if type(titleText) == "string" and titleText ~= "" then
+			local titleColor = sender:GetAttribute("TitleColor")
+			local hex = (type(titleColor) == "string" and titleColor:sub(1, 1) == "#") and titleColor or "#FFD700"
+			table.insert(tags, string.format("<font color='%s'>[%s]</font>", hex, (titleText:gsub("[<>&]", ""))))
+		end
 		local found = sender:GetAttribute("SecretsFound") or ""
 		if found ~= "" and #string.split(found, ",") >= #Config.Secrets then
 			table.insert(tags, "<font color='#80FF9A'>[🕵️ Secret Master]</font>")
@@ -14058,7 +15067,7 @@ return ChatTags
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="45">
+        <Item class="ModuleScript" referent="46">
           <Properties>
             <string name="Name">Disasters</string>
             <string name="Source"><![CDATA[--[[
@@ -14975,7 +15984,7 @@ return Disasters
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="46">
+        <Item class="ModuleScript" referent="47">
           <Properties>
             <string name="Name">DropVisuals</string>
             <string name="Source"><![CDATA[--[[
@@ -15250,7 +16259,7 @@ return DropVisuals
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">Duo</string>
             <string name="Source"><![CDATA[--[[ Duo (client) - invite players to build one tower together + invite popups ]]
@@ -15449,7 +16458,7 @@ return Duo
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="49">
           <Properties>
             <string name="Name">Gifts</string>
             <string name="Source"><![CDATA[--[[ Gifts (client) - the playtime gift button (bottom right) ]]
@@ -15548,7 +16557,7 @@ return Gifts
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">Guide</string>
             <string name="Source"><![CDATA[--[[
@@ -15729,7 +16738,7 @@ return Guide
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">HUD</string>
             <string name="Source"><![CDATA[--[[ HUD - cash counter, income, multiplier/boost info, floor indicator,
@@ -16007,10 +17016,12 @@ function HUD:Init(controllers)
 	for i, def in more do
 		local _, holder = addButton(morePanel, i, def, true)
 		if def[1] == "Admin" then
-			holder.Visible = (player:GetAttribute("AdminRank") or 0) > 0
-			player:GetAttributeChangedSignal("AdminRank"):Connect(function()
-				holder.Visible = (player:GetAttribute("AdminRank") or 0) > 0
-			end)
+			local function show()
+				holder.Visible = (player:GetAttribute("AdminRank") or 0) > 0 or (player:GetAttribute("AdminPerms") or "") ~= ""
+			end
+			show()
+			player:GetAttributeChangedSignal("AdminRank"):Connect(show)
+			player:GetAttributeChangedSignal("AdminPerms"):Connect(show)
 		end
 	end
 
@@ -16119,7 +17130,7 @@ return HUD
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">Minigame</string>
             <string name="Source"><![CDATA[--[[ Minigame (client) - join popup, countdown, in-game HUD and results ]]
@@ -16354,7 +17365,7 @@ return Minigame
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">Music</string>
             <string name="Source"><![CDATA[--[[
@@ -16574,7 +17585,7 @@ return Music
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">Notifications</string>
             <string name="Source"><![CDATA[--[[ Notifications - toast messages (top right) + big announcement banners ]]
@@ -16764,7 +17775,7 @@ return Notifications
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">Panels</string>
             <string name="Source"><![CDATA[--[[ Panels - Rebirth, Daily Rewards, Codes and Settings menus ]]
@@ -17199,7 +18210,7 @@ return Panels
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">Pets</string>
             <string name="Source"><![CDATA[--[[
@@ -17464,7 +18475,7 @@ return Pets
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">Quests</string>
             <string name="Source"><![CDATA[--[[ Quests (client) - the quest tracker in the bottom-right corner ]]
@@ -17640,7 +18651,7 @@ return Quests
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">Shield</string>
             <string name="Source"><![CDATA[--[[
@@ -17756,7 +18767,7 @@ return Shield
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">Shop</string>
             <string name="Source"><![CDATA[--[[ Shop - Robux panel with Game Passes and Developer Products ]]
@@ -17776,6 +18787,8 @@ local ROBUX = utf8.char(0xE002)
 
 local Shop = {}
 local C
+local openGiftPicker: (string, string, string) -> ()
+
 
 local function sorted(map)
 	local list = {}
@@ -17820,7 +18833,7 @@ local function card(parent: Instance, order: number, data, isPass: boolean, key:
 	local button = UIKit.Button({
 		Text = ROBUX .. " " .. tostring(data.PriceHint or "?"),
 		Color = Theme.Green,
-		Size = UDim2.new(1, -24, 0, 42),
+		Size = Config.CanGift(isPass and "Pass" or "Product", key) and UDim2.new(1, -84, 0, 42) or UDim2.new(1, -24, 0, 42),
 		Position = UDim2.new(0, 12, 1, -52),
 		ZIndex = 7,
 		Parent = frame,
@@ -17835,6 +18848,20 @@ local function card(parent: Instance, order: number, data, isPass: boolean, key:
 			end
 		end,
 	})
+
+	if Config.CanGift(isPass and "Pass" or "Product", key) then
+		UIKit.Button({
+			Text = "🎁",
+			Color = Theme.Purple,
+			Size = UDim2.fromOffset(52, 42),
+			Position = UDim2.new(1, -64, 1, -52),
+			ZIndex = 7,
+			Parent = frame,
+			Callback = function()
+				openGiftPicker(isPass and "Pass" or "Product", key, data.Name)
+			end,
+		})
+	end
 
 	-- real price from Roblox if configured
 	if data.Id and data.Id ~= 0 then
@@ -17862,6 +18889,55 @@ end
 function Shop:Init(controllers)
 	C = controllers
 	local _, content = C.UI:MakePanel("Shop", "🛒 SHOP", Theme.Accent, 820, 560)
+
+	-- gift picker: choose who gets it (the server checks everything again)
+	local picker = UIKit.new("Frame", {
+		Name = "GiftPicker",
+		Size = UDim2.new(1, 0, 1, 0),
+		BackgroundColor3 = Theme.Panel,
+		BackgroundTransparency = 0.04,
+		Visible = false,
+		ZIndex = 30,
+		Parent = content,
+	})
+	UIKit.Corner(picker, 14)
+	local pickerTitle = UIKit.Label({ Text = "", Size = UDim2.new(1, -20, 0, 34), Position = UDim2.fromOffset(10, 8), ZIndex = 31, Parent = picker })
+	local pickerList = UIKit.Scroll({ Size = UDim2.new(1, -20, 1, -110), Position = UDim2.fromOffset(10, 50), Parent = picker })
+	pickerList.ZIndex = 31
+	UIKit.List(pickerList, 6)
+	UIKit.Button({ Text = "CANCEL", Color = Theme.Red, Size = UDim2.fromOffset(160, 40), Position = UDim2.new(0.5, 0, 1, -50), AnchorPoint = Vector2.new(0.5, 0), ZIndex = 31, Parent = picker, Callback = function()
+		picker.Visible = false
+	end })
+	openGiftPicker = function(kind: string, key: string, itemName: string)
+		pickerTitle.Text = "🎁 Gift " .. itemName .. " to..."
+		for _, child in pickerList:GetChildren() do
+			if child:IsA("GuiObject") then
+				child:Destroy()
+			end
+		end
+		local others = 0
+		for _, other in Players:GetPlayers() do
+			if other ~= player then
+				others += 1
+				UIKit.Button({
+					Text = other.DisplayName .. "  (@" .. other.Name .. ")",
+					Color = Theme.PanelLight,
+					Size = UDim2.new(1, -10, 0, 40),
+					LayoutOrder = others,
+					ZIndex = 32,
+					Parent = pickerList,
+					Callback = function()
+						picker.Visible = false
+						Remotes.GiftItem:FireServer(kind, key, other.UserId)
+					end,
+				})
+			end
+		end
+		if others == 0 then
+			UIKit.Label({ Text = "Nobody else is in your server right now.", Size = UDim2.new(1, -10, 0, 40), Font = Theme.BodyFont, TextColor3 = Theme.SubText, ZIndex = 32, Parent = pickerList })
+		end
+		picker.Visible = true
+	end
 
 	local tabs = UIKit.new("Frame", { Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, ZIndex = 6, Parent = content })
 	UIKit.List(tabs, 10, Enum.FillDirection.Horizontal, Enum.HorizontalAlignment.Center)
@@ -17923,7 +18999,7 @@ return Shop
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="59">
+        <Item class="ModuleScript" referent="60">
           <Properties>
             <string name="Name">Travel</string>
             <string name="Source"><![CDATA[--[[
@@ -18038,7 +19114,7 @@ return Travel
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="60">
+        <Item class="ModuleScript" referent="61">
           <Properties>
             <string name="Name">UI</string>
             <string name="Source"><![CDATA[--[[ UI - owns the main ScreenGui and the "one panel at a time" manager ]]
@@ -18177,7 +19253,7 @@ return UI
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="61">
+        <Item class="ModuleScript" referent="62">
           <Properties>
             <string name="Name">VFX</string>
             <string name="Source"><![CDATA[--[[
@@ -18720,7 +19796,7 @@ return VFX
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="62">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">Weekly</string>
             <string name="Source"><![CDATA[--[[
@@ -18834,7 +19910,7 @@ return Weekly
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="63">
+        <Item class="ModuleScript" referent="64">
           <Properties>
             <string name="Name">Wheel</string>
             <string name="Source"><![CDATA[--[[
@@ -19017,13 +20093,13 @@ return Wheel
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="64">
+  <Item class="TextChatService" referent="65">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="65">
+  <Item class="Workspace" referent="66">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="Gravity">196.2</float>

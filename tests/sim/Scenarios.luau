@@ -3865,4 +3865,228 @@ table.insert(Scenarios, {
 	end,
 })
 
+table.insert(Scenarios, {
+	Name = "staff_gifts",
+	MaxSeconds = 400,
+	Run = function(T, place)
+		local game, me = T.Boot(place, { Name = "Boss", UserId = 7000 })
+		local helper = T.AddPlayer("Helper", { UserId = 7001 })
+		local buddy = T.AddPlayer("Buddy", { UserId = 7002 })
+		T.Wait(6)
+		local Config = T.Shared("Config")
+		local DataService = T.Service("DataService")
+		local StaffService = T.Service("StaffService")
+		local CollectionService = game:GetService("CollectionService")
+		T.Check(me:GetAttribute("AdminRank") == 4, "Boss is Owner in Studio")
+		helper:SetAttribute("AdminRank", 0)
+		buddy:SetAttribute("AdminRank", 0)
+		local function run(player, text)
+			local ok, message = T.Admin(player, text)
+			T.Wait(0.2)
+			return ok, tostring(message)
+		end
+
+		-- no rank, no permissions: nothing works
+		local ok = run(helper, ";kill buddy")
+		T.Check(ok == false, "a player with no rank and no permissions can't run commands")
+
+		-- the Owner ticks permission groups
+		for _, group in Config.Admin.Permissions do
+			T.Check(group.Id ~= nil and group.Name ~= nil and (group.Commands ~= nil or group.MaxRank ~= nil), "group " .. tostring(group.Id) .. " is defined")
+		end
+		ok = run(me, ";giveperm helper Disasters")
+		T.Check(ok == true and helper:GetAttribute("AdminPerms") == "Disasters", "giveperm sets AdminPerms (" .. tostring(helper:GetAttribute("AdminPerms")) .. ")")
+		ok = run(helper, ";stopdisaster")
+		T.Check(ok == true, "the Disasters group lets Helper stop disasters")
+		ok = run(helper, ";givecash helper 1000")
+		T.Check(ok == false, "...but not give cash (Economy isn't ticked)")
+		ok = run(helper, ";kill buddy")
+		T.Check(ok == false, "...and not Mod commands")
+		ok = run(helper, ";giveperm helper all")
+		T.Check(ok == false, "permissions can't be ticked by a non-owner")
+		run(me, ";giveperm helper Mod")
+		T.Check(helper:GetAttribute("AdminPerms") == "Disasters,Mod", "two groups: " .. tostring(helper:GetAttribute("AdminPerms")))
+		ok = run(helper, ";freeze buddy")
+		T.Check(ok == true and T.Root(buddy).Anchored, "Mod group: Helper can freeze Buddy")
+		run(helper, ";thaw buddy")
+		run(helper, ";kill me")
+		T.Check(T.Humanoid(me).Health > 0, "a permission holder can't harm the Owner")
+		ok = run(me, ";takeperm helper Mod")
+		T.Check(helper:GetAttribute("AdminPerms") == "Disasters", "takeperm removes a group")
+		run(me, ";takeperm helper all")
+		T.Check((helper:GetAttribute("AdminPerms") or "") == "", "takeperm all removes everything")
+		T.Check(run(helper, ";stopdisaster") == false, "...and the commands stop working")
+		-- Owner-only commands can never be granted
+		run(me, ";giveperm helper all")
+		T.Check(run(helper, ";unadmin me") == false and run(helper, ";shutdown") == false, "Owner commands are never granted")
+		run(me, ";takeperm helper all")
+
+		-- glowing titles
+		ok = run(helper, ";title buddy gold Nope")
+		T.Check(ok == false, "no title without the Titles permission")
+		run(me, ";giveperm helper Titles")
+		ok = run(helper, ";title buddy gold Big Boss")
+		T.Check(ok == true and buddy:GetAttribute("TitleText") == "Big Boss" and buddy:GetAttribute("TitleColor") == "#FFD700", "title set (" .. tostring(buddy:GetAttribute("TitleText")) .. ")")
+		T.Wait(0.5)
+		local function titleLabel(p)
+			local head = p.Character and p.Character:FindFirstChild("Head")
+			local tag = head and head:FindFirstChild("StaffTitle")
+			return tag and tag:FindFirstChild("Label"), tag
+		end
+		local label = titleLabel(buddy)
+		T.Check(label ~= nil and label.Text == "Big Boss" and CollectionService:HasTag(label, "GlowTitle"), "glowing title above the head")
+		T.Check(label ~= nil and label:FindFirstChildOfClass("UIStroke") ~= nil, "the title has a glow outline")
+		run(me, ";title buddy #00ff88 Mint <b>Boss</b>")
+		T.Check(buddy:GetAttribute("TitleColor") == "#00FF88" and buddy:GetAttribute("TitleText") == "Mint bBoss/b", "custom hex colour, markup stripped (" .. tostring(buddy:GetAttribute("TitleText")) .. ")")
+		run(me, ";title buddy rainbow Rainbow King")
+		label = titleLabel(buddy)
+		T.Check(buddy:GetAttribute("TitleColor") == "rainbow" and label and label:GetAttribute("Rainbow") == true, "rainbow titles")
+		ok = run(me, ";title buddy notacolour Hi")
+		T.Check(ok == true and buddy:GetAttribute("TitleText") == "Rainbow King", "a bad colour changes nothing")
+		ok = run(me, ";title buddy red " .. string.rep("x", 60))
+		T.Check(#tostring(buddy:GetAttribute("TitleText")) <= Config.Admin.MaxTitleLength, "titles are length limited")
+		-- stays after dying
+		T.Humanoid(buddy).Health = 0
+		T.Wait(7)
+		T.Check(titleLabel(buddy) ~= nil, "the title comes back after respawning")
+		-- saved: a fresh read of the registry still has it
+		local info = StaffService:GetInfo(7002, "Buddy")
+		T.Check(info.Title ~= nil and info.Title.Text:sub(1, 1) == "x", "titles are saved in the registry")
+		run(me, ";cleartitle buddy")
+		T.Wait(0.5)
+		T.Check(buddy:GetAttribute("TitleText") == nil and titleLabel(buddy) == nil, "cleartitle removes it")
+
+		-- passes for players who are offline arrive when they join
+		ok = run(me, ";givepass 7003 VIP")
+		T.Check(ok == true, "givepass works for an offline UserId")
+		T.Check(table.find(StaffService:GetInfo(7003, "Late").Pending, "VIP") ~= nil, "the pass is waiting")
+		local late = T.AddPlayer("Late", { UserId = 7003 })
+		T.Wait(6)
+		T.Check(late:GetAttribute("Pass_VIP") == true, "the waiting pass is granted on join")
+		T.Check(DataService:Get(late).Passes.VIP == true, "...and saved")
+		T.Check(#StaffService:GetInfo(7003, "Late").Pending == 0, "...and no longer waiting")
+		run(me, ";givepass buddy DoubleCash")
+		T.Check(buddy:GetAttribute("Pass_DoubleCash") == true and T.Noticed(buddy, "Boss gave you"), "admins can give passes (buddy is told who gave it)")
+		run(me, ";removepass buddy DoubleCash")
+
+		-- the Staff tab
+		run(me, ";giveperm buddy Fun")
+		T.Client(function()
+			T.Controller("UI"):Open("Admin")
+		end)
+		T.Wait(0.5)
+		local gui = me.PlayerGui
+		local tab = T.FindButton(gui, "^STAFF$")
+		T.Check(tab ~= nil, "the admin panel has a Staff tab")
+		T.Client(function()
+			T.Engine.Click(tab)
+		end)
+		T.Wait(1)
+		T.Check(T.FindText(gui, "Staff & titles") ~= nil, "the Staff tab lists staff")
+		local box
+		for _, d in gui:GetDescendants() do
+			if d:IsA("TextBox") and d.PlaceholderText == "Username or UserId..." then
+				box = d
+			end
+		end
+		T.Check(box ~= nil, "the Staff tab has a player box")
+		if box then
+			box.Text = "Buddy"
+			T.Client(function()
+				T.Engine.Click(T.FindButton(gui, "^SELECT$"))
+			end)
+			T.Wait(1)
+			T.Check(T.FindText(gui, "⚙️ Buddy") ~= nil, "Buddy is selected")
+			local ticks = 0
+			for _, b in T.Buttons(gui) do
+				if b:IsA("TextButton") and (b.Text == "☐" or b.Text == "☑") then
+					ticks += 1
+				end
+			end
+			T.Check(ticks == #Config.Admin.Permissions, "one tick box per group (" .. ticks .. ")")
+			-- tick "Economy" for Buddy
+			local before = buddy:GetAttribute("AdminPerms")
+			local row = T.FindText(gui, "💰 Cash & progress")
+			local tick = row and row.Parent and row.Parent:FindFirstChildWhichIsA("TextButton")
+			T.Check(tick ~= nil, "found the Economy row")
+			if tick then
+				T.Client(function()
+					T.Engine.Click(tick)
+				end)
+			end
+			T.Wait(1)
+			T.Check(before == "Fun" and buddy:GetAttribute("AdminPerms") == "Economy,Fun", "ticking Economy in the panel gives it (" .. tostring(buddy:GetAttribute("AdminPerms")) .. ")")
+		end
+		T.Client(function()
+			T.Controller("UI"):Close()
+		end)
+		run(me, ";takeperm buddy all")
+
+		-- gifts (simulated in Studio): chat/remote
+		local function gift(kind, key, target)
+			T.Client(function()
+				T.Remote("GiftItem"):FireServer(kind, key, target)
+			end)
+			T.Wait(2.2)
+		end
+		T.Check(Config.CanGift("Pass", "VIP") and Config.CanGift("Product", "CashSmall"), "passes and cash packs can be gifted")
+		T.Check(not Config.CanGift("Product", "CashRain") and not Config.CanGift("Product", "LaunchNuke") and not Config.CanGift("Pass", "Nope"), "server events and unknown items can't")
+		for key in Config.GamePasses do
+			T.Check(Config.GiftProducts[key] ~= nil, "gift slot for " .. key)
+		end
+		gift("Pass", "DoubleCash", 7002)
+		T.Check(buddy:GetAttribute("Pass_DoubleCash") == true and me:GetAttribute("Pass_DoubleCash") == nil, "gifted pass goes to Buddy, not the buyer")
+		T.Check(T.Noticed(buddy, "gave you") and T.Noticed(me, "got your gift"), "both are told")
+		gift("Pass", "DoubleCash", 7002)
+		T.Check(T.Noticed(me, "already owns"), "can't gift a pass they own")
+		gift("Pass", "SuperSpeed", me.UserId)
+		T.Check(me:GetAttribute("Pass_SuperSpeed") == nil, "can't gift to yourself")
+		gift("Pass", "SuperSpeed", 999999)
+		gift("Pass", "NotAPass", 7002)
+		gift("Product", "CashRain", 7002)
+		T.Check(buddy:GetAttribute("Pass_SuperSpeed") == nil, "bad gifts are ignored")
+		local cash = DataService:Get(buddy).Cash
+		gift("Product", "CashSmall", 7002)
+		T.Check(DataService:Get(buddy).Cash > cash, "gifted cash pack pays Buddy")
+
+		-- the Gift button and the picker in the shop
+		T.Client(function()
+			T.Controller("UI"):Open("Shop")
+		end)
+		T.Wait(0.5)
+		local card
+		for _, d in me.PlayerGui:GetDescendants() do
+			if d.Name == "VIP" and d:IsA("Frame") then
+				card = d
+			end
+		end
+		local giftButton = card and card:FindFirstChildWhichIsA("TextButton", true)
+		local found
+		if card then
+			for _, b in T.Buttons(card) do
+				if b:IsA("TextButton") and b.Text == "🎁" then
+					found = b
+				end
+			end
+		end
+		T.Check(found ~= nil and giftButton ~= nil, "the VIP card has a Gift button")
+		if found then
+			T.Client(function()
+				T.Engine.Click(found)
+			end)
+			T.Wait(0.5)
+			local pickButton = T.FindButton(me.PlayerGui, "Buddy")
+			T.Check(pickButton ~= nil, "the picker lists the other players")
+			T.Check(T.FindButton(me.PlayerGui, "%(@Boss%)") == nil, "...but not yourself")
+			if pickButton then
+				T.Client(function()
+					T.Engine.Click(pickButton)
+				end)
+				T.Wait(2.2)
+				T.Check(buddy:GetAttribute("Pass_VIP") == true, "picking Buddy sends the VIP gift")
+			end
+		end
+	end,
+})
+
 return Scenarios

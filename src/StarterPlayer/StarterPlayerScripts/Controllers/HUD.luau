@@ -273,10 +273,12 @@ function HUD:Init(controllers)
 	for i, def in more do
 		local _, holder = addButton(morePanel, i, def, true)
 		if def[1] == "Admin" then
-			holder.Visible = (player:GetAttribute("AdminRank") or 0) > 0
-			player:GetAttributeChangedSignal("AdminRank"):Connect(function()
-				holder.Visible = (player:GetAttribute("AdminRank") or 0) > 0
-			end)
+			local function show()
+				holder.Visible = (player:GetAttribute("AdminRank") or 0) > 0 or (player:GetAttribute("AdminPerms") or "") ~= ""
+			end
+			show()
+			player:GetAttributeChangedSignal("AdminRank"):Connect(show)
+			player:GetAttributeChangedSignal("AdminPerms"):Connect(show)
 		end
 	end
 

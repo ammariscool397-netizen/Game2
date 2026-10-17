@@ -156,8 +156,14 @@ Open the **Admin Panel** with the 🛡️ button or **F2**.
 |---|---|
 | **Mod (1)** | `cmds` `logs` `tp` `bring` `to` `home` `floor` `speed` `jump` `heal` `god` `ungod` `ff` `unff` `kill` `freeze` `thaw` `sparkles` `fire` `smoke` `unfx` `invisible` `visible` `respawn` `jail` `unjail` `fly` `unfly` `noclip` `clip` `view` `unview` `m` `h` |
 | **Admin (2)** | `kick` `givecash` `takecash` `setcash` `giverebirth` `rebirth` `unlockall` `unlockfloor` `explode` `giant` `tiny` `normal` `confetti` `cashrain` `doublecash` `music` `stopmusic` `minigame` `time` `nuke` `meteors` `tornado` `ufo` `earthquake` `stopdisaster` `repair` `wreck` `givesecrets` `duo` `unduo` |
-| **Head Admin (3)** | `ban` `unban` `strikes` `clearstrikes` `resetdata` `resetsecrets` `givepass` `removepass` |
-| **Owner (4)** | `admin` `unadmin` `shutdown` |
+| **Head Admin (3)** | `ban` `unban` `strikes` `clearstrikes` `resetdata` `resetsecrets` `givepass` `removepass` `givepet` `title` `cleartitle` |
+| **Owner (4)** | `admin` `unadmin` `shutdown` `giveperm` `takeperm` `perms` |
+
+### Permissions, titles and passes (Staff tab)
+- **Per-player permissions**: the Owner opens *Admin Panel > Staff*, types or picks a player (even an offline one) and **ticks** permission groups (Mod commands, Kick & ban, Disasters, Cash & progress, Give passes & pets, Events & world, Fun effects, Give titles, All Admin commands). The player can then run those commands without any rank. Saved across servers; `;giveperm <player> <group|all>`, `;takeperm`, `;perms`. Groups are defined in `Config.Admin.Permissions`; Owner-only commands can never be granted.
+- **Glowing titles**: `;title <player> <color|#hex|rainbow> <text>` (or the Staff tab with colour swatches) puts a glowing, pulsing title above the head and in chat. Saved, survives respawns. `;cleartitle` removes it.
+- **Giving passes**: tick any of the passes in the Staff tab or `;givepass <player or UserId> <pass>`. Offline players get it the next time they join.
+- **Gifting for Robux**: every pass and cash pack has a 🎁 button; the buyer picks a player in the server and pays, the *other* player gets it. Create one Developer Product per item (same price) and paste its ID into `Config.GiftProducts`. `0` = off (simulated in Studio).
 
 ## 📁 Project structure
 
