@@ -141,11 +141,26 @@ Items.TrophyPos = Vector3.new(0, 13, 36)
 Items.ElevatorPos = Vector3.new(-37, 0, -37)
 Items.VaultPadPos = Vector3.new(37, 0, -4)
 Items.CollectorPos = Vector3.new(37, 0, Items.BeltZ)
+-- Purchase pads. Droppers / upgraders / generators get a pad in a lane right in
+-- front of the spot they will be built on; everything else uses one of the
+-- general slots (4 x 2, well spread out in the front half of the floor).
 Items.ButtonSlots = {}
 for row = 0, 1 do
-	for col = 0, 5 do
-		table.insert(Items.ButtonSlots, Vector3.new(-27 + col * 10.8, 0, -20 - row * 10))
+	for col = 0, 3 do
+		table.insert(Items.ButtonSlots, Vector3.new(-27 + col * 18, 0, -22 - row * 8))
 	end
+end
+
+function Items.ButtonLane(item: any): Vector3?
+	local kind = item.Kind
+	if kind == "Dropper" or kind == "Mk2" then
+		return Vector3.new(item.LocalPos.X, 0, -12)
+	elseif kind == "Upgrader" then
+		return Vector3.new(math.min(item.LocalPos.X, 31), 0, -12)
+	elseif kind == "Generator" then
+		return Vector3.new(item.LocalPos.X, 0, 20)
+	end
+	return nil
 end
 Items.RoofPos = {
 	Vector3.new(0, 0, 0), -- helipad

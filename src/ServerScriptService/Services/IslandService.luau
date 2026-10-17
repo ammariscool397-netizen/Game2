@@ -28,6 +28,11 @@ end
 local lastTravel: { [Player]: number } = {}
 local lastChestNote: { [Player]: { [string]: number } } = {}
 
+-- seconds a chest stays closed for this player (half with the Island Express pass)
+function IslandService:_cooldown(player: Player): number
+	return S.MonetizationService:HasPass(player, "IslandExpress") and IC.Cooldown / 2 or IC.Cooldown
+end
+
 function IslandService:_unlocked(player: Player, island): boolean
 	local data = S.DataService:Get(player)
 	return data ~= nil and data.Rebirths >= island.Rebirths
@@ -42,7 +47,7 @@ function IslandService:_status(player: Player, islandId: string): (number, numbe
 	end
 	for _, entry in S.WorldBuilder.Chests do
 		if entry.Island == islandId then
-			local openAt = (data.Chests[entry.Id] or 0) + IC.Cooldown
+			local openAt = (data.Chests[entry.Id] or 0) + self:_cooldown(player)
 			if os.time() >= openAt then
 				ready += 1
 			elseif nextAt == 0 or openAt < nextAt then
@@ -72,7 +77,7 @@ function IslandService:OpenChest(player: Player, entry)
 		return
 	end
 	local island = islandById[entry.Island]
-	local openAt = (data.Chests[entry.Id] or 0) + IC.Cooldown
+	local openAt = (data.Chests[entry.Id] or 0) + self:_cooldown(player)
 	if os.time() < openAt then
 		-- say it once in a while, not every touch
 		local notes = lastChestNote[player] or {}

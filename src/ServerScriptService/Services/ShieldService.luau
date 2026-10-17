@@ -20,7 +20,8 @@ local S
 function ShieldService:_times(player: Player): (number, number)
 	local data = S.DataService:Get(player)
 	local start = data and data.Shield.Start or 0
-	return start + SC.Seconds, start + SC.Cooldown -- (shield ends, ready again)
+	local pro = S.MonetizationService:HasPass(player, "ShieldPro")
+	return start + SC.Seconds * (pro and 2 or 1), start + SC.Cooldown / (pro and 2 or 1) -- (shield ends, ready again)
 end
 
 function ShieldService:IsShielded(player: Player): boolean

@@ -28,6 +28,8 @@ local floorLabel: TextLabel
 local repairFrame: Frame
 local repairLabel: TextLabel
 local menuButtons: { [string]: TextButton } = {}
+local moreNames: { [string]: boolean } = {}
+local badgeOn: { [string]: boolean } = {}
 
 local animVersion = 0
 local function animateCash(target: number)
@@ -85,14 +87,25 @@ local function sideButton(parent: Instance, order: number, icon: string, text: s
 	return button, holder
 end
 
-function HUD:SetBadge(name: string, visible: boolean, text: string?)
+local function showBadge(name: string, visible: boolean, text: string?)
 	local button = menuButtons[name]
-	if button then
-		local badge = button:FindFirstChild("Badge") :: TextLabel?
-		if badge then
-			badge.Visible = visible
-			badge.Text = text or "!"
+	local badge = button and button:FindFirstChild("Badge") :: TextLabel?
+	if badge then
+		badge.Visible = visible
+		badge.Text = text or "!"
+	end
+end
+
+function HUD:SetBadge(name: string, visible: boolean, text: string?)
+	showBadge(name, visible, text)
+	if moreNames[name] and name ~= "Secrets" then
+		-- a hidden button needs attention: show it on MORE
+		badgeOn[name] = visible
+		local any = false
+		for _, on in badgeOn do
+			any = any or on
 		end
+		showBadge("More", any)
 	end
 end
 
@@ -156,41 +169,66 @@ function HUD:Init(controllers)
 		Remotes.BuyProduct:FireServer("InstantRepair")
 	end })
 
-	-- side menu (left)
+	-- side menu (left): the main buttons, and a MORE button that opens the rest
 	local menu = UIKit.new("Frame", {
 		Name = "Menu",
-		Size = UDim2.new(0, 160, 0, 500),
+		Size = UDim2.new(0, 80, 0, 480),
 		Position = UDim2.new(0, 10, 0.5, 0),
 		AnchorPoint = Vector2.new(0, 0.5),
 		BackgroundTransparency = 1,
 		Parent = gui,
 	})
-	local grid = UIKit.new("UIGridLayout", {
+	local list = UIKit.new("UIListLayout", {
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 2),
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		Parent = menu,
+	})
+	list.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	local menuScale = UIKit.new("UIScale", { Parent = menu })
+
+	local morePanel = UIKit.new("Frame", {
+		Name = "MorePanel",
+		Size = UDim2.fromOffset(170, 440),
+		Position = UDim2.new(0, 96, 0.5, 0),
+		AnchorPoint = Vector2.new(0, 0.5),
+		BackgroundColor3 = Theme.Panel,
+		BackgroundTransparency = 0.05,
+		Visible = false,
+		Parent = gui,
+	})
+	UIKit.Corner(morePanel, 16)
+	UIKit.Stroke(morePanel, Color3.new(0, 0, 0), 3, 0.1)
+	local moreGrid = UIKit.new("UIGridLayout", {
 		CellSize = UDim2.fromOffset(70, 80),
 		CellPadding = UDim2.fromOffset(6, 2),
 		SortOrder = Enum.SortOrder.LayoutOrder,
-		Parent = menu,
+		Parent = morePanel,
 	})
-	grid.FillDirectionMaxCells = 2
-	grid.VerticalAlignment = Enum.VerticalAlignment.Center
-	local menuScale = UIKit.new("UIScale", { Parent = menu })
+	moreGrid.FillDirectionMaxCells = 2
+	moreGrid.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	moreGrid.VerticalAlignment = Enum.VerticalAlignment.Center
+	local moreScale = UIKit.new("UIScale", { Parent = morePanel })
 	local function rescale()
 		local vp = workspace.CurrentCamera.ViewportSize
-		menuScale.Scale = math.clamp(vp.Y / 860, 0.55, 1.1)
+		local scale = math.clamp(vp.Y / 860, 0.55, 1.1)
+		menuScale.Scale, moreScale.Scale = scale, scale
 	end
 	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
 	rescale()
 
-	local buttons = {
+	local main = {
 		{ "Shop", "🛒", "SHOP", Color3.fromRGB(255, 180, 0) },
 		{ "Build", "🏗️", "BUILD", Color3.fromRGB(255, 140, 40) },
 		{ "Rebirth", "🔄", "REBIRTH", Color3.fromRGB(200, 90, 255) },
+		{ "Pets", "🐾", "PETS", Color3.fromRGB(255, 150, 200) },
+		{ "Daily", "🎁", "DAILY", Color3.fromRGB(255, 90, 120) },
+	}
+	local more = {
 		{ "Duo", "👥", "DUO", Color3.fromRGB(0, 190, 255) },
 		{ "Floors", "🛗", "FLOORS", Color3.fromRGB(0, 160, 220) },
-		{ "Secrets", "🕵️", "SECRETS", Color3.fromRGB(120, 200, 120) },
-		{ "Daily", "🎁", "DAILY", Color3.fromRGB(255, 90, 120) },
 		{ "Wheel", "🎰", "WHEEL", Color3.fromRGB(255, 120, 60) },
-		{ "Pets", "🐾", "PETS", Color3.fromRGB(255, 150, 200) },
+		{ "Secrets", "🕵️", "SECRETS", Color3.fromRGB(120, 200, 120) },
 		{ "Travel", "🧭", "TRAVEL", Color3.fromRGB(60, 200, 190) },
 		{ "Shield", "🛡️", "SHIELD", Color3.fromRGB(70, 170, 255) },
 		{ "Codes", "🎟️", "CODES", Color3.fromRGB(0, 200, 160) },
@@ -198,9 +236,15 @@ function HUD:Init(controllers)
 		{ "Settings", "⚙️", "SETTINGS", Color3.fromRGB(130, 140, 160) },
 		{ "Admin", "🛡️", "ADMIN", Color3.fromRGB(235, 70, 70) },
 	}
-	for i, def in buttons do
+	local function setMore(open: boolean)
+		morePanel.Visible = open
+	end
+	local function addButton(parent: Instance, index: number, def, inMore: boolean)
 		local name = def[1]
-		local button, holder = sideButton(menu, i, def[2], def[3], def[4], function()
+		local button, holder = sideButton(parent, index, def[2], def[3], def[4], function()
+			if inMore then
+				setMore(false)
+			end
 			if name == "Home" then
 				Remotes.GoHome:FireServer()
 			elseif name == "Floors" then
@@ -214,7 +258,21 @@ function HUD:Init(controllers)
 			end
 		end)
 		menuButtons[name] = button
-		if name == "Admin" then
+		if inMore then
+			moreNames[name] = true
+		end
+		return button, holder
+	end
+	for i, def in main do
+		addButton(menu, i, def, false)
+	end
+	local moreButton = sideButton(menu, #main + 1, "➕", "MORE", Color3.fromRGB(90, 100, 130), function()
+		setMore(not morePanel.Visible)
+	end)
+	menuButtons.More = moreButton
+	for i, def in more do
+		local _, holder = addButton(morePanel, i, def, true)
+		if def[1] == "Admin" then
 			holder.Visible = (player:GetAttribute("AdminRank") or 0) > 0
 			player:GetAttributeChangedSignal("AdminRank"):Connect(function()
 				holder.Visible = (player:GetAttribute("AdminRank") or 0) > 0

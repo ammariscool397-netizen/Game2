@@ -475,6 +475,19 @@ function DataService:TeamHasPass(player: Player, key: string): boolean
 	return false
 end
 
+-- a player's pet bonus (+50% with the Pet Power pass) and income per rebirth (+50% with Rebirth Booster)
+local function petBonusOf(player: Player, data): number
+	local bonus = Config.PetsBonus(data.Pets)
+	if S and S.MonetizationService and S.MonetizationService:HasPass(player, "PetPower") then
+		bonus *= 1.5
+	end
+	return bonus
+end
+
+local function rebirthIncome(passOwned: boolean, rebirths: number): number
+	return rebirths * Config.Rebirth.MultiplierPerRebirth * (passOwned and 1.5 or 1)
+end
+
 -- Global income multiplier of the wallet that `player` uses.
 -- permanentOnly = the player's own rebirths + passes (no duo, boosts or events),
 -- used for offline earnings
@@ -484,8 +497,9 @@ function DataService:GetMultiplier(player: Player, permanentOnly: boolean?): num
 		if not own then
 			return 1
 		end
-		local mult = 1 + own.Rebirths * Config.Rebirth.MultiplierPerRebirth + Config.RebirthPerk(own.Rebirths, "Income") + Config.PetsBonus(own.Pets)
 		local monetization = S and S.MonetizationService
+		local boosted = monetization ~= nil and monetization:HasPass(player, "RebirthBoost")
+		local mult = 1 + rebirthIncome(boosted, own.Rebirths) + Config.RebirthPerk(own.Rebirths, "Income") + petBonusOf(player, own)
 		if monetization and monetization:HasPass(player, "DoubleCash") then
 			mult *= 2
 		end
@@ -499,7 +513,7 @@ function DataService:GetMultiplier(player: Player, permanentOnly: boolean?): num
 	if not data then
 		return 1
 	end
-	local mult = 1 + data.Rebirths * Config.Rebirth.MultiplierPerRebirth + Config.RebirthPerk(data.Rebirths, "Income")
+	local mult = 1 + rebirthIncome(self:TeamHasPass(host, "RebirthBoost"), data.Rebirths) + Config.RebirthPerk(data.Rebirths, "Income")
 	if self:TeamHasPass(host, "DoubleCash") then
 		mult *= 2
 	end
@@ -510,7 +524,7 @@ function DataService:GetMultiplier(player: Player, permanentOnly: boolean?): num
 	for _, member in self:GetTeam(host) do
 		local memberData = profiles[member]
 		if memberData then
-			mult += Config.PetsBonus(memberData.Pets) -- (a duo's pets both help)
+			mult += petBonusOf(member, memberData) -- (a duo's pets both help)
 			if memberData.BoostEnd > os.time() then
 				boosted = true
 			end

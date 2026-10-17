@@ -24,6 +24,11 @@ local function rebirthsOf(player: Player): number
 	return data and data.Rebirths or 0
 end
 
+-- equip slots: by rebirths, +1 with the "+1 Pet Slot" pass
+function PetService:_slots(player: Player, data): number
+	return Config.PetSlots(data.Rebirths) + (S.MonetizationService:HasPass(player, "PetSlot") and 1 or 0)
+end
+
 function PetService:GetEggCost(player: Player, egg): number
 	local wallet = S.DataService:GetWallet(player)
 	local rebirths = wallet and wallet.Rebirths or 0
@@ -54,15 +59,25 @@ local function equippedIndex(data, uid: number): number?
 end
 
 -- picks a pet from an egg: first a rarity by the egg's weights, then a pet of it
-function PetService:_roll(egg)
+function PetService:_roll(egg, lucky: boolean?)
+	local weights = {}
+	local first = true
+	for _, name in PC.RarityOrder do
+		local weight = egg.Weights[name]
+		if weight then
+			-- Lucky Hatch: everything except the most common rarity is 1.6x likelier
+			weights[name] = (lucky and not first) and weight * 1.6 or weight
+			first = false
+		end
+	end
 	local total = 0
-	for _, weight in egg.Weights do
+	for _, weight in weights do
 		total += weight
 	end
 	local roll = math.random() * total
 	local rarity
 	for _, name in PC.RarityOrder do
-		local weight = egg.Weights[name]
+		local weight = weights[name]
 		if weight then
 			rarity = name
 			roll -= weight
@@ -94,7 +109,7 @@ function PetService:_state(player: Player)
 	for _, pet in data.Pets.Owned do
 		table.insert(owned, { Uid = pet.Uid, Id = pet.Id, Sell = self:GetSellValue(player, pet.Id) })
 	end
-	return { Owned = owned, Equipped = data.Pets.Equipped, Slots = Config.PetSlots(data.Rebirths), Eggs = eggs, Bonus = Config.PetsBonus(data.Pets) }
+	return { Owned = owned, Equipped = data.Pets.Equipped, Slots = self:_slots(player, data), Eggs = eggs, Bonus = Config.PetsBonus(data.Pets) }
 end
 
 -- everyone sees equipped pets (attribute), the owner gets the full list
@@ -123,7 +138,7 @@ end
 -- drops equipped pets that don't exist or don't fit the slots (e.g. after a data edit)
 function PetService:_clean(data)
 	local seen, kept = {}, {}
-	local slots = Config.PetSlots(data.Rebirths)
+	local slots = Config.PetSlots(data.Rebirths) + 1 -- (the pass's slot is checked when equipping)
 	for _, uid in data.Pets.Equipped do
 		if not seen[uid] and findOwned(data, uid) and #kept < slots then
 			seen[uid] = true
@@ -173,7 +188,7 @@ function PetService:Hatch(player: Player, eggId: any): (boolean, string)
 	if not S.DataService:SpendCash(player, cost) then
 		return false, "You need " .. Util.Money(cost) .. " for a " .. egg.Name .. "!"
 	end
-	local pet = self:_roll(egg)
+	local pet = self:_roll(egg, S.MonetizationService:HasPass(player, "PetLuck"))
 	self:Give(player, pet.Id, 1)
 	data.Pets.Hatched += 1
 	if S.QuestService then
@@ -202,7 +217,7 @@ function PetService:Equip(player: Player, uid: any): (boolean, string)
 	if equippedIndex(data, pet.Uid) then
 		return false, "Already equipped."
 	end
-	local slots = Config.PetSlots(data.Rebirths)
+	local slots = self:_slots(player, data)
 	if #data.Pets.Equipped >= slots then
 		return false, "All " .. slots .. " pet slots are used - unequip one first. (More slots at " .. table.concat(PC.SlotRebirths, " and ") .. " rebirths.)"
 	end
@@ -258,7 +273,7 @@ function PetService:EquipBest(player: Player): (boolean, string)
 	end)
 	data.Pets.Equipped = {}
 	for _, pet in sorted do
-		if #data.Pets.Equipped < Config.PetSlots(data.Rebirths) then
+		if #data.Pets.Equipped < self:_slots(player, data) then
 			table.insert(data.Pets.Equipped, pet.Uid)
 		end
 	end

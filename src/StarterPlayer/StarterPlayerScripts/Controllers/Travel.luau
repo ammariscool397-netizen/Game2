@@ -59,7 +59,7 @@ function Travel:Init(controllers)
 	local _, content = C.UI:MakePanel("Travel", "🧭 TRAVEL", Color3.fromRGB(60, 200, 190), 620, 460)
 	UIKit.List(content, 10)
 	UIKit.new("TextLabel", {
-		Text = "Islands beyond the edge of the world, full of treasure chests. Each chest reopens 30 minutes after you open it - even if you leave the game.",
+		Text = "Islands beyond the edge of the world, full of treasure chests. Each chest reopens 12 hours after you open it (6 with the Island Express pass) - even if you leave the game.",
 		Size = UDim2.new(1, -20, 0, 54),
 		BackgroundTransparency = 1,
 		TextWrapped = true,

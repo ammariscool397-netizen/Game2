@@ -36,10 +36,11 @@ Config.Tycoon = {
 	ConveyorSpeed = 12, -- studs per second (visual drops)
 	-- Pacing: how long (in seconds of income) items cost, from the first item to
 	-- the last one. Bigger = slower game. With the defaults a full 8-floor
-	-- tower takes about 3 hours (much less with rebirths / passes).
-	PaceStartSeconds = 4,
-	PaceEndSeconds = 44,
-	ButtonSlotsPerFloor = 12,
+	-- tower takes about 5-6 hours (much less with rebirths / passes).
+	PaceStartSeconds = 8,
+	PaceEndSeconds = 85,
+	ButtonSlotsPerFloor = 8,
+	MaxVisibleButtons = 6, -- upgrade pads shown at once per floor (the cheapest next ones)
 	MaxBuildPerTick = 30, -- items built per frame when a big tycoon loads
 }
 
@@ -267,6 +268,96 @@ Config.GamePasses = {
 		Icon = "🤖",
 		Color = Color3.fromRGB(0, 210, 190),
 		Order = 6,
+	},
+	PetLuck = {
+		Id = 0,
+		Name = "Lucky Hatch",
+		Description = "Eggs hatch much rarer pets (rare+ odds x1.6).",
+		PriceHint = 199,
+		Icon = "🍀",
+		Color = Color3.fromRGB(90, 220, 110),
+		Order = 7,
+	},
+	PetPower = {
+		Id = 0,
+		Name = "Pet Power",
+		Description = "Your pets give +50% more income.",
+		PriceHint = 249,
+		Icon = "🐾",
+		Color = Color3.fromRGB(255, 150, 200),
+		Order = 8,
+	},
+	PetSlot = {
+		Id = 0,
+		Name = "+1 Pet Slot",
+		Description = "Equip one more pet at the same time.",
+		PriceHint = 149,
+		Icon = "➕",
+		Color = Color3.fromRGB(180, 120, 255),
+		Order = 9,
+	},
+	OfflineBoost = {
+		Id = 0,
+		Name = "Offline Boost",
+		Description = "Earn double income while you are offline.",
+		PriceHint = 199,
+		Icon = "💤",
+		Color = Color3.fromRGB(100, 140, 255),
+		Order = 10,
+	},
+	Discount = {
+		Id = 0,
+		Name = "10% Off Upgrades",
+		Description = "Every tower upgrade costs 10% less, forever.",
+		PriceHint = 249,
+		Icon = "🏷️",
+		Color = Color3.fromRGB(255, 120, 60),
+		Order = 11,
+	},
+	IslandExpress = {
+		Id = 0,
+		Name = "Island Express",
+		Description = "Island treasure chests reopen twice as fast (6 hours).",
+		PriceHint = 179,
+		Icon = "🏝️",
+		Color = Color3.fromRGB(60, 200, 190),
+		Order = 12,
+	},
+	WheelPlus = {
+		Id = 0,
+		Name = "Double Spins",
+		Description = "A free Lucky Wheel spin every 15 minutes instead of 30.",
+		PriceHint = 99,
+		Icon = "🎰",
+		Color = Color3.fromRGB(255, 90, 120),
+		Order = 13,
+	},
+	ShieldPro = {
+		Id = 0,
+		Name = "Shield Pro",
+		Description = "Your personal shield lasts twice as long and recharges twice as fast.",
+		PriceHint = 149,
+		Icon = "🛡️",
+		Color = Color3.fromRGB(70, 170, 255),
+		Order = 14,
+	},
+	RebirthBoost = {
+		Id = 0,
+		Name = "Rebirth Booster",
+		Description = "Each rebirth gives +0.75x income instead of +0.5x.",
+		PriceHint = 349,
+		Icon = "🔄",
+		Color = Color3.fromRGB(200, 90, 255),
+		Order = 15,
+	},
+	GiftBoost = {
+		Id = 0,
+		Name = "Gift Boost",
+		Description = "Playtime gifts, daily and weekly rewards pay +50% more.",
+		PriceHint = 129,
+		Icon = "🎁",
+		Color = Color3.fromRGB(255, 170, 0),
+		Order = 16,
 	},
 }
 
@@ -606,12 +697,12 @@ Config.Weekly = {
 Config.Islands = {
 	Enabled = true,
 	TravelDelay = 5, -- seconds between trips (anti-spam)
-	Cooldown = 30 * 60, -- a chest stays closed this long after you open it
+	Cooldown = 12 * 60 * 60, -- a chest stays closed this long after you open it (12 hours)
 	Plaza = Vector3.new(0, 4, 24), -- the main island's spawn plaza
 	List = {
-		{ Id = "Treasure", Name = "Treasure Isle", Icon = "🏝️", Position = Vector3.new(-1500, 0, 500), Radius = 110, Rebirths = 0, Chests = 4, IncomeSeconds = 120, MinCash = 3_000, Color = Color3.fromRGB(235, 210, 140), Material = Enum.Material.Sand, Text = "Pirates buried their gold here!" },
-		{ Id = "Volcano", Name = "Volcano Isle", Icon = "🌋", Position = Vector3.new(1500, 0, -600), Radius = 110, Rebirths = 1, Chests = 4, IncomeSeconds = 300, MinCash = 12_000, Color = Color3.fromRGB(70, 55, 55), Material = Enum.Material.Slate, Text = "Hot loot - mind the lava!" },
-		{ Id = "Frost", Name = "Frost Isle", Icon = "❄️", Position = Vector3.new(-300, 0, -1550), Radius = 110, Rebirths = 3, Chests = 4, IncomeSeconds = 600, MinCash = 40_000, Color = Color3.fromRGB(225, 240, 255), Material = Enum.Material.Snow, Text = "Frozen chests full of cash." },
+		{ Id = "Treasure", Name = "Treasure Isle", Icon = "🏝️", Position = Vector3.new(-1500, 0, 500), Radius = 110, Rebirths = 0, Chests = 4, IncomeSeconds = 20, MinCash = 800, Color = Color3.fromRGB(235, 210, 140), Material = Enum.Material.Sand, Text = "Pirates buried their gold here!" },
+		{ Id = "Volcano", Name = "Volcano Isle", Icon = "🌋", Position = Vector3.new(1500, 0, -600), Radius = 110, Rebirths = 1, Chests = 4, IncomeSeconds = 40, MinCash = 2_500, Color = Color3.fromRGB(70, 55, 55), Material = Enum.Material.Slate, Text = "Hot loot - mind the lava!" },
+		{ Id = "Frost", Name = "Frost Isle", Icon = "❄️", Position = Vector3.new(-300, 0, -1550), Radius = 110, Rebirths = 3, Chests = 4, IncomeSeconds = 70, MinCash = 6_000, Color = Color3.fromRGB(225, 240, 255), Material = Enum.Material.Snow, Text = "Frozen chests full of cash." },
 	},
 }
 
@@ -689,12 +780,12 @@ Config.Wheel = {
 	SpinSeconds = 4.5, -- how long the reel animation runs
 	Segments = {
 		{ Name = "Pocket Change", Icon = "💵", Minutes = 1, MinCash = 400, Weight = 28, Color = Color3.fromRGB(60, 170, 90) },
-		{ Name = "Cash Stack", Icon = "💰", Minutes = 5, MinCash = 2_000, Weight = 22, Color = Color3.fromRGB(40, 150, 200) },
-		{ Name = "Cash Bag", Icon = "👜", Minutes = 15, MinCash = 7_000, Weight = 12, Color = Color3.fromRGB(150, 90, 230) },
+		{ Name = "Cash Stack", Icon = "💰", Minutes = 3, MinCash = 2_000, Weight = 22, Color = Color3.fromRGB(40, 150, 200) },
+		{ Name = "Cash Bag", Icon = "👜", Minutes = 8, MinCash = 7_000, Weight = 12, Color = Color3.fromRGB(150, 90, 230) },
 		{ Name = "2x Boost 5m", Icon = "⚡", BoostSeconds = 5 * 60, Weight = 16, Color = Color3.fromRGB(240, 170, 20) },
 		{ Name = "2x Boost 15m", Icon = "🔥", BoostSeconds = 15 * 60, Weight = 8, Color = Color3.fromRGB(235, 100, 40) },
-		{ Name = "Mega Cash", Icon = "💎", Minutes = 60, MinCash = 40_000, Weight = 3, Color = Color3.fromRGB(60, 210, 230) },
-		{ Name = "JACKPOT", Icon = "🎰", Minutes = 180, MinCash = 150_000, Weight = 1, Color = Color3.fromRGB(255, 70, 110) },
+		{ Name = "Mega Cash", Icon = "💎", Minutes = 30, MinCash = 40_000, Weight = 3, Color = Color3.fromRGB(60, 210, 230) },
+		{ Name = "JACKPOT", Icon = "🎰", Minutes = 90, MinCash = 150_000, Weight = 1, Color = Color3.fromRGB(255, 70, 110) },
 	},
 }
 

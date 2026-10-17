@@ -99,6 +99,9 @@ function WeeklyService:Claim(player: Player, index: any): (boolean, string)
 	local wallet = S.DataService:GetWallet(player)
 	local rebirths = wallet and wallet.Rebirths or 0
 	local cash = math.floor(math.max(milestone.MinCash * (1 + rebirths), S.TycoonService:GetIncome(player) * milestone.IncomeMinutes * 60))
+	if S.MonetizationService:HasPass(player, "GiftBoost") then
+		cash = math.floor(cash * 1.5)
+	end
 	S.DataService:AddCash(player, cash, false)
 	local text = "📅 Weekly reward: +" .. Util.Money(cash)
 	if milestone.BoostSeconds then

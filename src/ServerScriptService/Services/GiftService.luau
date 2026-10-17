@@ -67,7 +67,7 @@ function GiftService:GetReward(player: Player, index: number): number
 	local wallet = S.DataService:GetWallet(player)
 	local rebirths = wallet and wallet.Rebirths or 0
 	local cash = math.max(GC.MinCash[index] * (1 + rebirths), S.TycoonService:GetIncome(player) * GC.IncomeMinutes[index] * 60)
-	return math.floor(cash * (1 + Config.RebirthPerk(rebirths, "Gift")))
+	return math.floor(cash * (1 + Config.RebirthPerk(rebirths, "Gift") + (S.MonetizationService:HasPass(player, "GiftBoost") and 0.5 or 0)))
 end
 
 function GiftService:Claim(player: Player): (boolean, string)

@@ -450,10 +450,11 @@ Config.Tycoon = {
 	ConveyorSpeed = 12, -- studs per second (visual drops)
 	-- Pacing: how long (in seconds of income) items cost, from the first item to
 	-- the last one. Bigger = slower game. With the defaults a full 8-floor
-	-- tower takes about 3 hours (much less with rebirths / passes).
-	PaceStartSeconds = 4,
-	PaceEndSeconds = 44,
-	ButtonSlotsPerFloor = 12,
+	-- tower takes about 5-6 hours (much less with rebirths / passes).
+	PaceStartSeconds = 8,
+	PaceEndSeconds = 85,
+	ButtonSlotsPerFloor = 8,
+	MaxVisibleButtons = 6, -- upgrade pads shown at once per floor (the cheapest next ones)
 	MaxBuildPerTick = 30, -- items built per frame when a big tycoon loads
 }
 
@@ -681,6 +682,96 @@ Config.GamePasses = {
 		Icon = "🤖",
 		Color = Color3.fromRGB(0, 210, 190),
 		Order = 6,
+	},
+	PetLuck = {
+		Id = 0,
+		Name = "Lucky Hatch",
+		Description = "Eggs hatch much rarer pets (rare+ odds x1.6).",
+		PriceHint = 199,
+		Icon = "🍀",
+		Color = Color3.fromRGB(90, 220, 110),
+		Order = 7,
+	},
+	PetPower = {
+		Id = 0,
+		Name = "Pet Power",
+		Description = "Your pets give +50% more income.",
+		PriceHint = 249,
+		Icon = "🐾",
+		Color = Color3.fromRGB(255, 150, 200),
+		Order = 8,
+	},
+	PetSlot = {
+		Id = 0,
+		Name = "+1 Pet Slot",
+		Description = "Equip one more pet at the same time.",
+		PriceHint = 149,
+		Icon = "➕",
+		Color = Color3.fromRGB(180, 120, 255),
+		Order = 9,
+	},
+	OfflineBoost = {
+		Id = 0,
+		Name = "Offline Boost",
+		Description = "Earn double income while you are offline.",
+		PriceHint = 199,
+		Icon = "💤",
+		Color = Color3.fromRGB(100, 140, 255),
+		Order = 10,
+	},
+	Discount = {
+		Id = 0,
+		Name = "10% Off Upgrades",
+		Description = "Every tower upgrade costs 10% less, forever.",
+		PriceHint = 249,
+		Icon = "🏷️",
+		Color = Color3.fromRGB(255, 120, 60),
+		Order = 11,
+	},
+	IslandExpress = {
+		Id = 0,
+		Name = "Island Express",
+		Description = "Island treasure chests reopen twice as fast (6 hours).",
+		PriceHint = 179,
+		Icon = "🏝️",
+		Color = Color3.fromRGB(60, 200, 190),
+		Order = 12,
+	},
+	WheelPlus = {
+		Id = 0,
+		Name = "Double Spins",
+		Description = "A free Lucky Wheel spin every 15 minutes instead of 30.",
+		PriceHint = 99,
+		Icon = "🎰",
+		Color = Color3.fromRGB(255, 90, 120),
+		Order = 13,
+	},
+	ShieldPro = {
+		Id = 0,
+		Name = "Shield Pro",
+		Description = "Your personal shield lasts twice as long and recharges twice as fast.",
+		PriceHint = 149,
+		Icon = "🛡️",
+		Color = Color3.fromRGB(70, 170, 255),
+		Order = 14,
+	},
+	RebirthBoost = {
+		Id = 0,
+		Name = "Rebirth Booster",
+		Description = "Each rebirth gives +0.75x income instead of +0.5x.",
+		PriceHint = 349,
+		Icon = "🔄",
+		Color = Color3.fromRGB(200, 90, 255),
+		Order = 15,
+	},
+	GiftBoost = {
+		Id = 0,
+		Name = "Gift Boost",
+		Description = "Playtime gifts, daily and weekly rewards pay +50% more.",
+		PriceHint = 129,
+		Icon = "🎁",
+		Color = Color3.fromRGB(255, 170, 0),
+		Order = 16,
 	},
 }
 
@@ -1020,12 +1111,12 @@ Config.Weekly = {
 Config.Islands = {
 	Enabled = true,
 	TravelDelay = 5, -- seconds between trips (anti-spam)
-	Cooldown = 30 * 60, -- a chest stays closed this long after you open it
+	Cooldown = 12 * 60 * 60, -- a chest stays closed this long after you open it (12 hours)
 	Plaza = Vector3.new(0, 4, 24), -- the main island's spawn plaza
 	List = {
-		{ Id = "Treasure", Name = "Treasure Isle", Icon = "🏝️", Position = Vector3.new(-1500, 0, 500), Radius = 110, Rebirths = 0, Chests = 4, IncomeSeconds = 120, MinCash = 3_000, Color = Color3.fromRGB(235, 210, 140), Material = Enum.Material.Sand, Text = "Pirates buried their gold here!" },
-		{ Id = "Volcano", Name = "Volcano Isle", Icon = "🌋", Position = Vector3.new(1500, 0, -600), Radius = 110, Rebirths = 1, Chests = 4, IncomeSeconds = 300, MinCash = 12_000, Color = Color3.fromRGB(70, 55, 55), Material = Enum.Material.Slate, Text = "Hot loot - mind the lava!" },
-		{ Id = "Frost", Name = "Frost Isle", Icon = "❄️", Position = Vector3.new(-300, 0, -1550), Radius = 110, Rebirths = 3, Chests = 4, IncomeSeconds = 600, MinCash = 40_000, Color = Color3.fromRGB(225, 240, 255), Material = Enum.Material.Snow, Text = "Frozen chests full of cash." },
+		{ Id = "Treasure", Name = "Treasure Isle", Icon = "🏝️", Position = Vector3.new(-1500, 0, 500), Radius = 110, Rebirths = 0, Chests = 4, IncomeSeconds = 20, MinCash = 800, Color = Color3.fromRGB(235, 210, 140), Material = Enum.Material.Sand, Text = "Pirates buried their gold here!" },
+		{ Id = "Volcano", Name = "Volcano Isle", Icon = "🌋", Position = Vector3.new(1500, 0, -600), Radius = 110, Rebirths = 1, Chests = 4, IncomeSeconds = 40, MinCash = 2_500, Color = Color3.fromRGB(70, 55, 55), Material = Enum.Material.Slate, Text = "Hot loot - mind the lava!" },
+		{ Id = "Frost", Name = "Frost Isle", Icon = "❄️", Position = Vector3.new(-300, 0, -1550), Radius = 110, Rebirths = 3, Chests = 4, IncomeSeconds = 70, MinCash = 6_000, Color = Color3.fromRGB(225, 240, 255), Material = Enum.Material.Snow, Text = "Frozen chests full of cash." },
 	},
 }
 
@@ -1103,12 +1194,12 @@ Config.Wheel = {
 	SpinSeconds = 4.5, -- how long the reel animation runs
 	Segments = {
 		{ Name = "Pocket Change", Icon = "💵", Minutes = 1, MinCash = 400, Weight = 28, Color = Color3.fromRGB(60, 170, 90) },
-		{ Name = "Cash Stack", Icon = "💰", Minutes = 5, MinCash = 2_000, Weight = 22, Color = Color3.fromRGB(40, 150, 200) },
-		{ Name = "Cash Bag", Icon = "👜", Minutes = 15, MinCash = 7_000, Weight = 12, Color = Color3.fromRGB(150, 90, 230) },
+		{ Name = "Cash Stack", Icon = "💰", Minutes = 3, MinCash = 2_000, Weight = 22, Color = Color3.fromRGB(40, 150, 200) },
+		{ Name = "Cash Bag", Icon = "👜", Minutes = 8, MinCash = 7_000, Weight = 12, Color = Color3.fromRGB(150, 90, 230) },
 		{ Name = "2x Boost 5m", Icon = "⚡", BoostSeconds = 5 * 60, Weight = 16, Color = Color3.fromRGB(240, 170, 20) },
 		{ Name = "2x Boost 15m", Icon = "🔥", BoostSeconds = 15 * 60, Weight = 8, Color = Color3.fromRGB(235, 100, 40) },
-		{ Name = "Mega Cash", Icon = "💎", Minutes = 60, MinCash = 40_000, Weight = 3, Color = Color3.fromRGB(60, 210, 230) },
-		{ Name = "JACKPOT", Icon = "🎰", Minutes = 180, MinCash = 150_000, Weight = 1, Color = Color3.fromRGB(255, 70, 110) },
+		{ Name = "Mega Cash", Icon = "💎", Minutes = 30, MinCash = 40_000, Weight = 3, Color = Color3.fromRGB(60, 210, 230) },
+		{ Name = "JACKPOT", Icon = "🎰", Minutes = 90, MinCash = 150_000, Weight = 1, Color = Color3.fromRGB(255, 70, 110) },
 	},
 }
 
@@ -1503,11 +1594,26 @@ Items.TrophyPos = Vector3.new(0, 13, 36)
 Items.ElevatorPos = Vector3.new(-37, 0, -37)
 Items.VaultPadPos = Vector3.new(37, 0, -4)
 Items.CollectorPos = Vector3.new(37, 0, Items.BeltZ)
+-- Purchase pads. Droppers / upgraders / generators get a pad in a lane right in
+-- front of the spot they will be built on; everything else uses one of the
+-- general slots (4 x 2, well spread out in the front half of the floor).
 Items.ButtonSlots = {}
 for row = 0, 1 do
-	for col = 0, 5 do
-		table.insert(Items.ButtonSlots, Vector3.new(-27 + col * 10.8, 0, -20 - row * 10))
+	for col = 0, 3 do
+		table.insert(Items.ButtonSlots, Vector3.new(-27 + col * 18, 0, -22 - row * 8))
 	end
+end
+
+function Items.ButtonLane(item: any): Vector3?
+	local kind = item.Kind
+	if kind == "Dropper" or kind == "Mk2" then
+		return Vector3.new(item.LocalPos.X, 0, -12)
+	elseif kind == "Upgrader" then
+		return Vector3.new(math.min(item.LocalPos.X, 31), 0, -12)
+	elseif kind == "Generator" then
+		return Vector3.new(item.LocalPos.X, 0, 20)
+	end
+	return nil
 end
 Items.RoofPos = {
 	Vector3.new(0, 0, 0), -- helipad
@@ -4878,6 +4984,19 @@ function DataService:TeamHasPass(player: Player, key: string): boolean
 	return false
 end
 
+-- a player's pet bonus (+50% with the Pet Power pass) and income per rebirth (+50% with Rebirth Booster)
+local function petBonusOf(player: Player, data): number
+	local bonus = Config.PetsBonus(data.Pets)
+	if S and S.MonetizationService and S.MonetizationService:HasPass(player, "PetPower") then
+		bonus *= 1.5
+	end
+	return bonus
+end
+
+local function rebirthIncome(passOwned: boolean, rebirths: number): number
+	return rebirths * Config.Rebirth.MultiplierPerRebirth * (passOwned and 1.5 or 1)
+end
+
 -- Global income multiplier of the wallet that `player` uses.
 -- permanentOnly = the player's own rebirths + passes (no duo, boosts or events),
 -- used for offline earnings
@@ -4887,8 +5006,9 @@ function DataService:GetMultiplier(player: Player, permanentOnly: boolean?): num
 		if not own then
 			return 1
 		end
-		local mult = 1 + own.Rebirths * Config.Rebirth.MultiplierPerRebirth + Config.RebirthPerk(own.Rebirths, "Income") + Config.PetsBonus(own.Pets)
 		local monetization = S and S.MonetizationService
+		local boosted = monetization ~= nil and monetization:HasPass(player, "RebirthBoost")
+		local mult = 1 + rebirthIncome(boosted, own.Rebirths) + Config.RebirthPerk(own.Rebirths, "Income") + petBonusOf(player, own)
 		if monetization and monetization:HasPass(player, "DoubleCash") then
 			mult *= 2
 		end
@@ -4902,7 +5022,7 @@ function DataService:GetMultiplier(player: Player, permanentOnly: boolean?): num
 	if not data then
 		return 1
 	end
-	local mult = 1 + data.Rebirths * Config.Rebirth.MultiplierPerRebirth + Config.RebirthPerk(data.Rebirths, "Income")
+	local mult = 1 + rebirthIncome(self:TeamHasPass(host, "RebirthBoost"), data.Rebirths) + Config.RebirthPerk(data.Rebirths, "Income")
 	if self:TeamHasPass(host, "DoubleCash") then
 		mult *= 2
 	end
@@ -4913,7 +5033,7 @@ function DataService:GetMultiplier(player: Player, permanentOnly: boolean?): num
 	for _, member in self:GetTeam(host) do
 		local memberData = profiles[member]
 		if memberData then
-			mult += Config.PetsBonus(memberData.Pets) -- (a duo's pets both help)
+			mult += petBonusOf(member, memberData) -- (a duo's pets both help)
 			if memberData.BoostEnd > os.time() then
 				boosted = true
 			end
@@ -6408,7 +6528,7 @@ function GiftService:GetReward(player: Player, index: number): number
 	local wallet = S.DataService:GetWallet(player)
 	local rebirths = wallet and wallet.Rebirths or 0
 	local cash = math.max(GC.MinCash[index] * (1 + rebirths), S.TycoonService:GetIncome(player) * GC.IncomeMinutes[index] * 60)
-	return math.floor(cash * (1 + Config.RebirthPerk(rebirths, "Gift")))
+	return math.floor(cash * (1 + Config.RebirthPerk(rebirths, "Gift") + (S.MonetizationService:HasPass(player, "GiftBoost") and 0.5 or 0)))
 end
 
 function GiftService:Claim(player: Player): (boolean, string)
@@ -6513,6 +6633,11 @@ end
 local lastTravel: { [Player]: number } = {}
 local lastChestNote: { [Player]: { [string]: number } } = {}
 
+-- seconds a chest stays closed for this player (half with the Island Express pass)
+function IslandService:_cooldown(player: Player): number
+	return S.MonetizationService:HasPass(player, "IslandExpress") and IC.Cooldown / 2 or IC.Cooldown
+end
+
 function IslandService:_unlocked(player: Player, island): boolean
 	local data = S.DataService:Get(player)
 	return data ~= nil and data.Rebirths >= island.Rebirths
@@ -6527,7 +6652,7 @@ function IslandService:_status(player: Player, islandId: string): (number, numbe
 	end
 	for _, entry in S.WorldBuilder.Chests do
 		if entry.Island == islandId then
-			local openAt = (data.Chests[entry.Id] or 0) + IC.Cooldown
+			local openAt = (data.Chests[entry.Id] or 0) + self:_cooldown(player)
 			if os.time() >= openAt then
 				ready += 1
 			elseif nextAt == 0 or openAt < nextAt then
@@ -6557,7 +6682,7 @@ function IslandService:OpenChest(player: Player, entry)
 		return
 	end
 	local island = islandById[entry.Island]
-	local openAt = (data.Chests[entry.Id] or 0) + IC.Cooldown
+	local openAt = (data.Chests[entry.Id] or 0) + self:_cooldown(player)
 	if os.time() < openAt then
 		-- say it once in a while, not every touch
 		local notes = lastChestNote[player] or {}
@@ -8250,6 +8375,11 @@ local function rebirthsOf(player: Player): number
 	return data and data.Rebirths or 0
 end
 
+-- equip slots: by rebirths, +1 with the "+1 Pet Slot" pass
+function PetService:_slots(player: Player, data): number
+	return Config.PetSlots(data.Rebirths) + (S.MonetizationService:HasPass(player, "PetSlot") and 1 or 0)
+end
+
 function PetService:GetEggCost(player: Player, egg): number
 	local wallet = S.DataService:GetWallet(player)
 	local rebirths = wallet and wallet.Rebirths or 0
@@ -8280,15 +8410,25 @@ local function equippedIndex(data, uid: number): number?
 end
 
 -- picks a pet from an egg: first a rarity by the egg's weights, then a pet of it
-function PetService:_roll(egg)
+function PetService:_roll(egg, lucky: boolean?)
+	local weights = {}
+	local first = true
+	for _, name in PC.RarityOrder do
+		local weight = egg.Weights[name]
+		if weight then
+			-- Lucky Hatch: everything except the most common rarity is 1.6x likelier
+			weights[name] = (lucky and not first) and weight * 1.6 or weight
+			first = false
+		end
+	end
 	local total = 0
-	for _, weight in egg.Weights do
+	for _, weight in weights do
 		total += weight
 	end
 	local roll = math.random() * total
 	local rarity
 	for _, name in PC.RarityOrder do
-		local weight = egg.Weights[name]
+		local weight = weights[name]
 		if weight then
 			rarity = name
 			roll -= weight
@@ -8320,7 +8460,7 @@ function PetService:_state(player: Player)
 	for _, pet in data.Pets.Owned do
 		table.insert(owned, { Uid = pet.Uid, Id = pet.Id, Sell = self:GetSellValue(player, pet.Id) })
 	end
-	return { Owned = owned, Equipped = data.Pets.Equipped, Slots = Config.PetSlots(data.Rebirths), Eggs = eggs, Bonus = Config.PetsBonus(data.Pets) }
+	return { Owned = owned, Equipped = data.Pets.Equipped, Slots = self:_slots(player, data), Eggs = eggs, Bonus = Config.PetsBonus(data.Pets) }
 end
 
 -- everyone sees equipped pets (attribute), the owner gets the full list
@@ -8349,7 +8489,7 @@ end
 -- drops equipped pets that don't exist or don't fit the slots (e.g. after a data edit)
 function PetService:_clean(data)
 	local seen, kept = {}, {}
-	local slots = Config.PetSlots(data.Rebirths)
+	local slots = Config.PetSlots(data.Rebirths) + 1 -- (the pass's slot is checked when equipping)
 	for _, uid in data.Pets.Equipped do
 		if not seen[uid] and findOwned(data, uid) and #kept < slots then
 			seen[uid] = true
@@ -8399,7 +8539,7 @@ function PetService:Hatch(player: Player, eggId: any): (boolean, string)
 	if not S.DataService:SpendCash(player, cost) then
 		return false, "You need " .. Util.Money(cost) .. " for a " .. egg.Name .. "!"
 	end
-	local pet = self:_roll(egg)
+	local pet = self:_roll(egg, S.MonetizationService:HasPass(player, "PetLuck"))
 	self:Give(player, pet.Id, 1)
 	data.Pets.Hatched += 1
 	if S.QuestService then
@@ -8428,7 +8568,7 @@ function PetService:Equip(player: Player, uid: any): (boolean, string)
 	if equippedIndex(data, pet.Uid) then
 		return false, "Already equipped."
 	end
-	local slots = Config.PetSlots(data.Rebirths)
+	local slots = self:_slots(player, data)
 	if #data.Pets.Equipped >= slots then
 		return false, "All " .. slots .. " pet slots are used - unequip one first. (More slots at " .. table.concat(PC.SlotRebirths, " and ") .. " rebirths.)"
 	end
@@ -8484,7 +8624,7 @@ function PetService:EquipBest(player: Player): (boolean, string)
 	end)
 	data.Pets.Equipped = {}
 	for _, pet in sorted do
-		if #data.Pets.Equipped < Config.PetSlots(data.Rebirths) then
+		if #data.Pets.Equipped < self:_slots(player, data) then
 			table.insert(data.Pets.Equipped, pet.Uid)
 		end
 	end
@@ -8938,7 +9078,10 @@ function RewardService:GetDailyReward(player: Player, streak: number): number
 	if S.MonetizationService:HasPass(player, "VIP") then
 		amount *= 2
 	end
-	return amount
+	if S.MonetizationService:HasPass(player, "GiftBoost") then
+		amount *= 1.5
+	end
+	return math.floor(amount)
 end
 
 function RewardService:ClaimDaily(player: Player): (boolean, string)
@@ -9182,7 +9325,8 @@ local S
 function ShieldService:_times(player: Player): (number, number)
 	local data = S.DataService:Get(player)
 	local start = data and data.Shield.Start or 0
-	return start + SC.Seconds, start + SC.Cooldown -- (shield ends, ready again)
+	local pro = S.MonetizationService:HasPass(player, "ShieldPro")
+	return start + SC.Seconds * (pro and 2 or 1), start + SC.Cooldown / (pro and 2 or 1) -- (shield ends, ready again)
 end
 
 function ShieldService:IsShielded(player: Player): boolean
@@ -9385,9 +9529,9 @@ end
 ---------------------------------------------------------------------------
 -- Purchase button
 ---------------------------------------------------------------------------
-function TycoonBuilder.BuildButton(plot, item, slot: number)
+function TycoonBuilder.BuildButton(plot, item, slot: number?, price: number)
 	local floorCF = TycoonBuilder.FloorCF(plot, item.ButtonFloor or 1)
-	local pos = Items.ButtonSlots[slot]
+	local pos = Items.ButtonLane(item) or Items.ButtonSlots[slot :: number]
 	local model = BuildKit.Model(item.Id, plot.Buttons)
 	local ring = Part({
 		Name = "Ring",
@@ -9407,15 +9551,25 @@ function TycoonBuilder.BuildButton(plot, item, slot: number)
 		Material = Enum.Material.Neon,
 		Parent = model,
 	})
-	local gui, label = BuildKit.Billboard(pad, item.Name .. "\n" .. Util.Money(item.Cost), {
+	local gui, label = BuildKit.Billboard(pad, item.Name .. "\n" .. Util.Money(price), {
 		Size = UDim2.fromOffset(180, 56),
-		Offset = Vector3.new(0, 3.5, 0),
-		MaxDistance = 60,
+		Offset = Vector3.new(0, 4.5, 0),
+		MaxDistance = 38,
+	})
+	local pillar = Part({
+		Name = "Pillar",
+		Size = Vector3.new(0.8, 16, 0.8),
+		CFrame = at(floorCF, pos.X, 8.4, pos.Z),
+		Color = Color3.fromRGB(235, 70, 70),
+		Material = Enum.Material.Neon,
+		Transparency = 0.7,
+		CanCollide = false,
+		Parent = model,
 	})
 	model.PrimaryPart = ring
 	pad.Size = Vector3.new(0.6, 0.5, 0.5)
 	TweenService:Create(pad, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = Vector3.new(0.6, 5, 5) }):Play()
-	return { Model = model, Pad = pad, Label = label, Gui = gui, Slot = slot, Floor = item.ButtonFloor }
+	return { Model = model, Pad = pad, Pillar = pillar, Label = label, Gui = gui, Slot = slot, Floor = item.ButtonFloor }
 end
 
 ---------------------------------------------------------------------------
@@ -10516,7 +10670,7 @@ function TycoonService:_afterBulkBuild(plot)
 			plot.OfflinePaid = true
 			local away = math.min(os.time() - data.LastOnline, oe.MaxHours * 3600)
 			if away > 60 then
-				local amount = data.LastIncome * away * (oe.Percent + Config.RebirthPerk(data.Rebirths, "Offline"))
+				local amount = data.LastIncome * away * (oe.Percent + Config.RebirthPerk(data.Rebirths, "Offline")) * (S.MonetizationService:HasPass(owner, "OfflineBoost") and 2 or 1)
 				S.DataService:AddVault(owner, amount)
 				Remotes.Notify:FireClient(owner, { Text = "💤 While you were away (" .. Util.FormatTime(away) .. ") your tower made " .. Util.Money(amount) .. "! Collect it at the vault.", Type = "success", Duration = 10 })
 			end
@@ -10769,6 +10923,14 @@ function TycoonService:RefreshPlayer(player: Player)
 	end
 end
 
+-- what an item costs for this plot's owner (10% less with the Discount pass)
+function TycoonService:GetPrice(plot, item): number
+	if plot.Owner and S.DataService:TeamHasPass(plot.Owner, "Discount") then
+		return math.max(1, math.floor(item.Cost * 0.9))
+	end
+	return item.Cost
+end
+
 function TycoonService:_freeSlot(plot, floor: number): number?
 	plot.SlotUsed[floor] = plot.SlotUsed[floor] or {}
 	for slot = 1, TC.ButtonSlotsPerFloor do
@@ -10783,7 +10945,7 @@ function TycoonService:_removeButton(plot, id: string)
 	local button = plot.ButtonObjs[id]
 	if button then
 		plot.ButtonObjs[id] = nil
-		if plot.SlotUsed[button.Floor] then
+		if button.Slot and plot.SlotUsed[button.Floor] then
 			plot.SlotUsed[button.Floor][button.Slot] = nil
 		end
 		button.Model:Destroy()
@@ -10804,13 +10966,22 @@ function TycoonService:_refreshButtons(plot)
 			self:_removeButton(plot, id)
 		end
 	end
+	-- only the next few upgrades of each floor get a pad (the list is in buying order)
+	local shown: { [number]: number } = {}
+	for _, button in plot.ButtonObjs do
+		shown[button.Floor] = (shown[button.Floor] or 0) + 1
+	end
 	for _, item in TycoonItems.List do
 		if item.ButtonFloor and not plot.ButtonObjs[item.Id] and TycoonItems.IsAvailable(item, data.Purchased) then
 			local floor = item.ButtonFloor
-			local slot = self:_freeSlot(plot, floor)
-			if slot then
-				local button = TycoonBuilder.BuildButton(plot, item, slot)
-				plot.SlotUsed[floor][slot] = item.Id
+			local lane = TycoonItems.ButtonLane(item) ~= nil
+			local slot = not lane and self:_freeSlot(plot, floor) or nil
+			if (lane or slot) and (shown[floor] or 0) < TC.MaxVisibleButtons then
+				shown[floor] = (shown[floor] or 0) + 1
+				local button = TycoonBuilder.BuildButton(plot, item, slot, self:GetPrice(plot, item))
+				if slot then
+					plot.SlotUsed[floor][slot] = item.Id
+				end
 				plot.ButtonObjs[item.Id] = button
 				local lastFail = 0
 				local busy = false
@@ -10847,8 +11018,9 @@ function TycoonService:_updateButtonColors(plot)
 	for id, button in plot.ButtonObjs do
 		local item = TycoonItems.ById[id]
 		if item and button.Pad.Parent then
-			local affordable = cash >= item.Cost
+			local affordable = cash >= self:GetPrice(plot, item)
 			button.Pad.Color = affordable and GREEN or RED
+			button.Pillar.Color = affordable and GREEN or RED
 			button.Label.TextColor3 = affordable and Color3.fromRGB(180, 255, 190) or Color3.fromRGB(255, 190, 190)
 		end
 	end
@@ -10898,10 +11070,11 @@ function TycoonService:TryPurchase(player: Player, itemId: string, silent: boole
 	if not TycoonItems.IsAvailable(item, data.Purchased) then
 		return false, "Buy the previous upgrades first!"
 	end
-	if data.Cash < item.Cost then
-		return false, "You need " .. Util.Money(item.Cost - data.Cash) .. " more!"
+	local price = item.Cost == 0 and 0 or self:GetPrice(plot, item)
+	if data.Cash < price then
+		return false, "You need " .. Util.Money(price - data.Cash) .. " more!"
 	end
-	S.DataService:SpendCash(plot.Owner, item.Cost)
+	S.DataService:SpendCash(plot.Owner, price)
 	data.Purchased[itemId] = true
 
 	local button = plot.ButtonObjs[itemId]
@@ -11424,6 +11597,9 @@ function WeeklyService:Claim(player: Player, index: any): (boolean, string)
 	local wallet = S.DataService:GetWallet(player)
 	local rebirths = wallet and wallet.Rebirths or 0
 	local cash = math.floor(math.max(milestone.MinCash * (1 + rebirths), S.TycoonService:GetIncome(player) * milestone.IncomeMinutes * 60))
+	if S.MonetizationService:HasPass(player, "GiftBoost") then
+		cash = math.floor(cash * 1.5)
+	end
 	S.DataService:AddCash(player, cash, false)
 	local text = "📅 Weekly reward: +" .. Util.Money(cash)
 	if milestone.BoostSeconds then
@@ -11524,10 +11700,14 @@ function WheelService:GetPrize(player: Player, segment): (number, number)
 	return cash, segment.BoostSeconds or 0
 end
 
+function WheelService:_cooldown(player: Player): number
+	return WC.CooldownMinutes * 60 / (S.MonetizationService:HasPass(player, "WheelPlus") and 2 or 1)
+end
+
 function WheelService:_sync(player: Player)
 	local data = S.DataService:Get(player)
 	if data then
-		player:SetAttribute("WheelReadyAt", data.Wheel.Last + WC.CooldownMinutes * 60)
+		player:SetAttribute("WheelReadyAt", data.Wheel.Last + self:_cooldown(player))
 	end
 end
 
@@ -11536,7 +11716,7 @@ function WheelService:Spin(player: Player): (boolean, number, string)
 	if not data then
 		return false, 0, "Data still loading..."
 	end
-	local readyAt = data.Wheel.Last + WC.CooldownMinutes * 60
+	local readyAt = data.Wheel.Last + self:_cooldown(player)
 	if os.time() < readyAt then
 		return false, 0, "Your next free spin is in " .. Util.FormatTime(readyAt - os.time())
 	end
@@ -15582,6 +15762,8 @@ local floorLabel: TextLabel
 local repairFrame: Frame
 local repairLabel: TextLabel
 local menuButtons: { [string]: TextButton } = {}
+local moreNames: { [string]: boolean } = {}
+local badgeOn: { [string]: boolean } = {}
 
 local animVersion = 0
 local function animateCash(target: number)
@@ -15639,14 +15821,25 @@ local function sideButton(parent: Instance, order: number, icon: string, text: s
 	return button, holder
 end
 
-function HUD:SetBadge(name: string, visible: boolean, text: string?)
+local function showBadge(name: string, visible: boolean, text: string?)
 	local button = menuButtons[name]
-	if button then
-		local badge = button:FindFirstChild("Badge") :: TextLabel?
-		if badge then
-			badge.Visible = visible
-			badge.Text = text or "!"
+	local badge = button and button:FindFirstChild("Badge") :: TextLabel?
+	if badge then
+		badge.Visible = visible
+		badge.Text = text or "!"
+	end
+end
+
+function HUD:SetBadge(name: string, visible: boolean, text: string?)
+	showBadge(name, visible, text)
+	if moreNames[name] and name ~= "Secrets" then
+		-- a hidden button needs attention: show it on MORE
+		badgeOn[name] = visible
+		local any = false
+		for _, on in badgeOn do
+			any = any or on
 		end
+		showBadge("More", any)
 	end
 end
 
@@ -15710,41 +15903,66 @@ function HUD:Init(controllers)
 		Remotes.BuyProduct:FireServer("InstantRepair")
 	end })
 
-	-- side menu (left)
+	-- side menu (left): the main buttons, and a MORE button that opens the rest
 	local menu = UIKit.new("Frame", {
 		Name = "Menu",
-		Size = UDim2.new(0, 160, 0, 500),
+		Size = UDim2.new(0, 80, 0, 480),
 		Position = UDim2.new(0, 10, 0.5, 0),
 		AnchorPoint = Vector2.new(0, 0.5),
 		BackgroundTransparency = 1,
 		Parent = gui,
 	})
-	local grid = UIKit.new("UIGridLayout", {
+	local list = UIKit.new("UIListLayout", {
+		SortOrder = Enum.SortOrder.LayoutOrder,
+		Padding = UDim.new(0, 2),
+		VerticalAlignment = Enum.VerticalAlignment.Center,
+		Parent = menu,
+	})
+	list.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	local menuScale = UIKit.new("UIScale", { Parent = menu })
+
+	local morePanel = UIKit.new("Frame", {
+		Name = "MorePanel",
+		Size = UDim2.fromOffset(170, 440),
+		Position = UDim2.new(0, 96, 0.5, 0),
+		AnchorPoint = Vector2.new(0, 0.5),
+		BackgroundColor3 = Theme.Panel,
+		BackgroundTransparency = 0.05,
+		Visible = false,
+		Parent = gui,
+	})
+	UIKit.Corner(morePanel, 16)
+	UIKit.Stroke(morePanel, Color3.new(0, 0, 0), 3, 0.1)
+	local moreGrid = UIKit.new("UIGridLayout", {
 		CellSize = UDim2.fromOffset(70, 80),
 		CellPadding = UDim2.fromOffset(6, 2),
 		SortOrder = Enum.SortOrder.LayoutOrder,
-		Parent = menu,
+		Parent = morePanel,
 	})
-	grid.FillDirectionMaxCells = 2
-	grid.VerticalAlignment = Enum.VerticalAlignment.Center
-	local menuScale = UIKit.new("UIScale", { Parent = menu })
+	moreGrid.FillDirectionMaxCells = 2
+	moreGrid.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	moreGrid.VerticalAlignment = Enum.VerticalAlignment.Center
+	local moreScale = UIKit.new("UIScale", { Parent = morePanel })
 	local function rescale()
 		local vp = workspace.CurrentCamera.ViewportSize
-		menuScale.Scale = math.clamp(vp.Y / 860, 0.55, 1.1)
+		local scale = math.clamp(vp.Y / 860, 0.55, 1.1)
+		menuScale.Scale, moreScale.Scale = scale, scale
 	end
 	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
 	rescale()
 
-	local buttons = {
+	local main = {
 		{ "Shop", "🛒", "SHOP", Color3.fromRGB(255, 180, 0) },
 		{ "Build", "🏗️", "BUILD", Color3.fromRGB(255, 140, 40) },
 		{ "Rebirth", "🔄", "REBIRTH", Color3.fromRGB(200, 90, 255) },
+		{ "Pets", "🐾", "PETS", Color3.fromRGB(255, 150, 200) },
+		{ "Daily", "🎁", "DAILY", Color3.fromRGB(255, 90, 120) },
+	}
+	local more = {
 		{ "Duo", "👥", "DUO", Color3.fromRGB(0, 190, 255) },
 		{ "Floors", "🛗", "FLOORS", Color3.fromRGB(0, 160, 220) },
-		{ "Secrets", "🕵️", "SECRETS", Color3.fromRGB(120, 200, 120) },
-		{ "Daily", "🎁", "DAILY", Color3.fromRGB(255, 90, 120) },
 		{ "Wheel", "🎰", "WHEEL", Color3.fromRGB(255, 120, 60) },
-		{ "Pets", "🐾", "PETS", Color3.fromRGB(255, 150, 200) },
+		{ "Secrets", "🕵️", "SECRETS", Color3.fromRGB(120, 200, 120) },
 		{ "Travel", "🧭", "TRAVEL", Color3.fromRGB(60, 200, 190) },
 		{ "Shield", "🛡️", "SHIELD", Color3.fromRGB(70, 170, 255) },
 		{ "Codes", "🎟️", "CODES", Color3.fromRGB(0, 200, 160) },
@@ -15752,9 +15970,15 @@ function HUD:Init(controllers)
 		{ "Settings", "⚙️", "SETTINGS", Color3.fromRGB(130, 140, 160) },
 		{ "Admin", "🛡️", "ADMIN", Color3.fromRGB(235, 70, 70) },
 	}
-	for i, def in buttons do
+	local function setMore(open: boolean)
+		morePanel.Visible = open
+	end
+	local function addButton(parent: Instance, index: number, def, inMore: boolean)
 		local name = def[1]
-		local button, holder = sideButton(menu, i, def[2], def[3], def[4], function()
+		local button, holder = sideButton(parent, index, def[2], def[3], def[4], function()
+			if inMore then
+				setMore(false)
+			end
 			if name == "Home" then
 				Remotes.GoHome:FireServer()
 			elseif name == "Floors" then
@@ -15768,7 +15992,21 @@ function HUD:Init(controllers)
 			end
 		end)
 		menuButtons[name] = button
-		if name == "Admin" then
+		if inMore then
+			moreNames[name] = true
+		end
+		return button, holder
+	end
+	for i, def in main do
+		addButton(menu, i, def, false)
+	end
+	local moreButton = sideButton(menu, #main + 1, "➕", "MORE", Color3.fromRGB(90, 100, 130), function()
+		setMore(not morePanel.Visible)
+	end)
+	menuButtons.More = moreButton
+	for i, def in more do
+		local _, holder = addButton(morePanel, i, def, true)
+		if def[1] == "Admin" then
 			holder.Visible = (player:GetAttribute("AdminRank") or 0) > 0
 			player:GetAttributeChangedSignal("AdminRank"):Connect(function()
 				holder.Visible = (player:GetAttribute("AdminRank") or 0) > 0
@@ -17749,7 +17987,7 @@ function Travel:Init(controllers)
 	local _, content = C.UI:MakePanel("Travel", "🧭 TRAVEL", Color3.fromRGB(60, 200, 190), 620, 460)
 	UIKit.List(content, 10)
 	UIKit.new("TextLabel", {
-		Text = "Islands beyond the edge of the world, full of treasure chests. Each chest reopens 30 minutes after you open it - even if you leave the game.",
+		Text = "Islands beyond the edge of the world, full of treasure chests. Each chest reopens 12 hours after you open it (6 with the Island Express pass) - even if you leave the game.",
 		Size = UDim2.new(1, -20, 0, 54),
 		BackgroundTransparency = 1,
 		TextWrapped = true,
@@ -18686,7 +18924,7 @@ local function refresh()
 	else
 		spinButton.Text = "Next spin in " .. Util.Clock(left)
 		spinButton.BackgroundColor3 = Theme.PanelLight
-		infoLabel.Text = "A free spin every " .. WC.CooldownMinutes .. " minutes - it keeps counting while you're away."
+		infoLabel.Text = "A free spin every " .. (player:GetAttribute("Pass_WheelPlus") and WC.CooldownMinutes / 2 or WC.CooldownMinutes) .. " minutes - it keeps counting while you're away."
 	end
 	if C.HUD and C.HUD.SetBadge then
 		C.HUD:SetBadge("Wheel", left <= 0 and not Wheel.Spinning)

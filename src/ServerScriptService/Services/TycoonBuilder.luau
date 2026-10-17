@@ -113,9 +113,9 @@ end
 ---------------------------------------------------------------------------
 -- Purchase button
 ---------------------------------------------------------------------------
-function TycoonBuilder.BuildButton(plot, item, slot: number)
+function TycoonBuilder.BuildButton(plot, item, slot: number?, price: number)
 	local floorCF = TycoonBuilder.FloorCF(plot, item.ButtonFloor or 1)
-	local pos = Items.ButtonSlots[slot]
+	local pos = Items.ButtonLane(item) or Items.ButtonSlots[slot :: number]
 	local model = BuildKit.Model(item.Id, plot.Buttons)
 	local ring = Part({
 		Name = "Ring",
@@ -135,15 +135,25 @@ function TycoonBuilder.BuildButton(plot, item, slot: number)
 		Material = Enum.Material.Neon,
 		Parent = model,
 	})
-	local gui, label = BuildKit.Billboard(pad, item.Name .. "\n" .. Util.Money(item.Cost), {
+	local gui, label = BuildKit.Billboard(pad, item.Name .. "\n" .. Util.Money(price), {
 		Size = UDim2.fromOffset(180, 56),
-		Offset = Vector3.new(0, 3.5, 0),
-		MaxDistance = 60,
+		Offset = Vector3.new(0, 4.5, 0),
+		MaxDistance = 38,
+	})
+	local pillar = Part({
+		Name = "Pillar",
+		Size = Vector3.new(0.8, 16, 0.8),
+		CFrame = at(floorCF, pos.X, 8.4, pos.Z),
+		Color = Color3.fromRGB(235, 70, 70),
+		Material = Enum.Material.Neon,
+		Transparency = 0.7,
+		CanCollide = false,
+		Parent = model,
 	})
 	model.PrimaryPart = ring
 	pad.Size = Vector3.new(0.6, 0.5, 0.5)
 	TweenService:Create(pad, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = Vector3.new(0.6, 5, 5) }):Play()
-	return { Model = model, Pad = pad, Label = label, Gui = gui, Slot = slot, Floor = item.ButtonFloor }
+	return { Model = model, Pad = pad, Pillar = pillar, Label = label, Gui = gui, Slot = slot, Floor = item.ButtonFloor }
 end
 
 ---------------------------------------------------------------------------

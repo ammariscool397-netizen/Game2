@@ -22,7 +22,7 @@ All settings live in `src/ReplicatedStorage/Shared/Config.luau`.
 | What | Where in Config | Notes |
 |---|---|---|
 | **Server size** | Place settings | Set **Max Players = 8** (one tower per player; duos free up towers) |
-| Game Pass IDs | `Config.GamePasses.*.Id` | Create passes on the Creator Dashboard (2x Cash, Auto Collect, Fast Droppers, VIP, Super Speed, Auto Builder). `0` = not configured |
+| Game Pass IDs | `Config.GamePasses.*.Id` | Create passes on the Creator Dashboard (16 passes: 2x Cash, Auto Collect, Fast Droppers, VIP, Super Speed, Auto Builder, Lucky Hatch, Pet Power, +1 Pet Slot, Offline Boost, 10% Off Upgrades, Island Express, Double Spins, Shield Pro, Rebirth Booster, Gift Boost). `0` = not configured |
 | Developer Product IDs | `Config.Products.*.Id` | Cash packs, 2x boost, instant repair, launch nuke, meteor storm, cash rain |
 | Admins | `Config.Admin.Admins` | `[UserId] = rank` (1 Mod, 2 Admin, 3 Head Admin, 4 Owner). The place creator is always Owner |
 | Music | `Config.Music` | Replace the IDs with audio you're allowed to use. Broken IDs are skipped automatically |
@@ -88,7 +88,7 @@ rojo build -o MegaTycoon.rbxlx   # rebuild the place file
 - **20 disasters**: nuke, meteors, tornado, UFO, earthquake plus 15 more - Hailstorm, Lightning Storm, Acid Rain, Fire Rain, Volcano Eruption, Airstrike (things fall from the sky), Tsunami, Avalanche (a wall sweeps the map - climb above it), Sinkholes, Toxic Gas, Quicksand (danger circles), Blizzard, Heat Wave, Sandstorm, Gravity Storm (everyone outside cover suffers). Start one with `;<name>` or `;disaster <name>`; they're tuned in `Config.ExtraDisasters`
 - **Personal shield**: 90 seconds of protection from every disaster, then a 15 minute recharge that is saved (rejoining doesn't reset it)
 - **Pets**: hatch Basic / Golden / Cosmic eggs with cash, 22 pets from Common to Mythic that follow you and add a permanent income bonus (3 slots, more at 5 and 10 rebirths). `Config.Pets`
-- **Far islands**: Treasure, Volcano (1 rebirth) and Frost (3 rebirths) isles beyond the world's edge, reached from the Travel panel, each with 4 treasure chests that reopen 30 minutes after you open them. `Config.Islands`
+- **Far islands**: Treasure, Volcano (1 rebirth) and Frost (3 rebirths) isles beyond the world's edge, reached from the Travel panel, each with 4 treasure chests that reopen 12 hours after you open them (small payouts). `Config.Islands`
 - **Weekly rewards**: join on 3, 5 and 7 days of a Monday-Sunday week for bigger rewards (the last one includes a free pet). `Config.Weekly`
 - **Cooldowns can't be skipped by rejoining**: playtime gifts, the wheel, the shield, daily and weekly rewards and island chests are all saved with the player
 - **Lucky Wheel**: a free reel spin every 30 minutes (cash or 2x boosts, rare jackpot). Prizes and odds are in `Config.Wheel`

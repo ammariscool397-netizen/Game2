@@ -56,7 +56,10 @@ function RewardService:GetDailyReward(player: Player, streak: number): number
 	if S.MonetizationService:HasPass(player, "VIP") then
 		amount *= 2
 	end
-	return amount
+	if S.MonetizationService:HasPass(player, "GiftBoost") then
+		amount *= 1.5
+	end
+	return math.floor(amount)
 end
 
 function RewardService:ClaimDaily(player: Player): (boolean, string)

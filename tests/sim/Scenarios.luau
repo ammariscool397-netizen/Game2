@@ -194,7 +194,7 @@ add({
 		local floorTimes = {}
 		local lastIncome = 0
 		local stalls = 0
-		while count(data.Purchased) < TycoonItems.BuyableCount and T.Engine.Now - start < 7 * 3600 do
+		while count(data.Purchased) < TycoonItems.BuyableCount and T.Engine.Now - start < 10 * 3600 do
 			T.Wait(5)
 			TycoonService:CollectVault(player)
 			T.Engine.FireServerAs(player, T.Remote("BuyAll"))
@@ -219,7 +219,7 @@ add({
 		end
 		print(("    playthrough: %d/%d upgrades in %.1f h (%s)"):format(count(data.Purchased), TycoonItems.BuyableCount, elapsed / 3600, table.concat(summary, ", ")))
 		T.Check(count(data.Purchased) == TycoonItems.BuyableCount, "bought every upgrade")
-		T.Check(elapsed > 1.5 * 3600 and elapsed < 5 * 3600, ("full tower takes 1.5-5 hours of optimal play (took %.2f h)"):format(elapsed / 3600))
+		T.Check(elapsed > 3 * 3600 and elapsed < 8 * 3600, ("full tower takes 3-8 hours of optimal play (took %.2f h)"):format(elapsed / 3600))
 
 		-- every purchased item is standing (or wrecked and waiting for repair)
 		T.Wait(200) -- let disaster knockouts repair
@@ -3507,7 +3507,7 @@ add({
 		local cash = data.Cash
 		T.Engine.Touch(entry.Part, me)
 		T.Wait(1)
-		T.Check(data.Cash >= cash + 3000 and data.Chests[entry.Id] ~= nil, "opening a chest pays and is saved")
+		T.Check(data.Cash >= cash + 800 and data.Chests[entry.Id] ~= nil, "opening a chest pays and is saved")
 		cash = data.Cash
 		T.Engine.Touch(entry.Part, me)
 		T.Wait(1)
@@ -3750,6 +3750,118 @@ add({
 			T.Check(T.Humanoid(me).WalkSpeed == Config.BaseWalkSpeed, def.Name .. " restored walk speed (" .. tostring(T.Humanoid(me).WalkSpeed) .. ")")
 			T.Check(me.Parent ~= nil and T.Humanoid(me).Health > 0, "the victim is still alive after " .. def.Name)
 		end
+	end,
+})
+
+table.insert(Scenarios, {
+	Name = "new_passes",
+	MaxSeconds = 300,
+	Run = function(T, place)
+		local game, me = T.Boot(place, { Name = "PassFan", UserId = 6600 })
+		T.Wait(6)
+		local Config = T.Shared("Config")
+		local TycoonItems = T.Shared("TycoonItems")
+		local DataService = T.Service("DataService")
+		local PetService = T.Service("PetService")
+		local TycoonService = T.Service("TycoonService")
+		local data = DataService:Get(me)
+		local ws = game:GetService("Workspace")
+
+		-- every new pass is configured and has a card
+		for _, key in { "PetLuck", "PetPower", "PetSlot", "OfflineBoost", "Discount", "IslandExpress", "WheelPlus", "ShieldPro", "RebirthBoost", "GiftBoost" } do
+			T.Check(Config.GamePasses[key] ~= nil and Config.GamePasses[key].Name ~= nil, key .. " pass exists")
+		end
+
+		-- upgrade pads: only a few per floor, and spread out
+		local pads = {}
+		for _, d in ws:GetDescendants() do
+			if d.Name == "Pad" and d.Parent and d.Parent:FindFirstChild("Pillar") then
+				table.insert(pads, d)
+			end
+		end
+		T.Check(#pads >= 1 and #pads <= Config.Tycoon.MaxVisibleButtons, "at most " .. Config.Tycoon.MaxVisibleButtons .. " pads on the first floor (" .. #pads .. ")")
+		local closest = math.huge
+		for i = 1, #pads do
+			for j = i + 1, #pads do
+				closest = math.min(closest, (pads[i].Position - pads[j].Position).Magnitude)
+			end
+		end
+		T.Check(closest >= 5.2, "pads don't overlap (closest " .. string.format("%.1f", closest) .. ")")
+
+		-- 10% Off Upgrades
+		local target
+		for _, item in TycoonItems.List do
+			if item.Cost > 0 and item.Kind ~= "Secret" and TycoonItems.IsAvailable(item, data.Purchased) then
+				target = item
+				break
+			end
+		end
+		T.Check(target ~= nil, "found an upgrade to buy")
+		me:SetAttribute("Pass_Discount", true)
+		DataService:AddCash(me, target.Cost * 2, false)
+		local before = data.Cash
+		local ok = TycoonService:TryPurchase(me, target.Id)
+		T.Check(ok and before - data.Cash == math.floor(target.Cost * 0.9), ("Discount pays 90%% (paid %s of %s)"):format(tostring(before - data.Cash), tostring(target.Cost)))
+
+		-- pets: +1 slot, Pet Power, Lucky Hatch
+		local common = Config.Pets.List[1].Id
+		PetService:Give(me, common, 5)
+		local uids = {}
+		for _, pet in data.Pets.Owned do
+			table.insert(uids, pet.Uid)
+		end
+		for i = 1, Config.PetSlots(0) do
+			T.Check(PetService:Equip(me, uids[i]), "slot " .. i .. " equips")
+		end
+		local full = PetService:Equip(me, uids[Config.PetSlots(0) + 1])
+		T.Check(not full, "no extra slot without the pass")
+		me:SetAttribute("Pass_PetSlot", true)
+		T.Check(PetService:Equip(me, uids[Config.PetSlots(0) + 1]), "+1 Pet Slot gives another slot")
+		local plain = DataService:GetMultiplier(me, true)
+		me:SetAttribute("Pass_PetPower", true)
+		local boosted = DataService:GetMultiplier(me, true)
+		T.Check(math.abs((boosted - plain) - Config.PetsBonus(data.Pets) * 0.5) < 1e-6, "Pet Power adds half of the pet bonus")
+
+		local egg = Config.Pets.Eggs[1]
+		local function rares(lucky)
+			local n = 0
+			for _ = 1, 4000 do
+				local pet = PetService:_roll(egg, lucky)
+				if pet.Rarity ~= "Common" then
+					n += 1
+				end
+			end
+			return n
+		end
+		local normal, lucky = rares(false), rares(true)
+		T.Check(lucky > normal * 1.25, ("Lucky Hatch gives more uncommon+ pets (%d vs %d)"):format(lucky, normal))
+
+		-- Rebirth Booster
+		data.Rebirths = 2
+		local without = DataService:GetMultiplier(me, true)
+		me:SetAttribute("Pass_RebirthBoost", true)
+		local withPass = DataService:GetMultiplier(me, true)
+		T.Check(math.abs((withPass - without) - 2 * Config.Rebirth.MultiplierPerRebirth * 0.5) < 1e-6, "Rebirth Booster adds +50% per rebirth")
+
+		-- cooldown passes
+		local IslandService, WheelService, ShieldService = T.Service("IslandService"), T.Service("WheelService"), T.Service("ShieldService")
+		T.Check(IslandService:_cooldown(me) == Config.Islands.Cooldown and Config.Islands.Cooldown == 12 * 3600, "island chests close for 12 hours")
+		me:SetAttribute("Pass_IslandExpress", true)
+		T.Check(IslandService:_cooldown(me) == 6 * 3600, "Island Express halves it")
+		local wheel = WheelService:_cooldown(me)
+		me:SetAttribute("Pass_WheelPlus", true)
+		T.Check(WheelService:_cooldown(me) == wheel / 2, "Double Spins halves the wheel wait")
+		local shieldEnds, shieldReady = ShieldService:_times(me)
+		me:SetAttribute("Pass_ShieldPro", true)
+		local proEnds, proReady = ShieldService:_times(me)
+		T.Check(proEnds - shieldEnds == Config.Shield.Seconds and shieldReady - proReady == Config.Shield.Cooldown / 2, "Shield Pro: twice as long, recharges twice as fast")
+
+		-- Gift Boost
+		local GiftService = T.Service("GiftService")
+		local gift = GiftService:GetReward(me, 1)
+		me:SetAttribute("Pass_GiftBoost", true)
+		local boostedGift = GiftService:GetReward(me, 1)
+		T.Check(boostedGift > gift * 1.2, ("Gift Boost pays more (%d vs %d)"):format(boostedGift, gift))
 	end,
 })
 

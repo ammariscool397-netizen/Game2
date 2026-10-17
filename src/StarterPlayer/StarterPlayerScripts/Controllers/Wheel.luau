@@ -85,7 +85,7 @@ local function refresh()
 	else
 		spinButton.Text = "Next spin in " .. Util.Clock(left)
 		spinButton.BackgroundColor3 = Theme.PanelLight
-		infoLabel.Text = "A free spin every " .. WC.CooldownMinutes .. " minutes - it keeps counting while you're away."
+		infoLabel.Text = "A free spin every " .. (player:GetAttribute("Pass_WheelPlus") and WC.CooldownMinutes / 2 or WC.CooldownMinutes) .. " minutes - it keeps counting while you're away."
 	end
 	if C.HUD and C.HUD.SetBadge then
 		C.HUD:SetBadge("Wheel", left <= 0 and not Wheel.Spinning)

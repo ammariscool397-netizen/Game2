@@ -42,10 +42,14 @@ function WheelService:GetPrize(player: Player, segment): (number, number)
 	return cash, segment.BoostSeconds or 0
 end
 
+function WheelService:_cooldown(player: Player): number
+	return WC.CooldownMinutes * 60 / (S.MonetizationService:HasPass(player, "WheelPlus") and 2 or 1)
+end
+
 function WheelService:_sync(player: Player)
 	local data = S.DataService:Get(player)
 	if data then
-		player:SetAttribute("WheelReadyAt", data.Wheel.Last + WC.CooldownMinutes * 60)
+		player:SetAttribute("WheelReadyAt", data.Wheel.Last + self:_cooldown(player))
 	end
 end
 
@@ -54,7 +58,7 @@ function WheelService:Spin(player: Player): (boolean, number, string)
 	if not data then
 		return false, 0, "Data still loading..."
 	end
-	local readyAt = data.Wheel.Last + WC.CooldownMinutes * 60
+	local readyAt = data.Wheel.Last + self:_cooldown(player)
 	if os.time() < readyAt then
 		return false, 0, "Your next free spin is in " .. Util.FormatTime(readyAt - os.time())
 	end

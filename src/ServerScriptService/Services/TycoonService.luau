@@ -419,7 +419,7 @@ function TycoonService:_afterBulkBuild(plot)
 			plot.OfflinePaid = true
 			local away = math.min(os.time() - data.LastOnline, oe.MaxHours * 3600)
 			if away > 60 then
-				local amount = data.LastIncome * away * (oe.Percent + Config.RebirthPerk(data.Rebirths, "Offline"))
+				local amount = data.LastIncome * away * (oe.Percent + Config.RebirthPerk(data.Rebirths, "Offline")) * (S.MonetizationService:HasPass(owner, "OfflineBoost") and 2 or 1)
 				S.DataService:AddVault(owner, amount)
 				Remotes.Notify:FireClient(owner, { Text = "💤 While you were away (" .. Util.FormatTime(away) .. ") your tower made " .. Util.Money(amount) .. "! Collect it at the vault.", Type = "success", Duration = 10 })
 			end
@@ -672,6 +672,14 @@ function TycoonService:RefreshPlayer(player: Player)
 	end
 end
 
+-- what an item costs for this plot's owner (10% less with the Discount pass)
+function TycoonService:GetPrice(plot, item): number
+	if plot.Owner and S.DataService:TeamHasPass(plot.Owner, "Discount") then
+		return math.max(1, math.floor(item.Cost * 0.9))
+	end
+	return item.Cost
+end
+
 function TycoonService:_freeSlot(plot, floor: number): number?
 	plot.SlotUsed[floor] = plot.SlotUsed[floor] or {}
 	for slot = 1, TC.ButtonSlotsPerFloor do
@@ -686,7 +694,7 @@ function TycoonService:_removeButton(plot, id: string)
 	local button = plot.ButtonObjs[id]
 	if button then
 		plot.ButtonObjs[id] = nil
-		if plot.SlotUsed[button.Floor] then
+		if button.Slot and plot.SlotUsed[button.Floor] then
 			plot.SlotUsed[button.Floor][button.Slot] = nil
 		end
 		button.Model:Destroy()
@@ -707,13 +715,22 @@ function TycoonService:_refreshButtons(plot)
 			self:_removeButton(plot, id)
 		end
 	end
+	-- only the next few upgrades of each floor get a pad (the list is in buying order)
+	local shown: { [number]: number } = {}
+	for _, button in plot.ButtonObjs do
+		shown[button.Floor] = (shown[button.Floor] or 0) + 1
+	end
 	for _, item in TycoonItems.List do
 		if item.ButtonFloor and not plot.ButtonObjs[item.Id] and TycoonItems.IsAvailable(item, data.Purchased) then
 			local floor = item.ButtonFloor
-			local slot = self:_freeSlot(plot, floor)
-			if slot then
-				local button = TycoonBuilder.BuildButton(plot, item, slot)
-				plot.SlotUsed[floor][slot] = item.Id
+			local lane = TycoonItems.ButtonLane(item) ~= nil
+			local slot = not lane and self:_freeSlot(plot, floor) or nil
+			if (lane or slot) and (shown[floor] or 0) < TC.MaxVisibleButtons then
+				shown[floor] = (shown[floor] or 0) + 1
+				local button = TycoonBuilder.BuildButton(plot, item, slot, self:GetPrice(plot, item))
+				if slot then
+					plot.SlotUsed[floor][slot] = item.Id
+				end
 				plot.ButtonObjs[item.Id] = button
 				local lastFail = 0
 				local busy = false
@@ -750,8 +767,9 @@ function TycoonService:_updateButtonColors(plot)
 	for id, button in plot.ButtonObjs do
 		local item = TycoonItems.ById[id]
 		if item and button.Pad.Parent then
-			local affordable = cash >= item.Cost
+			local affordable = cash >= self:GetPrice(plot, item)
 			button.Pad.Color = affordable and GREEN or RED
+			button.Pillar.Color = affordable and GREEN or RED
 			button.Label.TextColor3 = affordable and Color3.fromRGB(180, 255, 190) or Color3.fromRGB(255, 190, 190)
 		end
 	end
@@ -801,10 +819,11 @@ function TycoonService:TryPurchase(player: Player, itemId: string, silent: boole
 	if not TycoonItems.IsAvailable(item, data.Purchased) then
 		return false, "Buy the previous upgrades first!"
 	end
-	if data.Cash < item.Cost then
-		return false, "You need " .. Util.Money(item.Cost - data.Cash) .. " more!"
+	local price = item.Cost == 0 and 0 or self:GetPrice(plot, item)
+	if data.Cash < price then
+		return false, "You need " .. Util.Money(price - data.Cash) .. " more!"
 	end
-	S.DataService:SpendCash(plot.Owner, item.Cost)
+	S.DataService:SpendCash(plot.Owner, price)
 	data.Purchased[itemId] = true
 
 	local button = plot.ButtonObjs[itemId]
