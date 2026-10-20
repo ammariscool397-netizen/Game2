@@ -1207,7 +1207,7 @@ local function buildCommands()
 			if not id then
 				return "Unknown cosmetic"
 			end
-			local affected = eachTarget(executor, args[1], false, function(target)
+			local affected = eachTarget(executor, args[1], true, function(target)
 				S.CosmeticService:Take(target, id)
 			end)
 			return "Took " .. id .. " from " .. namesOf(affected)

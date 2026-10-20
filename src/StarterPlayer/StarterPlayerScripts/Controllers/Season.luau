@@ -58,7 +58,7 @@ local function cell(row: Frame, track: string, level: number, state, x: number)
 	end
 	local claimedSet = track == "Free" and state.Free or state.PremiumClaimed
 	local claimed = claimedSet[tostring(level)] == true
-	UIKit.Label({ Text = rewardText(reward), Size = UDim2.new(1, -92, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, Font = Theme.BodyFont, ZIndex = 8, Parent = holder })
+	UIKit.new("TextLabel", { Text = rewardText(reward), Size = UDim2.new(1, -66, 1, 0), BackgroundTransparency = 1, TextWrapped = true, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, Font = Theme.BodyFont, TextColor3 = Theme.Text, ZIndex = 8, Parent = holder })
 	local text, color, active = "CLAIM", Theme.Green, true
 	if claimed then
 		text, color, active = "✓", Theme.SubText, false
@@ -67,7 +67,7 @@ local function cell(row: Frame, track: string, level: number, state, x: number)
 	elseif track == "Premium" and not state.Premium then
 		text, color, active = "🎫", Color3.fromRGB(150, 90, 30), false
 	end
-	UIKit.Button({ Text = text, Color = color, Size = UDim2.fromOffset(84, 36), Position = UDim2.new(1, -86, 0.5, -18), ZIndex = 9, Parent = holder, Callback = function()
+	UIKit.Button({ Text = text, Color = color, Size = UDim2.fromOffset(62, 36), Position = UDim2.new(1, -62, 0.5, -18), ZIndex = 9, Parent = holder, Callback = function()
 		if active then
 			claim(track, level)
 		end

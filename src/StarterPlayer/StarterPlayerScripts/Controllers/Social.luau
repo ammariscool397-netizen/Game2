@@ -39,12 +39,19 @@ local function note(order: number, text: string, height: number?, color: Color3?
 	return label
 end
 
+local generation = 0
+
 local function refresh()
-	UIKit.Clear(scroll)
+	generation += 1
+	local mine = generation
 	local state = Remotes.SocialGet:InvokeServer()
-	if not state then
-		return
+	local ok, friends = pcall(function()
+		return player:GetFriendsOnline(50)
+	end)
+	if not state or mine ~= generation then
+		return -- failed, or a newer refresh took over
 	end
+	UIKit.Clear(scroll)
 	local order = 0
 	local function nextOrder()
 		order += 1
@@ -93,9 +100,6 @@ local function refresh()
 	end })
 
 	-- friends currently playing this game in another server
-	local ok, friends = pcall(function()
-		return player:GetFriendsOnline(50)
-	end)
 	local joinable = 0
 	if ok and type(friends) == "table" then
 		for _, friend in friends do

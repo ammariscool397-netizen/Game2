@@ -106,8 +106,10 @@ function LeaderboardService:RefreshBoards()
 	boards.Updated = os.time()
 end
 
+local lastTry = -math.huge
 function LeaderboardService:GetBoards()
-	if boards.Updated == 0 then
+	if boards.Updated == 0 and os.clock() - lastTry > 30 then
+		lastTry = os.clock()
 		Util.Try("Boards", self.RefreshBoards, self)
 	end
 	return boards

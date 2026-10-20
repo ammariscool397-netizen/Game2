@@ -4644,7 +4644,7 @@ table.insert(Scenarios, {
 		end)
 		T.Wait(0.5)
 		T.Check(petsFrame ~= nil and petsFrame.Visible, "...and shown during it")
-		local hud = T.FindText(gui, "Spooky Season")
+		local hud = T.FindText(gui, "🎃")
 		T.Check(hud ~= nil, "the HUD announces the live event")
 		EventService:Force("Halloween", nil)
 

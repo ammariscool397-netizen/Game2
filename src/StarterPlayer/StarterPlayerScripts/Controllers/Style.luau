@@ -95,13 +95,13 @@ function Style:Init(controllers)
 	local tabs = UIKit.new("Frame", { Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, ZIndex = 6, Parent = content })
 	UIKit.List(tabs, 8, Enum.FillDirection.Horizontal, Enum.HorizontalAlignment.Left)
 	for i, kind in CC.Kinds do
-		tabButtons[kind.Id] = UIKit.Button({ Text = kind.Icon .. " " .. kind.Name:upper(), Color = Theme.PanelLight, Size = UDim2.fromOffset(170, 40), LayoutOrder = i, ZIndex = 7, Parent = tabs, Callback = function()
+		tabButtons[kind.Id] = UIKit.Button({ Text = kind.Icon .. " " .. kind.Name:upper(), Color = Theme.PanelLight, Size = UDim2.new(0.32, 0, 0, 40), LayoutOrder = i, ZIndex = 7, Parent = tabs, Callback = function()
 			currentKind = kind.Id
 			render()
 		end })
 	end
-	info = UIKit.Label({ Text = "", Size = UDim2.new(0.3, 0, 0, 30), Position = UDim2.new(1, 0, 0, 6), AnchorPoint = Vector2.new(1, 0), Font = Theme.BodyFont, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 7, Parent = content })
-	grid = UIKit.Scroll({ Size = UDim2.new(1, 0, 1, -52), Position = UDim2.fromOffset(0, 50), Parent = content })
+	info = UIKit.Label({ Text = "", Size = UDim2.new(1, 0, 0, 22), Position = UDim2.fromOffset(0, 46), Font = Theme.BodyFont, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 7, Parent = content })
+	grid = UIKit.Scroll({ Size = UDim2.new(1, 0, 1, -74), Position = UDim2.fromOffset(0, 72), Parent = content })
 	local layout = UIKit.new("UIGridLayout", { CellSize = UDim2.fromOffset(160, 150), CellPadding = UDim2.fromOffset(10, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = grid })
 	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	UIKit.new("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingRight = UDim.new(0, 8), Parent = grid })

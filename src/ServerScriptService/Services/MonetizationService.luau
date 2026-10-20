@@ -44,6 +44,27 @@ for id, cosmetic in Config.Cosmetics.ById do
 	end
 end
 
+do -- every Developer Product id must be used once
+	local seen: { [number]: string } = {}
+	local function claim(id: number, label: string)
+		if id ~= 0 then
+			if seen[id] then
+				warn(("[Monetization] product id %d is used by both %s and %s - fix Config"):format(id, seen[id], label))
+			end
+			seen[id] = label
+		end
+	end
+	for key, product in Config.Products do
+		claim(product.Id, "Products." .. key)
+	end
+	for key, id in Config.GiftProducts do
+		claim(id, "GiftProducts." .. key)
+	end
+	for id, cosmetic in Config.Cosmetics.ById do
+		claim(cosmetic.ProductId or 0, "Cosmetics." .. id)
+	end
+end
+
 -- gift developer products -> what they gift
 local giftById: { [number]: { Kind: string, Key: string } } = {}
 for key, id in Config.GiftProducts do
@@ -55,7 +76,7 @@ for key, id in Config.GiftProducts do
 	end
 end
 -- buyer UserId -> gift product id -> the gift they are paying for
-local pendingGifts: { [number]: { [number]: { Kind: string, Key: string, Target: number } } } = {}
+local pendingGifts: { [number]: { [number]: { { Kind: string, Key: string, Target: number } } } } = {}
 local lastGift: { [Player]: number } = {}
 
 local function canSimulate()
@@ -336,7 +357,8 @@ function MonetizationService:PromptGift(player: Player, kind: any, key: any, tar
 	end
 	local pending = pendingGifts[player.UserId] or {}
 	pendingGifts[player.UserId] = pending
-	pending[giftId] = { Kind = kind, Key = key, Target = target.UserId }
+	pending[giftId] = pending[giftId] or {}
+	table.insert(pending[giftId], { Kind = kind, Key = key, Target = target.UserId }) -- a queue: one entry per prompt
 	MarketplaceService:PromptProductPurchase(player, giftId)
 end
 
@@ -408,10 +430,8 @@ end
 -- a paid gift: to the chosen player; if they left, passes wait for their next join and
 -- anything else goes to the buyer (so the Robux are never wasted)
 function MonetizationService:_receiveGift(buyer: Player, productId: number, gift): boolean
-	local pending = pendingGifts[buyer.UserId] and pendingGifts[buyer.UserId][productId]
-	if pending then
-		pendingGifts[buyer.UserId][productId] = nil
-	end
+	local queue = pendingGifts[buyer.UserId] and pendingGifts[buyer.UserId][productId]
+	local pending = queue and table.remove(queue, 1)
 	local target = pending and Players:GetPlayerByUserId(pending.Target)
 	if target and target ~= buyer and S.DataService:IsLoaded(target) then
 		return self:_deliverGift(buyer, target, gift.Kind, gift.Key)
@@ -457,7 +477,13 @@ function MonetizationService:_processReceipt(receipt)
 
 	local granted
 	if cosmeticId then
-		S.CosmeticService:Give(player, cosmeticId, true)
+		if not S.CosmeticService:Give(player, cosmeticId, true) then
+			-- they got it elsewhere while the prompt was open: pay it back as cash
+			local data = S.DataService:Get(player)
+			local refund = math.max(50_000 * (1 + (data and data.Rebirths or 0)), S.TycoonService:GetIncome(player) * 1800)
+			S.DataService:AddCash(player, refund, false)
+			Remotes.Notify:FireClient(player, { Text = "You already had it - here's " .. Util.Money(refund) .. " instead!", Type = "info", Duration = 7 })
+		end
 		granted = true
 	elseif gift then
 		granted = self:_receiveGift(player, receipt.ProductId, gift)

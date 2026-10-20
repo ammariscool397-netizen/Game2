@@ -425,6 +425,11 @@ function DataService:Get(player: Player)
 	return profiles[player]
 end
 
+-- can this player's data be saved? (false when it is open in another server)
+function DataService:CanSave(player: Player): boolean
+	return canSave[player] == true or store == nil
+end
+
 function DataService:IsLoaded(player: Player)
 	return profiles[player] ~= nil
 end

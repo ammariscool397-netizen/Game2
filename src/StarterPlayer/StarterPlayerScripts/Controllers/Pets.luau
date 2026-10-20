@@ -131,6 +131,9 @@ local function render()
 			if frame then
 				frame.Visible = egg.Active ~= false
 				frame.Size = UDim2.new(1 / math.max(active, 1), -6, 1, 0)
+				if not frame:FindFirstChildOfClass("UISizeConstraint") then
+					UIKit.new("UISizeConstraint", { MinSize = Vector2.new(104, 0), Parent = frame })
+				end
 			end
 		end
 	end

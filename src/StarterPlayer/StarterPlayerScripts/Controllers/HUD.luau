@@ -217,7 +217,9 @@ function HUD:Init(controllers)
 		-- fits the screen, a little bigger for fingers, and the player's UI size setting
 		local vp = workspace.CurrentCamera.ViewportSize
 		local scale = math.clamp(vp.Y / 860, 0.55, 1.1) * (UIKit.IsTouch() and 1.15 or 1) * math.clamp(tonumber(player:GetAttribute("UISize")) or 1, 0.7, 1.5)
+		scale = math.min(scale, vp.Y * 0.95 / 500) -- the tallest popup must fit the screen
 		menuScale.Scale, moreScale.Scale = scale, scale
+		morePanel.Position = UDim2.new(0, 16 + 80 * scale, 0.5, 0)
 	end
 	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
 	player:GetAttributeChangedSignal("UISize"):Connect(rescale)
@@ -353,7 +355,7 @@ function HUD:Refresh()
 		for id in live:gmatch("[^,]+") do
 			local event = liveById[id]
 			if event then
-				table.insert(parts, event.Icon .. " " .. event.Name .. " " .. event.Multiplier .. "x")
+				table.insert(parts, event.Icon .. event.Multiplier .. "x")
 			end
 		end
 	end

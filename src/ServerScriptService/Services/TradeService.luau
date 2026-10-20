@@ -31,6 +31,7 @@ type Trade = {
 local trades: { [Player]: Trade } = {} -- both players point at the same trade
 local invites: { [Player]: { From: Player, Expires: number } } = {} -- by the invited player
 local lastAction: { [Player]: number } = {}
+local lastCounted: { [Player]: number } = {}
 
 local function findOwned(data, uid: number)
 	for index, pet in data.Pets.Owned do
@@ -107,6 +108,9 @@ function TradeService:Invite(player: Player, targetUserId: any): (boolean, strin
 	end
 	if not S.DataService:IsLoaded(player) or not S.DataService:IsLoaded(target) then
 		return false, "Data still loading..."
+	end
+	if not S.DataService:CanSave(player) or not S.DataService:CanSave(target) then
+		return false, "Trading isn't available right now."
 	end
 	if trades[player] then
 		return false, "Finish your current trade first."
@@ -201,7 +205,7 @@ end
 function TradeService:_execute(trade: Trade): (boolean, string)
 	local a, b = trade.A, trade.B
 	local dataA, dataB = S.DataService:Get(a), S.DataService:Get(b)
-	if not dataA or not dataB then
+	if not dataA or not dataB or not S.DataService:CanSave(a) or not S.DataService:CanSave(b) then
 		self:_end(trade, "The trade was cancelled.", "error")
 		return false, "Trade cancelled."
 	end
@@ -266,14 +270,19 @@ function TradeService:_execute(trade: Trade): (boolean, string)
 		Remotes.Notify:FireClient(player, { Text = "🤝 Trade complete with " .. other(trade, player).DisplayName .. "!", Type = "success", Duration = 6 })
 		Remotes.VFX:FireClient(player, "Confetti", {})
 		S.PetService:Resync(player)
-		if S.ProgressService then
+		-- trades count for achievements at most every 10 minutes (no farming with a second account)
+		if S.ProgressService and (not lastCounted[player] or os.clock() - lastCounted[player] >= 600) then
+			lastCounted[player] = os.clock()
 			S.ProgressService:Record(player, "Trade")
 		end
 	end
 	-- save both right away so a crash can't duplicate or lose pets
 	task.spawn(function()
-		S.DataService:Save(a)
-		S.DataService:Save(b)
+		for _, player in { a, b } do
+			if player.Parent and not S.DataService:Save(player) then
+				warn("[Trade] could not save " .. player.Name .. " after a trade")
+			end
+		end
 	end)
 	return true, "Trade complete!"
 end
@@ -320,6 +329,7 @@ function TradeService:Init(services)
 		end
 		invites[player] = nil
 		lastAction[player] = nil
+		lastCounted[player] = nil
 		for target, invite in invites do
 			if invite.From == player then
 				invites[target] = nil

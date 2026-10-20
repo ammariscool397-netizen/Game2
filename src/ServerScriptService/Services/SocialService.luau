@@ -50,7 +50,11 @@ function SocialService:ClaimGroup(player: Player): (boolean, string)
 	if data.Social.Group then
 		return false, "You already claimed the group reward."
 	end
-	if not inGroup(player) then
+	local member = inGroup(player) -- (can yield: several quick claims could all pass the check above)
+	if data.Social.Group then
+		return false, "You already claimed the group reward."
+	end
+	if not member then
 		return false, "Join the group first, then press Claim again!"
 	end
 	data.Social.Group = true
