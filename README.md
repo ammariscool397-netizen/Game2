@@ -27,6 +27,7 @@ All settings live in `src/ReplicatedStorage/Shared/Config.luau`.
 | Admins | `Config.Admin.Admins` | `[UserId] = rank` (1 Mod, 2 Admin, 3 Head Admin, 4 Owner). The place creator is always Owner |
 | Music | `Config.Music` | Replace the IDs with audio you're allowed to use. Broken IDs are skipped automatically |
 | Siren | `Config.Sounds.Siren` | Optional air-raid siren audio id (empty = synthesized alarm) |
+| Achievements, Season, Cosmetics, LiveEvents, Social, Trading, Boards | `Config.*` | Rewards, prices, calendar events, group id and trading rules; Robux cosmetics need a Developer Product id in `ProductId` |
 | Pace / economy | `Config.Tycoon`, `Config.Rebirth` | `PaceStartSeconds`/`PaceEndSeconds` rescale every price at once |
 | Disasters | `Config.Disasters` | Frequency, weights, damage, wreck time |
 | Secrets | `Config.Secrets` | Names, hints, optional `BadgeId` |
@@ -93,6 +94,14 @@ rojo build -o MegaTycoon.rbxlx   # rebuild the place file
 - **Cooldowns can't be skipped by rejoining**: playtime gifts, the wheel, the shield, daily and weekly rewards and island chests are all saved with the player
 - **Lucky Wheel**: a free reel spin every 30 minutes (cash or 2x boosts, rare jackpot). Prizes and odds are in `Config.Wheel`
 - **10 rebirth ranks** (Reborn → Mythic): each rank gives a permanent perk (starting cash, walk speed, offline earnings, quest/gift bonuses, extra income) and a rank tag over your head. Edit them in `Config.Rebirth.Ranks`
+- **Achievements** (`GOALS` in the MORE menu): 16 groups with tiers (upgrades, rebirths, earnings, eggs, quests, disasters survived, secrets, trades, play time...). Each pays cash / a boost / an exclusive cosmetic once, and can also award a real Roblox badge: paste badge ids into `Config.Achievements.Badges`. A **Stats** page and global **Leaderboards** (richest, rebirths, eggs hatched) are in the same menu
+- **Season pass**: a 28-day season with 30 levels and a free and a premium reward track (the premium one needs the *Season Pass* game pass). XP comes from playing; unclaimed rewards are lost when the season ends. `Config.Season`
+- **Style** (cosmetics): trails, auras and hats that everyone sees - buy with cash or Robux, or earn exclusive ones from the season and achievements. `Config.Cosmetics`
+- **Live events** by the calendar (UTC): the weekend bonus (Fri 18:00 - Sun), Halloween, Winter and Summer events with a multiplier, an event egg and exclusive event pets. `;event <name> on/off/auto` forces them. `Config.LiveEvents`
+- **Pet trading**: both players offer up to 6 pets, the Accept button waits 3 seconds after every change, and the swap is one atomic step with immediate saves. `Config.Trading`
+- **Social**: reward for joining your Roblox group (`Config.Social.GroupId`), +25% income in private (VIP) servers, join friends who are in another server, invite friends
+- **Tutorial**: a short guided start (buy upgrades, spin the wheel, claim the daily reward); the server checks the steps before paying
+- **Mobile friendly**: touch devices get bigger menu buttons and a **UI size** slider in Settings
 - **Safe saving**: session-locked DataStore saves (hopping servers can't lose or
   duplicate progress), corrupted values are repaired, nothing invalid is ever saved
 

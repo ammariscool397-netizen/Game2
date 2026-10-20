@@ -16,7 +16,7 @@
 local Config = {}
 
 Config.GameName = "MEGA TYCOON"
-Config.Version = "2.1.0"
+Config.Version = "3.0.0"
 
 ---------------------------------------------------------------------------
 -- Data / economy
