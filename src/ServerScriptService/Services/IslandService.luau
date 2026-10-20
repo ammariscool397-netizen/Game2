@@ -89,6 +89,9 @@ function IslandService:OpenChest(player: Player, entry)
 		return
 	end
 	data.Chests[entry.Id] = os.time()
+	if S.ProgressService then
+		S.ProgressService:Record(player, "Chest")
+	end
 	local wallet = S.DataService:GetWallet(player)
 	local rebirths = wallet and wallet.Rebirths or 0
 	local cash = math.floor(math.max(island.MinCash * (1 + rebirths), S.TycoonService:GetIncome(player) * island.IncomeSeconds))

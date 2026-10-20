@@ -350,6 +350,15 @@ Config.GamePasses = {
 		Color = Color3.fromRGB(200, 90, 255),
 		Order = 15,
 	},
+	SeasonPass = {
+		Id = 0,
+		Name = "Season Pass",
+		Description = "Unlocks the premium reward track of the Season (cosmetics, pets, big cash).",
+		PriceHint = 399,
+		Icon = "🎫",
+		Color = Color3.fromRGB(255, 140, 40),
+		Order = 17,
+	},
 	GiftBoost = {
 		Id = 0,
 		Name = "Gift Boost",
@@ -386,6 +395,7 @@ Config.GiftProducts = {
 	ShieldPro = 0,
 	RebirthBoost = 0,
 	GiftBoost = 0,
+	SeasonPass = 0,
 	-- cash packs and boosts
 	CashSmall = 0,
 	CashMedium = 0,
@@ -535,8 +545,8 @@ Config.Admin = {
 		{ Id = "Moderation", Name = "Kick & ban", Icon = "🔨", Desc = "kick, ban, unban, strikes", Commands = { "kick", "ban", "unban", "strikes", "clearstrikes" } },
 		{ Id = "Disasters", Name = "Disasters", Icon = "☢️", Desc = "Start any disaster (nuke, tornado...), repair and wreck towers", Commands = { "nuke", "meteors", "tornado", "ufo", "earthquake", "disaster", "stopdisaster", "wreck", "repair" } },
 		{ Id = "Economy", Name = "Cash & progress", Icon = "💰", Desc = "givecash, rebirths, unlock floors, secrets, duo", Commands = { "givecash", "setcash", "takecash", "giverebirth", "rebirth", "unlockall", "unlockfloor", "givesecrets", "resetsecrets", "duo", "unduo" } },
-		{ Id = "Passes", Name = "Give passes & pets", Icon = "🎁", Desc = "givepass, removepass, givepet", Commands = { "givepass", "removepass", "givepet" } },
-		{ Id = "Events", Name = "Events & world", Icon = "🎉", Desc = "cash rain, 2x events, minigames, time, music, announcements", Commands = { "cashrain", "doublecash", "minigame", "time", "m", "music", "stopmusic", "confetti" } },
+		{ Id = "Passes", Name = "Give passes & pets", Icon = "🎁", Desc = "givepass, removepass, givepet", Commands = { "givepass", "removepass", "givepet", "givecosmetic", "takecosmetic" } },
+		{ Id = "Events", Name = "Events & world", Icon = "🎉", Desc = "cash rain, 2x events, minigames, time, music, announcements", Commands = { "cashrain", "doublecash", "minigame", "time", "m", "music", "stopmusic", "confetti", "event", "addxp" } },
 		{ Id = "Fun", Name = "Fun effects", Icon = "✨", Desc = "explode, giant, tiny, sparkles, fire, invisible...", Commands = { "explode", "giant", "tiny", "normal", "sparkles", "fire", "smoke", "unfx", "invisible", "visible", "fling", "launch" } },
 		{ Id = "Titles", Name = "Give titles", Icon = "🏷️", Desc = "Set glowing titles above players' heads", Commands = { "title", "cleartitle" } },
 		{ Id = "AdminTools", Name = "All Admin commands", Icon = "⭐", Desc = "Everything an Admin can do (Mod + Admin ranks)", MaxRank = 2 },
@@ -798,6 +808,10 @@ Config.Pets = {
 		{ Id = "Basic", Name = "Basic Egg", Icon = "🥚", IncomeSeconds = 300, MinCash = 2_000, Weights = { Common = 70, Uncommon = 25, Rare = 5 } },
 		{ Id = "Golden", Name = "Golden Egg", Icon = "🌟", IncomeSeconds = 1_800, MinCash = 40_000, Weights = { Uncommon = 40, Rare = 40, Epic = 17, Legendary = 3 } },
 		{ Id = "Cosmic", Name = "Cosmic Egg", Icon = "🪐", IncomeSeconds = 7_200, MinCash = 800_000, Weights = { Epic = 60, Legendary = 35, Mythic = 5 } },
+		-- event eggs: only for sale while their live event runs (Config.LiveEvents). The pets stay yours.
+		{ Id = "Spooky", Name = "Spooky Egg", Icon = "🎃", IncomeSeconds = 1_200, MinCash = 30_000, Event = "Halloween", Weights = { Rare = 55, Epic = 35, Legendary = 10 } },
+		{ Id = "Frosty", Name = "Frosty Egg", Icon = "🧊", IncomeSeconds = 1_200, MinCash = 30_000, Event = "Winter", Weights = { Rare = 55, Epic = 35, Legendary = 10 } },
+		{ Id = "Beach", Name = "Beach Egg", Icon = "🏖️", IncomeSeconds = 1_200, MinCash = 30_000, Event = "Summer", Weights = { Rare = 55, Epic = 35, Legendary = 10 } },
 	},
 	List = {
 		{ Id = "Dog", Name = "Dog", Icon = "🐶", Rarity = "Common" },
@@ -822,6 +836,15 @@ Config.Pets = {
 		{ Id = "Alien", Name = "Cosmic Alien", Icon = "👽", Rarity = "Mythic" },
 		{ Id = "Mecha", Name = "Mecha King", Icon = "🤖", Rarity = "Mythic" },
 		{ Id = "Crown", Name = "Golden Crown", Icon = "👑", Rarity = "Mythic" },
+		{ Id = "Ghost", Name = "Friendly Ghost", Icon = "👻", Rarity = "Rare", Event = "Halloween" },
+		{ Id = "Pumpkin", Name = "Jack-o-Lantern", Icon = "🎃", Rarity = "Epic", Event = "Halloween" },
+		{ Id = "Vampire", Name = "Vampire Bat", Icon = "🦇", Rarity = "Legendary", Event = "Halloween" },
+		{ Id = "Snowman", Name = "Snowman", Icon = "⛄", Rarity = "Rare", Event = "Winter" },
+		{ Id = "Reindeer", Name = "Reindeer", Icon = "🦌", Rarity = "Epic", Event = "Winter" },
+		{ Id = "IceDragon", Name = "Ice Dragon", Icon = "🐉", Rarity = "Legendary", Event = "Winter" },
+		{ Id = "Crab", Name = "Beach Crab", Icon = "🦀", Rarity = "Rare", Event = "Summer" },
+		{ Id = "Dolphin", Name = "Dolphin", Icon = "🐬", Rarity = "Epic", Event = "Summer" },
+		{ Id = "Shark", Name = "Surf Shark", Icon = "🦈", Rarity = "Legendary", Event = "Summer" },
 	},
 }
 
@@ -962,6 +985,208 @@ function Config.PetsBonus(pets: any): number
 	end
 	return total
 end
+
+---------------------------------------------------------------------------
+-- Stats and ACHIEVEMENTS. Stats come from the saved data (see
+-- AchievementService); every achievement pays once, automatically.
+-- Reward: Minutes = minutes of income (never below MinCash), Boost = seconds of
+-- 2x income, Cosmetic = a cosmetic id from Config.Cosmetics.
+-- Fill AchievementBadges[<achievement id>] with a Roblox Badge id to also award
+-- a real badge (0 = none).
+---------------------------------------------------------------------------
+Config.Achievements = { Enabled = true, List = {}, ById = {}, Badges = {} }
+do
+	local tierMinutes = { 1, 2, 4, 8, 15 }
+	local tierCash = { 1_000, 3_000, 10_000, 50_000, 250_000 }
+	local function add(group: string, names: { string }, stat: string, targets: { number }, icon: string, text: string, cosmeticAtEnd: string?)
+		for tier, target in targets do
+			local id = group .. "_" .. tier
+			local reward: { [string]: any } = { Minutes = tierMinutes[math.min(tier, 5)], MinCash = tierCash[math.min(tier, 5)] }
+			if tier >= 3 then
+				reward.Boost = 180 * (tier - 2)
+			end
+			if cosmeticAtEnd and tier == #targets then
+				reward.Cosmetic = cosmeticAtEnd
+			end
+			local roman = { "I", "II", "III", "IV", "V" }
+			local entry = { Id = id, Group = group, Tier = tier, Name = names[1] .. (#targets > 1 and (" " .. roman[tier]) or ""), Stat = stat, Target = target, Icon = icon, Text = text, Reward = reward }
+			table.insert(Config.Achievements.List, entry)
+			Config.Achievements.ById[id] = entry
+			Config.Achievements.Badges[id] = 0
+		end
+	end
+	add("Upgrades", { "Builder" }, "Upgrades", { 10, 50, 150, 300, 500 }, "🏗️", "Buy %s upgrades")
+	add("Rebirths", { "Reborn" }, "Rebirths", { 1, 3, 5, 10 }, "🔄", "Rebirth %s times")
+	add("Earned", { "Tycoon" }, "Earned", { 10_000, 1_000_000, 1_000_000_000, 1e12, 1e15 }, "💰", "Earn %s in total", "Trail_Gold")
+	add("Hatched", { "Egg Hunter" }, "Hatched", { 1, 10, 50, 150 }, "🥚", "Hatch %s eggs")
+	add("Quests", { "Questing" }, "Quests", { 1, 10, 50, 150 }, "📜", "Claim %s quest rewards")
+	add("Spins", { "Lucky" }, "Spins", { 1, 10, 50 }, "🎰", "Spin the Lucky Wheel %s times")
+	add("Survived", { "Survivor" }, "Survived", { 1, 5, 25, 100 }, "🛡️", "Survive %s disasters", "Aura_Inferno")
+	add("Minigames", { "Gamer" }, "MinigameWins", { 1, 5, 25 }, "🎮", "Win %s minigames")
+	add("Secrets", { "Detective" }, "Secrets", { 1, 6, 12 }, "🕵️", "Find %s secrets", "Hat_Dragon")
+	add("Chests", { "Treasure Hunter" }, "Chests", { 1, 10, 50 }, "🏝️", "Open %s island chests")
+	add("Trades", { "Trader" }, "Trades", { 1, 10, 50 }, "🤝", "Complete %s trades")
+	add("Time", { "Regular" }, "Hours", { 1, 5, 24, 100 }, "⏱️", "Play for %s hours")
+	add("Floors", { "Skyscraper" }, "Floors", { 2, 4, 8 }, "🏢", "Unlock floor %s")
+	add("Gifts", { "Generous" }, "GiftsSent", { 1, 5, 25 }, "🎁", "Gift %s items to friends")
+	add("Style", { "Fashionista" }, "Cosmetics", { 1, 5, 15 }, "✨", "Own %s cosmetics")
+	add("Season", { "Seasoned" }, "SeasonLevel", { 10, 30 }, "🎫", "Reach season level %s")
+end
+Config.AchievementBadges = Config.Achievements.Badges
+
+---------------------------------------------------------------------------
+-- SEASON (battle pass). A new season starts every Days days, counted from
+-- StartUnix (UTC). Earn XP by playing; each level unlocks a reward on the free
+-- track, and on the premium track for owners of the Season Pass. Unclaimed
+-- rewards are lost when a season ends. Reward kinds: Cash (Minutes of income,
+-- MinCash), Boost (Seconds), Pet (Id), Cosmetic (Id).
+---------------------------------------------------------------------------
+Config.Season = {
+	Enabled = true,
+	PremiumPass = "SeasonPass",
+	StartUnix = 1767225600, -- 2026-01-01 00:00 UTC
+	Days = 28,
+	Levels = 30,
+	Names = { "Season of Fire", "Season of Frost", "Season of Storms", "Season of Gold", "Season of Stars", "Season of Shadows" },
+	Xp = { Admin = 1, Upgrade = 3, Quest = 60, Hatch = 20, Survive = 40, Minigame = 40, Rebirth = 200, Chest = 40, Daily = 100, Spin = 30, Achievement = 100, Minute = 4 },
+	Free = {},
+	Premium = {},
+}
+function Config.SeasonXpForLevel(level: number): number
+	return 100 + 40 * (level - 1)
+end
+do
+	local S = Config.Season
+	for level = 1, S.Levels do
+		if level % 2 == 1 then
+			S.Free[level] = { Kind = "Cash", Minutes = 1 + level * 0.4, MinCash = 1_000 * level }
+		end
+		S.Premium[level] = { Kind = "Cash", Minutes = 2 + level * 0.8, MinCash = 3_000 * level }
+	end
+	for _, level in { 5, 15, 25 } do
+		S.Free[level] = { Kind = "Boost", Seconds = 300 + level * 30 }
+	end
+	S.Free[10] = { Kind = "Pet", Id = "Tiger" }
+	S.Free[20] = { Kind = "Pet", Id = "Dragon" }
+	S.Free[30] = { Kind = "Pet", Id = "Phoenix" }
+	for _, level in { 4, 8, 12, 16, 22, 26 } do
+		S.Premium[level] = { Kind = "Boost", Seconds = 600 + level * 60 }
+	end
+	S.Premium[5] = { Kind = "Cosmetic", Id = "Trail_Season" }
+	S.Premium[10] = { Kind = "Pet", Id = "Unicorn" }
+	S.Premium[15] = { Kind = "Cosmetic", Id = "Aura_Season" }
+	S.Premium[20] = { Kind = "Pet", Id = "Kraken" }
+	S.Premium[25] = { Kind = "Cosmetic", Id = "Hat_Season" }
+	S.Premium[30] = { Kind = "Pet", Id = "Alien" }
+end
+
+-- (season number, starts, ends, name) for a unix time
+function Config.CurrentSeason(now: number): (number, number, number, string)
+	local length = Config.Season.Days * 86400
+	local number = math.max(0, math.floor((now - Config.Season.StartUnix) / length))
+	local names = Config.Season.Names
+	return number + 1, Config.Season.StartUnix + number * length, Config.Season.StartUnix + (number + 1) * length, names[number % #names + 1]
+end
+
+---------------------------------------------------------------------------
+-- COSMETICS: trails, auras and hats. Buy with cash (Price), with Robux (Robux +
+-- ProductId: create a Developer Product, 0 = simulated in Studio), or they are
+-- rewards (Source = "Season" / "Achievement").
+---------------------------------------------------------------------------
+Config.Cosmetics = {
+	Kinds = {
+		{ Id = "Trail", Name = "Trails", Icon = "🌈" },
+		{ Id = "Aura", Name = "Auras", Icon = "✨" },
+		{ Id = "Hat", Name = "Hats", Icon = "🎩" },
+	},
+	List = {
+		{ Id = "Trail_Flame", Kind = "Trail", Name = "Flame Trail", Icon = "🔥", Price = 40_000, C1 = Color3.fromRGB(255, 120, 0), C2 = Color3.fromRGB(255, 230, 0) },
+		{ Id = "Trail_Ocean", Kind = "Trail", Name = "Ocean Trail", Icon = "🌊", Price = 120_000, C1 = Color3.fromRGB(0, 150, 255), C2 = Color3.fromRGB(0, 255, 220) },
+		{ Id = "Trail_Toxic", Kind = "Trail", Name = "Toxic Trail", Icon = "☣️", Price = 350_000, C1 = Color3.fromRGB(80, 255, 60), C2 = Color3.fromRGB(20, 120, 20) },
+		{ Id = "Trail_Galaxy", Kind = "Trail", Name = "Galaxy Trail", Icon = "🌌", Price = 2_000_000, C1 = Color3.fromRGB(140, 60, 255), C2 = Color3.fromRGB(255, 80, 200) },
+		{ Id = "Trail_Rainbow", Kind = "Trail", Name = "Rainbow Trail", Icon = "🌈", Robux = 99, ProductId = 0, Rainbow = true, C1 = Color3.fromRGB(255, 80, 80), C2 = Color3.fromRGB(80, 80, 255) },
+		{ Id = "Trail_Season", Kind = "Trail", Name = "Season Trail", Icon = "🎫", Source = "Season", C1 = Color3.fromRGB(255, 140, 40), C2 = Color3.fromRGB(255, 60, 120) },
+		{ Id = "Trail_Gold", Kind = "Trail", Name = "Golden Trail", Icon = "🏆", Source = "Achievement", C1 = Color3.fromRGB(255, 215, 0), C2 = Color3.fromRGB(255, 255, 160) },
+		{ Id = "Aura_Sparkle", Kind = "Aura", Name = "Sparkles", Icon = "✨", Price = 25_000, Color = Color3.fromRGB(255, 240, 150), Rate = 10 },
+		{ Id = "Aura_Hearts", Kind = "Aura", Name = "Love Aura", Icon = "💖", Price = 90_000, Color = Color3.fromRGB(255, 100, 170), Rate = 8 },
+		{ Id = "Aura_Snow", Kind = "Aura", Name = "Snowfall", Icon = "❄️", Price = 220_000, Color = Color3.fromRGB(235, 245, 255), Rate = 14 },
+		{ Id = "Aura_Lightning", Kind = "Aura", Name = "Storm Aura", Icon = "⚡", Price = 900_000, Color = Color3.fromRGB(140, 200, 255), Rate = 24 },
+		{ Id = "Aura_Void", Kind = "Aura", Name = "Void Aura", Icon = "🕳️", Robux = 149, ProductId = 0, Color = Color3.fromRGB(150, 60, 255), Rate = 18 },
+		{ Id = "Aura_Season", Kind = "Aura", Name = "Season Aura", Icon = "🎫", Source = "Season", Color = Color3.fromRGB(255, 120, 40), Rate = 16 },
+		{ Id = "Aura_Inferno", Kind = "Aura", Name = "Inferno Aura", Icon = "🔥", Source = "Achievement", Color = Color3.fromRGB(255, 70, 0), Rate = 26 },
+		{ Id = "Hat_Party", Kind = "Hat", Name = "Party Hat", Icon = "🎉", Price = 60_000, Shape = "Cone", Color = Color3.fromRGB(255, 90, 200) },
+		{ Id = "Hat_Halo", Kind = "Hat", Name = "Halo", Icon = "😇", Price = 600_000, Shape = "Halo", Color = Color3.fromRGB(255, 240, 140) },
+		{ Id = "Hat_Horns", Kind = "Hat", Name = "Devil Horns", Icon = "😈", Price = 250_000, Shape = "Horns", Color = Color3.fromRGB(200, 30, 30) },
+		{ Id = "Hat_TopHat", Kind = "Hat", Name = "Top Hat", Icon = "🎩", Price = 400_000, Shape = "TopHat", Color = Color3.fromRGB(30, 30, 40) },
+		{ Id = "Hat_Crown", Kind = "Hat", Name = "Royal Crown", Icon = "👑", Price = 1_500_000, Shape = "Crown", Color = Color3.fromRGB(255, 200, 30) },
+		{ Id = "Hat_Wizard", Kind = "Hat", Name = "Wizard Hat", Icon = "🧙", Robux = 99, ProductId = 0, Shape = "Wizard", Color = Color3.fromRGB(110, 60, 220) },
+		{ Id = "Hat_Season", Kind = "Hat", Name = "Season Crown", Icon = "🎫", Source = "Season", Shape = "Crown", Color = Color3.fromRGB(255, 120, 40) },
+		{ Id = "Hat_Dragon", Kind = "Hat", Name = "Dragon Horns", Icon = "🐲", Source = "Achievement", Shape = "Horns", Color = Color3.fromRGB(60, 220, 120) },
+	},
+	ById = {},
+}
+for _, cosmetic in Config.Cosmetics.List do
+	Config.Cosmetics.ById[cosmetic.Id] = cosmetic
+end
+
+---------------------------------------------------------------------------
+-- LIVE EVENTS: automatic, by the calendar (UTC). While one runs, everyone earns
+-- Multiplier x, and its event egg (Config.Pets.Eggs with Event = Id) is on sale.
+-- Weekly = the days of the week (1 = Sunday) with the hour they start; Dates =
+-- an every-year window {month, day}.
+---------------------------------------------------------------------------
+Config.LiveEvents = {
+	Enabled = true,
+	List = {
+		{ Id = "Weekend", Name = "Weekend Bonanza", Icon = "🎉", Multiplier = 2, Color = Color3.fromRGB(255, 140, 40), Weekly = { [6] = 18, [7] = 0, [1] = 0 }, Text = "2x cash from Friday evening to Sunday night (UTC)!" },
+		{ Id = "Halloween", Name = "Spooky Season", Icon = "🎃", Multiplier = 2, Color = Color3.fromRGB(255, 120, 20), Dates = { From = { 10, 24 }, To = { 11, 2 } }, Text = "2x cash and the Spooky Egg with ghost pets!" },
+		{ Id = "Winter", Name = "Winter Festival", Icon = "⛄", Multiplier = 2, Color = Color3.fromRGB(150, 210, 255), Dates = { From = { 12, 15 }, To = { 1, 3 } }, Text = "2x cash and the Frosty Egg with ice pets!" },
+		{ Id = "Summer", Name = "Summer Splash", Icon = "🏖️", Multiplier = 1.5, Color = Color3.fromRGB(255, 210, 60), Dates = { From = { 7, 1 }, To = { 7, 14 } }, Text = "1.5x cash and the Beach Egg with sea pets!" },
+	},
+}
+
+---------------------------------------------------------------------------
+-- Social: free reward for joining your Roblox group (set GroupId), the private
+-- server bonus, and friends. Roblox can't check "liked" / "favorited" games, so
+-- there is no reward for those.
+---------------------------------------------------------------------------
+Config.Social = {
+	GroupId = 0,
+	GroupLink = "Search the group on Roblox and press Join",
+	GroupReward = { Minutes = 20, MinCash = 30_000, BoostSeconds = 30 * 60 },
+	PrivateServerBonus = 0.25, -- +25% income in VIP / private servers
+}
+
+---------------------------------------------------------------------------
+-- Trading pets. Both players must accept; any change resets the accepts and
+-- the Accept button waits ConfirmDelay seconds again.
+---------------------------------------------------------------------------
+Config.Trading = {
+	Enabled = true,
+	MaxPets = 6, -- pets per side
+	ConfirmDelay = 3,
+	InviteTimeout = 30,
+	TradeTimeout = 300, -- a trade nobody finishes is cancelled
+}
+
+---------------------------------------------------------------------------
+-- First-time tutorial. Each step is checked by the server before it pays.
+---------------------------------------------------------------------------
+Config.Tutorial = {
+	Enabled = true,
+	BuyUpgrades = 3,
+	Reward = { Minutes = 3, MinCash = 2_000 },
+}
+
+---------------------------------------------------------------------------
+-- Global leaderboards (OrderedDataStores, refreshed every few minutes)
+---------------------------------------------------------------------------
+Config.Boards = {
+	Enabled = true,
+	Top = 25,
+	RefreshSeconds = 180,
+	Stores = { Rebirths = "MegaTycoon_Board_Rebirths_v1", Hatched = "MegaTycoon_Board_Hatched_v1" },
+}
 
 -- can this pass ("Pass") or product ("Product") be gifted? Server events (nukes, cash rain) can't.
 function Config.CanGift(kind: any, key: any): boolean

@@ -144,6 +144,45 @@ function UIKit.Label(props: { [string]: any })
 	return label
 end
 
+-- removes the GuiObjects inside a container (lists you refill)
+function UIKit.Clear(container: Instance)
+	for _, child in container:GetChildren() do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+end
+
+-- a rounded list row (alternating colours)
+function UIKit.Row(parent: Instance, order: number, height: number?)
+	local frame = UIKit.new("Frame", {
+		Size = UDim2.new(1, -10, 0, height or 56),
+		BackgroundColor3 = order % 2 == 0 and UIKit.Theme.PanelLight or UIKit.Theme.Panel,
+		LayoutOrder = order,
+		ZIndex = 7,
+		Parent = parent,
+	})
+	UIKit.Corner(frame, 10)
+	return frame
+end
+
+-- a progress bar; returns (bar, set(fraction))
+function UIKit.Bar(parent: Instance, size: UDim2, position: UDim2, color: Color3)
+	local bar = UIKit.new("Frame", { Size = size, Position = position, BackgroundColor3 = Color3.fromRGB(20, 22, 34), ZIndex = 8, Parent = parent })
+	UIKit.Corner(bar, 8)
+	local fill = UIKit.new("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = color, ZIndex = 9, Parent = bar })
+	UIKit.Corner(fill, 8)
+	return bar, function(fraction: number)
+		fill.Size = UDim2.fromScale(math.clamp(fraction, 0, 1), 1)
+	end
+end
+
+-- is this a touch device without a keyboard (phones, tablets)?
+function UIKit.IsTouch(): boolean
+	local UserInputService = game:GetService("UserInputService")
+	return UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+end
+
 -- A chunky "game style" button with hover + press animation and click sound
 function UIKit.Button(props: { [string]: any })
 	local color: Color3 = props.Color or UIKit.Theme.Accent

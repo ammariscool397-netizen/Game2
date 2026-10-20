@@ -88,7 +88,7 @@ function PetService:_roll(egg, lucky: boolean?)
 	end
 	local options = {}
 	for _, pet in PC.List do
-		if pet.Rarity == rarity then
+		if pet.Rarity == rarity and pet.Event == egg.Event then
 			table.insert(options, pet)
 		end
 	end
@@ -103,7 +103,7 @@ function PetService:_state(player: Player)
 	end
 	local eggs = {}
 	for _, egg in PC.Eggs do
-		table.insert(eggs, { Id = egg.Id, Cost = self:GetEggCost(player, egg) })
+		table.insert(eggs, { Id = egg.Id, Cost = self:GetEggCost(player, egg), Active = egg.Event == nil or S.EventService:IsActive(egg.Event) })
 	end
 	local owned = {}
 	for _, pet in data.Pets.Owned do
@@ -149,6 +149,11 @@ function PetService:_clean(data)
 end
 
 -- gives pets (hatching and the admin command); returns how many fit
+-- re-send the pets and refresh the income after another service changed them (trading)
+function PetService:Resync(player: Player)
+	self:_sync(player)
+end
+
 function PetService:Give(player: Player, petId: string, count: number?): number
 	local data = S.DataService:Get(player)
 	if not data or not Config.PetById[petId] then
@@ -181,6 +186,9 @@ function PetService:Hatch(player: Player, eggId: any): (boolean, string)
 	if not egg then
 		return false, "Unknown egg."
 	end
+	if egg.Event and not S.EventService:IsActive(egg.Event) then
+		return false, egg.Name .. " is only on sale during its event!"
+	end
 	if #data.Pets.Owned >= PC.MaxOwned then
 		return false, "Your pet storage is full (" .. PC.MaxOwned .. ") - sell some pets!"
 	end
@@ -191,6 +199,9 @@ function PetService:Hatch(player: Player, eggId: any): (boolean, string)
 	local pet = self:_roll(egg, S.MonetizationService:HasPass(player, "PetLuck"))
 	self:Give(player, pet.Id, 1)
 	data.Pets.Hatched += 1
+	if S.ProgressService then
+		S.ProgressService:Record(player, "Hatch")
+	end
 	if S.QuestService then
 		S.QuestService:Progress(player, "Hatch", 1)
 	end

@@ -53,7 +53,13 @@ local TEMPLATE = {
 	Pets = { Owned = {}, Equipped = {}, NextUid = 1, Hatched = 0 }, -- see PetService
 	Chests = {}, -- island chest id -> when you last opened it (see IslandService)
 	Weekly = { Week = 0, Days = {}, Claimed = {} }, -- days joined this week + milestones claimed (see WeeklyService)
-	Settings = { MusicVolume = Config.Music.DefaultVolume, SFX = true, LowGraphics = false, Guide = true, AutoBuild = true },
+	Stats = { Survived = 0, Chests = 0, Trades = 0, GiftsSent = 0, Quests = 0, Upgrades = 0, Floors = 1 }, -- counters that aren't saved anywhere else (see AchievementService)
+	Achievements = {}, -- achievement id -> true once rewarded
+	Season = { Id = 0, XP = 0, Free = {}, Premium = {} }, -- see SeasonService
+	Cosmetics = { Owned = {}, Equipped = {} }, -- see CosmeticService
+	Tutorial = { Done = false },
+	Social = { Group = false }, -- joined-the-group reward claimed
+	Settings = { MusicVolume = Config.Music.DefaultVolume, SFX = true, LowGraphics = false, Guide = true, AutoBuild = true, UISize = 1 },
 }
 
 local profiles: { [Player]: any } = {}
@@ -537,6 +543,10 @@ function DataService:GetMultiplier(player: Player, permanentOnly: boolean?): num
 	if Util.IsFinite(event) and event > 0 then
 		mult *= event
 	end
+	local live = workspace:GetAttribute("LiveEventMult") -- calendar events (EventService)
+	if Util.IsFinite(live) and live > 0 then
+		mult *= live
+	end
 	return mult * self:GetSocialBonus(host)
 end
 
@@ -547,6 +557,9 @@ function DataService:GetSocialBonus(host: Player): number
 		bonus *= 1 + Config.Bonuses.PremiumPercent / 100
 	end
 	local friends = math.min(tonumber(host:GetAttribute("FriendsHere")) or 0, Config.Bonuses.MaxFriends)
+	if game.PrivateServerId ~= "" and game.PrivateServerOwnerId ~= 0 then
+		bonus *= 1 + Config.Social.PrivateServerBonus -- VIP / private servers
+	end
 	return bonus * (1 + friends * Config.Bonuses.FriendPercent / 100)
 end
 
@@ -613,6 +626,7 @@ function DataService:Sync(player: Player)
 	player:SetAttribute("LowGraphics", data.Settings.LowGraphics)
 	player:SetAttribute("Guide", data.Settings.Guide)
 	player:SetAttribute("AutoBuild", data.Settings.AutoBuild)
+	player:SetAttribute("UISize", data.Settings.UISize)
 	local found = {}
 	for id in data.Secrets do
 		table.insert(found, id)

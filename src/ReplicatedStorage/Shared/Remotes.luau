@@ -31,6 +31,9 @@ local EVENTS = {
 	"WeeklyUpdate", -- server -> client  { Days, DayFlags, Claimed, ResetsIn }
 	"PetUpdate", -- server -> client  { Owned, Equipped, Slots, Eggs }
 	"GiftItem", -- client -> server  ("Pass"|"Product", key, targetUserId)
+	"TradeInvited", -- server -> client  { FromName, FromUserId, Timeout }
+	"TradeUpdate", -- server -> client  trade state (nil = no trade)
+	"TutorialClaim", -- client -> server  (finished the tutorial; the server checks)
 }
 
 local FUNCTIONS = {
@@ -46,6 +49,16 @@ local FUNCTIONS = {
 	"ActivateShield", -- () -> ok, message
 	"Travel", -- (island id or "Plaza") -> ok, message
 	"ClaimWeekly", -- (milestone index) -> ok, message
+	"AchievementsGet", -- () -> { List = { {Id, Progress, Done} }, Done }
+	"SeasonGet", -- () -> season state
+	"SeasonClaim", -- (track "Free"|"Premium", level) -> ok, message
+	"CosmeticsGet", -- () -> { Owned, Equipped }
+	"CosmeticsAction", -- (action "Buy"|"Equip"|"Unequip", id|kind) -> ok, message
+	"TradeAction", -- (action, arg) -> ok, message   (Invite userId | Respond bool | Add uid | Remove uid | Accept | Cancel)
+	"StatsGet", -- () -> list of {Label, Value}
+	"BoardsGet", -- () -> { Earned, Rebirths, Hatched }
+	"SocialGet", -- () -> { Group, Claimed, Private }
+	"SocialAction", -- ("ClaimGroup") -> ok, message
 	"PetAction", -- (action, arg) -> ok, message   (Hatch eggId | Equip uid | Unequip uid | Sell uid | EquipBest | Refresh)
 }
 

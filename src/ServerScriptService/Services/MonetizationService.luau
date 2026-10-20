@@ -36,6 +36,14 @@ for key, product in Config.Products do
 	end
 end
 
+-- cosmetic developer products -> the cosmetic
+local cosmeticByProductId: { [number]: string } = {}
+for id, cosmetic in Config.Cosmetics.ById do
+	if cosmetic.ProductId and cosmetic.ProductId ~= 0 then
+		cosmeticByProductId[cosmetic.ProductId] = id
+	end
+end
+
 -- gift developer products -> what they gift
 local giftById: { [number]: { Kind: string, Key: string } } = {}
 for key, id in Config.GiftProducts do
@@ -189,6 +197,9 @@ function MonetizationService:_applyPass(player: Player, key: string, announce: b
 	end
 	player:SetAttribute("Pass_" .. key, true)
 	S.DataService:RefreshMultiplier(player)
+	if key == Config.Season.PremiumPass and S.SeasonService then
+		S.SeasonService:Sync(player)
+	end
 	if S.TycoonService then
 		if key == "AutoCollect" then
 			S.TycoonService:CollectVault(player)
@@ -339,6 +350,9 @@ function MonetizationService:_deliverGift(buyer: Player, target: Player, kind: s
 		end
 		Remotes.Notify:FireClient(target, { Text = "🎁 " .. buyer.DisplayName .. " sent you " .. entry.Name .. "!", Type = "success", Duration = 6 })
 	end
+	if S.ProgressService then
+		S.ProgressService:Record(buyer, "Gift")
+	end
 	Remotes.Notify:FireClient(buyer, { Text = "🎁 " .. target.DisplayName .. " got your gift: " .. entry.Name .. "!", Type = "success", Duration = 6 })
 	return true
 end
@@ -418,7 +432,8 @@ end
 function MonetizationService:_processReceipt(receipt)
 	local gift = giftById[receipt.ProductId]
 	local key = productKeyById[receipt.ProductId]
-	if not key and not gift then
+	local cosmeticId = cosmeticByProductId[receipt.ProductId]
+	if not key and not gift and not cosmeticId then
 		warn("[Monetization] Unknown product id " .. tostring(receipt.ProductId))
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
@@ -441,7 +456,10 @@ function MonetizationService:_processReceipt(receipt)
 	end
 
 	local granted
-	if gift then
+	if cosmeticId then
+		S.CosmeticService:Give(player, cosmeticId, true)
+		granted = true
+	elseif gift then
 		granted = self:_receiveGift(player, receipt.ProductId, gift)
 	else
 		granted = self:_grantProduct(player, key)

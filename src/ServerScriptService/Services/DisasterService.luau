@@ -963,6 +963,9 @@ function DisasterService:_run(kind: string, by: string?)
 		local humanoid = getHumanoid(player)
 		if player.Parent and player.Character == character and humanoid and humanoid.Health > 0 and S.QuestService then
 			S.QuestService:Progress(player, "Survive", 1)
+			if S.ProgressService then
+				S.ProgressService:Record(player, "Survive")
+			end
 		end
 	end
 	broadcast({ Phase = "End", Kind = kind })

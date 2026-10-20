@@ -117,10 +117,21 @@ local function render()
 		return
 	end
 	infoLabel.Text = string.format("🐾 %d/%d equipped  •  +%sx income  •  %d pets", #state.Equipped, state.Slots, tostring(state.Bonus), #state.Owned)
+	local active = 0
+	for _, egg in state.Eggs do
+		if egg.Active ~= false then
+			active += 1
+		end
+	end
 	for _, egg in state.Eggs do
 		local entry = eggButtons[egg.Id]
 		if entry then
 			entry.Cost.Text = Util.Money(egg.Cost)
+			local frame = entry.Button.Parent
+			if frame then
+				frame.Visible = egg.Active ~= false
+				frame.Size = UDim2.new(1 / math.max(active, 1), -6, 1, 0)
+			end
 		end
 	end
 	for _, child in grid:GetChildren() do
@@ -187,7 +198,7 @@ function Pets:Init(controllers)
 	local eggRow = UIKit.new("Frame", { Name = "Eggs", Size = UDim2.new(1, 0, 0, 110), Position = UDim2.fromOffset(0, 34), BackgroundTransparency = 1, ZIndex = 6, Parent = content })
 	UIKit.List(eggRow, 8, Enum.FillDirection.Horizontal, Enum.HorizontalAlignment.Left)
 	for i, egg in PC.Eggs do
-		local frame = UIKit.new("Frame", { Name = "Egg" .. egg.Id, Size = UDim2.new(1 / #PC.Eggs, -6, 1, 0), BackgroundColor3 = Theme.Panel, LayoutOrder = i, ZIndex = 7, Parent = eggRow })
+		local frame = UIKit.new("Frame", { Name = "Egg" .. egg.Id, Size = UDim2.new(1 / 3, -6, 1, 0), Visible = egg.Event == nil, BackgroundColor3 = Theme.Panel, LayoutOrder = i, ZIndex = 7, Parent = eggRow })
 		UIKit.Corner(frame, 10)
 		UIKit.Stroke(frame, Theme.Accent, 2, 0.3)
 		UIKit.Label({ Text = egg.Icon .. " " .. egg.Name, Size = UDim2.new(1, -8, 0, 26), Position = UDim2.fromOffset(4, 4), ZIndex = 8, Parent = frame })

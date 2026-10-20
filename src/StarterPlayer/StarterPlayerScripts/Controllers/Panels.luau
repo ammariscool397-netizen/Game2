@@ -238,7 +238,8 @@ end
 
 ---------------------------------------------------------------------------
 local function buildSettings()
-	local _, content = C.UI:MakePanel("Settings", "⚙️ SETTINGS", Color3.fromRGB(130, 140, 160), 520, 520)
+	local _, outer = C.UI:MakePanel("Settings", "⚙️ SETTINGS", Color3.fromRGB(130, 140, 160), 520, 520)
+	local content = UIKit.Scroll({ Size = UDim2.fromScale(1, 1), Parent = outer }) -- scrolls on small screens
 	UIKit.List(content, 10)
 
 	local function row(order: number, text: string)
@@ -346,6 +347,26 @@ local function buildSettings()
 	player:GetAttributeChangedSignal("Pass_AutoBuild"):Connect(refreshAuto)
 	player:GetAttributeChangedSignal("AutoBuild"):Connect(refreshAuto)
 	refreshAuto()
+
+	-- UI size (phones: make the buttons bigger)
+	local sizeRow = row(7, "📱 UI Size")
+	local sizeLabel = UIKit.Label({ Text = "", Size = UDim2.fromOffset(60, 30), Position = UDim2.new(1, -150, 0, 11), ZIndex = 8, Parent = sizeRow })
+	local function setSize(value: number)
+		value = math.clamp(math.floor(value * 10 + 0.5) / 10, 0.7, 1.5)
+		player:SetAttribute("UISize", value) -- instant locally; the server saves it
+		Remotes.SaveSettings:FireServer({ UISize = value })
+		sizeLabel.Text = math.floor(value * 100 + 0.5) .. "%"
+	end
+	UIKit.Button({ Text = "-", Color = Theme.Red, Size = UDim2.fromOffset(40, 36), Position = UDim2.new(1, -196, 0, 8), ZIndex = 8, Parent = sizeRow, Callback = function()
+		setSize((player:GetAttribute("UISize") or 1) - 0.1)
+	end })
+	UIKit.Button({ Text = "+", Color = Theme.Green, Size = UDim2.fromOffset(40, 36), Position = UDim2.new(1, -84, 0, 8), ZIndex = 8, Parent = sizeRow, Callback = function()
+		setSize((player:GetAttribute("UISize") or 1) + 0.1)
+	end })
+	sizeLabel.Text = math.floor((player:GetAttribute("UISize") or 1) * 100 + 0.5) .. "%"
+	player:GetAttributeChangedSignal("UISize"):Connect(function()
+		sizeLabel.Text = math.floor((player:GetAttribute("UISize") or 1) * 100 + 0.5) .. "%"
+	end)
 
 	UIKit.Label({ Text = Config.GameName .. " v" .. Config.Version, Size = UDim2.new(1, 0, 0, 20), Font = Theme.BodyFont, TextColor3 = Theme.SubText, LayoutOrder = 9, ZIndex = 7, Parent = content })
 

@@ -280,6 +280,9 @@ function QuestService:Claim(player: Player, which: any): (boolean, string)
 	local cash, boost = self:_reward(player, quest)
 	table.remove(list, slot)
 	data.Quests.Claimed += 1
+	if S.ProgressService then
+		S.ProgressService:Record(player, "Quest")
+	end
 	S.DataService:AddCash(player, cash, false)
 	local text = "+" .. Util.Money(cash)
 	if boost then

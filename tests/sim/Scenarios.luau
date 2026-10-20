@@ -942,7 +942,9 @@ add({
 		end)
 		T.Wait(0.5)
 		local expected = math.max(Config.Products.CashSmall.MinCash, income * Config.Products.CashSmall.Minutes * 60)
-		T.Check(math.abs(data.Cash - cash - expected) < 1, "cash pack pays max(min, minutes of income)")
+		-- (Auto Collect keeps paying income while we wait: allow up to 1.5 s of it on top)
+		local gained = data.Cash - cash - expected
+		T.Check(gained > -1 and gained < income * 1.5, ("cash pack pays max(min, minutes of income): got %s expected %s (income %s)"):format(tostring(data.Cash - cash), tostring(expected), tostring(income)))
 		T.Client(function()
 			T.Remote("BuyProduct"):FireServer("Boost")
 		end)
@@ -4086,6 +4088,680 @@ table.insert(Scenarios, {
 				T.Check(buddy:GetAttribute("Pass_VIP") == true, "picking Buddy sends the VIP gift")
 			end
 		end
+	end,
+})
+
+table.insert(Scenarios, {
+	Name = "progress_systems",
+	MaxSeconds = 600,
+	Run = function(T, place)
+		local game, me = T.Boot(place, { Name = "Pro", UserId = 7100, Achievements = true, LiveEvents = true, Tutorial = true })
+		local ws = game:GetService("Workspace")
+		local function now()
+			return T.Engine.EpochBase + T.Engine.Now -- the game's clock
+		end
+		local friend = T.AddPlayer("Friend", { UserId = 7101 })
+		T.Wait(6)
+		local Config = T.Shared("Config")
+		local DataService = T.Service("DataService")
+		local AchievementService = T.Service("AchievementService")
+		local SeasonService = T.Service("SeasonService")
+		local CosmeticService = T.Service("CosmeticService")
+		local EventService = T.Service("EventService")
+		local PetService = T.Service("PetService")
+		local TradeService = T.Service("TradeService")
+		local SocialService = T.Service("SocialService")
+		local TutorialService = T.Service("TutorialService")
+		local TycoonService = T.Service("TycoonService")
+		local data, fdata = DataService:Get(me), DataService:Get(friend)
+
+		---------------- achievements ----------------
+		T.Check(#Config.Achievements.List >= 40, "plenty of achievements (" .. #Config.Achievements.List .. ")")
+		for _, a in Config.Achievements.List do
+			T.Check(a.Target > 0 and a.Reward ~= nil and a.Name ~= nil, a.Id .. " is well formed")
+			if a.Reward.Cosmetic then
+				T.Check(Config.Cosmetics.ById[a.Reward.Cosmetic] ~= nil, a.Id .. " rewards a real cosmetic")
+			end
+		end
+		local cash = data.Cash
+		data.Stats.Upgrades = 10
+		AchievementService:Check(me)
+		T.Check(data.Achievements.Upgrades_1 == true and data.Cash > cash, "Builder I pays when 10 upgrades are bought")
+		T.Check(not data.Achievements.Upgrades_2, "...but not the next tier")
+		cash = data.Cash
+		AchievementService:Check(me)
+		T.Check(data.Cash == cash, "an achievement pays only once")
+		T.Check(T.Noticed(me, "Achievement"), "the player is told")
+		local state = T.Client(function()
+			return { T.Remote("AchievementsGet"):InvokeServer() }
+		end)[1]
+		T.Check(state and state.Done.Upgrades_1 and state.Stats.Upgrades >= 10 and state.Total == #Config.Achievements.List, "the panel data has progress and done flags")
+		local page = T.Client(function()
+			return { T.Remote("StatsGet"):InvokeServer() }
+		end)[1]
+		T.Check(page and #page >= 12, "the stats page has " .. tostring(page and #page) .. " lines")
+		-- upgrades keep counting through a rebirth
+		TycoonService:Rebirth(me, true)
+		T.Wait(1)
+		T.Check(AchievementService:GetStat(me, data, "Upgrades") >= 10, "total upgrades survive a rebirth")
+
+		---------------- season ----------------
+		data.Season = { Id = (Config.CurrentSeason(now())), XP = 0, Free = {}, Premium = {} } -- (the achievements above gave XP)
+		SeasonService:Sync(me)
+		local season = SeasonService:GetState(me)
+		T.Check(season ~= nil and season.Level == 0 and season.Name ~= nil and season.EndsAt > now(), "the season has started")
+		T.Check(SeasonService:LevelOf(0) == 0 and SeasonService:LevelOf(100) == 1 and SeasonService:LevelOf(240) == 2, "levels follow the XP curve")
+		T.Check(SeasonService:LevelOf(1e9) == Config.Season.Levels, "the level is capped")
+		local ok = T.Server(function()
+			return SeasonService:Claim(me, "Free", 1)
+		end)
+		T.Check(not ok, "can't claim a level you haven't reached")
+		T.Server(function()
+			SeasonService:AddXp(me, "Admin", 100)
+		end)
+		T.Check(SeasonService:GetLevel(me) == 1 and me:GetAttribute("SeasonReady") == 1, "100 XP = level 1 with a reward waiting")
+		cash = data.Cash
+		ok = T.Server(function()
+			return SeasonService:Claim(me, "Free", 1)
+		end)
+		T.Check(ok and data.Cash > cash, "free level 1 pays")
+		ok = T.Server(function()
+			return SeasonService:Claim(me, "Free", 1)
+		end)
+		T.Check(not ok, "a reward can't be claimed twice")
+		ok = T.Server(function()
+			return SeasonService:Claim(me, "Premium", 1)
+		end)
+		T.Check(not ok, "the premium track needs the Season Pass")
+		T.Check(not (T.Server(function()
+			return SeasonService:Claim(me, "Nope", 1)
+		end)) and not (T.Server(function()
+			return SeasonService:Claim(me, "Free", 9999)
+		end)), "bad claims are refused")
+		me:SetAttribute("Pass_SeasonPass", true)
+		T.Server(function()
+			SeasonService:AddXp(me, "Admin", 30000)
+		end)
+		T.Check(SeasonService:GetLevel(me) == Config.Season.Levels, "plenty of XP reaches the top level")
+		local claimedAll = true
+		for level, reward in Config.Season.Premium do
+			local good = T.Server(function()
+				return SeasonService:Claim(me, "Premium", level)
+			end)
+			claimedAll = claimedAll and good
+			T.Wait(0.01)
+		end
+		T.Check(claimedAll, "every premium reward can be claimed with the pass")
+		for level in Config.Season.Free do
+			T.Server(function()
+				return SeasonService:Claim(me, "Free", level)
+			end)
+		end
+		T.Check(CosmeticService:GetState(me).Owned.Hat_Season and CosmeticService:GetState(me).Owned.Trail_Season, "season cosmetic rewards arrive")
+		T.Check(#data.Pets.Owned >= 3, "season pet rewards arrive (" .. #data.Pets.Owned .. ")")
+		T.Check(me:GetAttribute("SeasonReady") == 0, "nothing left to claim")
+		data.Season.Id = -4 -- an old season
+		local fresh = SeasonService:GetState(me)
+		T.Check(fresh.XP == 0 and fresh.Level == 0 and next(fresh.Free) == nil, "a new season starts from zero")
+		me:SetAttribute("Pass_SeasonPass", nil)
+
+		---------------- cosmetics ----------------
+		local function visuals(p)
+			local character = p.Character
+			return character:FindFirstChild("Cosmetic_Hat"), character:FindFirstChild("Cosmetic_Trail", true), character:FindFirstChild("Cosmetic_Aura", true)
+		end
+		data.Cash = 0
+		local bought = T.Server(function()
+			return CosmeticService:Buy(me, "Hat_Party")
+		end)
+		T.Check(not bought, "can't buy without cash")
+		data.Cash = 1e9
+		bought = T.Server(function()
+			return CosmeticService:Buy(me, "Hat_Party")
+		end)
+		T.Check(bought and data.Cosmetics.Owned.Hat_Party and data.Cash == 1e9 - Config.Cosmetics.ById.Hat_Party.Price, "buying with cash")
+		T.Check(not (T.Server(function()
+			return CosmeticService:Buy(me, "Hat_Party")
+		end)), "can't buy twice")
+		T.Check(not (T.Server(function()
+			return CosmeticService:Buy(me, "Hat_Season")
+		end)), "reward cosmetics can't be bought")
+		T.Check(not (T.Server(function()
+			return CosmeticService:Equip(me, "Trail_Flame")
+		end)), "can't wear what you don't own")
+		T.Check(T.Server(function()
+			return CosmeticService:Equip(me, "Hat_Party")
+		end), "equip")
+		local hat = visuals(me)
+		T.Check(hat ~= nil and #hat:GetChildren() >= 4, "the hat is built from parts (" .. tostring(hat and #hat:GetChildren()) .. ")")
+		for _, id in { "Trail_Flame", "Trail_Rainbow", "Aura_Sparkle", "Aura_Void", "Hat_Halo", "Hat_Horns", "Hat_TopHat", "Hat_Crown", "Hat_Wizard" } do
+			T.Server(function()
+				return CosmeticService:Buy(me, id)
+			end)
+			T.Check(data.Cosmetics.Owned[id], "bought " .. id .. " (Robux ones are simulated in Studio)")
+		end
+		for _, id in { "Trail_Rainbow", "Aura_Void" } do
+			T.Server(function()
+				return CosmeticService:Equip(me, id)
+			end)
+		end
+		local _, trail, aura = visuals(me)
+		T.Check(trail ~= nil and aura ~= nil, "trail and aura are on the character")
+		for _, id in { "Hat_Halo", "Hat_Horns", "Hat_TopHat", "Hat_Crown", "Hat_Wizard" } do
+			T.Server(function()
+				return CosmeticService:Equip(me, id)
+			end)
+			local worn = visuals(me)
+			T.Check(worn ~= nil and #worn:GetChildren() >= 2, id .. " builds")
+		end
+		T.Check(select(1, visuals(me)) ~= nil and #me.Character:GetChildren() < 40, "only one hat at a time")
+		T.Humanoid(me).Health = 0
+		T.Wait(7)
+		hat, trail, aura = visuals(me)
+		T.Check(hat ~= nil and trail ~= nil and aura ~= nil, "cosmetics come back after respawning")
+		T.Server(function()
+			return CosmeticService:Unequip(me, "Hat")
+		end)
+		T.Check(visuals(me) == nil, "unequip removes the hat")
+		T.Check(CosmeticService:GetState(me).Equipped.Hat == nil, "...and it is saved as off")
+		local shown = T.Client(function()
+			return { T.Remote("CosmeticsAction"):InvokeServer("Equip", "Hat_Crown") }
+		end)
+		T.Check(shown[1] == true, "equip works through the remote")
+		T.Check(CosmeticService:Take(me, "Hat_Crown") and visuals(me) == nil, "taking a cosmetic removes it from the character")
+		T.Check(select(1, T.Server(function()
+			return CosmeticService:Give(me, "Hat_Crown")
+		end)), "giving works")
+
+		---------------- live events ----------------
+		local function at(t)
+			EventService.Clock = function()
+				return t
+			end
+			EventService:Update()
+		end
+		local WED, HALLOWEEN, WINTER, NEWYEAR, SUMMER = 1773230400, 1793188800, 1797940800, 1798804800, 1783512000
+		at(WED)
+		T.Check(ws:GetAttribute("LiveEventMult") == 1 and #EventService:GetActive() == 0, "a normal Wednesday has no event")
+		local base = me:GetAttribute("Multiplier")
+		at(1773421200) -- Friday 17:00 UTC
+		T.Check(not EventService:IsActive("Weekend"), "the weekend starts at 18:00 on Friday")
+		at(1773424800) -- Friday 18:00
+		T.Check(EventService:IsActive("Weekend") and ws:GetAttribute("LiveEventMult") == 2, "Friday 18:00 starts the weekend bonus")
+		T.Check(math.abs(me:GetAttribute("Multiplier") - base * 2) < 1e-9, "everyone earns 2x (" .. tostring(me:GetAttribute("Multiplier")) .. ")")
+		at(1773615600) -- Sunday 23:00
+		T.Check(EventService:IsActive("Weekend"), "still on Sunday night")
+		at(1773622800) -- Monday 01:00
+		T.Check(not EventService:IsActive("Weekend") and ws:GetAttribute("LiveEventMult") == 1, "over on Monday")
+		T.Check(math.abs(me:GetAttribute("Multiplier") - base) < 1e-9, "the multiplier goes back")
+		at(HALLOWEEN)
+		T.Check(EventService:IsActive("Halloween") and not EventService:IsActive("Winter"), "Halloween event")
+		at(NEWYEAR)
+		T.Check(EventService:IsActive("Winter"), "the winter event runs over New Year")
+		at(WINTER)
+		T.Check(EventService:IsActive("Winter") and ws:GetAttribute("LiveEvents") == "Winter", "winter event")
+		at(SUMMER)
+		T.Check(EventService:IsActive("Summer") and ws:GetAttribute("LiveEventMult") == 1.5, "summer event is 1.5x")
+		at(WED)
+		-- event eggs
+		data.Cash = 1e12
+		local hatched, why = T.Server(function()
+			return PetService:Hatch(me, "Spooky")
+		end)
+		T.Check(not hatched, "the Spooky Egg can't be bought outside its event")
+		T.Check(select(1, T.Server(function()
+			return PetService:Hatch(me, "Basic")
+		end)), "normal eggs always work")
+		for _ = 1, 400 do
+			local pet = PetService:_roll(Config.Pets.Eggs[2], false)
+			if pet.Event then
+				T.Check(false, "a normal egg hatched an event pet: " .. pet.Id)
+				break
+			end
+		end
+		at(HALLOWEEN)
+		data.Pets.Owned = {}
+		data.Pets.Equipped = {}
+		hatched = T.Server(function()
+			return PetService:Hatch(me, "Spooky")
+		end)
+		T.Check(hatched, "the Spooky Egg works during Halloween")
+		T.Check(Config.PetById[data.Pets.Owned[1].Id].Event == "Halloween", "...and gives a Halloween pet")
+		local eggs = PetService:_state(me).Eggs
+		local spooky
+		for _, egg in eggs do
+			if egg.Id == "Spooky" then
+				spooky = egg
+			end
+		end
+		T.Check(spooky and spooky.Active == true, "the pet panel data marks the egg as on sale")
+		EventService:Force("Winter", true)
+		T.Check(EventService:IsActive("Winter"), ";event can force an event on")
+		EventService:Force("Winter", false)
+		EventService:Force("Halloween", false)
+		T.Check(not EventService:IsActive("Winter") and not EventService:IsActive("Halloween"), "...and off")
+		EventService:Force("Winter", nil)
+		EventService:Force("Halloween", nil)
+		local okEvent = T.Admin(me, ";event Summer on")
+		T.Check(okEvent and EventService:IsActive("Summer"), "the admin command ;event")
+		T.Admin(me, ";event Summer auto")
+		at(WED)
+		T.Check(not EventService:IsActive("Summer"), "auto follows the calendar again")
+
+		---------------- trading ----------------
+		data.Pets = { Owned = {}, Equipped = {}, NextUid = 1, Hatched = data.Pets.Hatched }
+		fdata.Pets = { Owned = {}, Equipped = {}, NextUid = 1, Hatched = 0 }
+		PetService:Give(me, "Dog", 3)
+		PetService:Give(me, "Dragon", 1)
+		PetService:Give(friend, "Cat", 2)
+		PetService:Equip(me, 4)
+		T.Check(select(1, T.Server(function()
+			return TradeService:Invite(me, friend.UserId)
+		end)), "invite")
+		T.Check(not (T.Server(function()
+			return TradeService:Invite(me, me.UserId)
+		end)), "can't trade with yourself")
+		T.Check(not (T.Server(function()
+			return TradeService:Add(me, 1)
+		end)), "can't add pets before the trade starts")
+		T.Check(select(1, T.Server(function()
+			return TradeService:Respond(friend, true)
+		end)), "accepting an invite starts the trade")
+		T.Check(#T.Sent(friend, "TradeUpdate") >= 1, "both players get the trade state")
+		T.Check(not (T.Server(function()
+			return TradeService:Add(me, 999)
+		end)), "can't offer a pet you don't have")
+		T.Check(select(1, T.Server(function()
+			return TradeService:Add(me, 4)
+		end)) and select(1, T.Server(function()
+			return TradeService:Add(friend, 1)
+		end)), "both offer a pet")
+		T.Check(not (T.Server(function()
+			return TradeService:Accept(me)
+		end)), "Accept is locked for a moment after a change")
+		T.Wait(Config.Trading.ConfirmDelay + 0.5)
+		T.Check(select(1, T.Server(function()
+			return TradeService:Accept(me)
+		end)), "first accept waits for the other")
+		T.Check(select(1, T.Server(function()
+			return TradeService:Add(friend, 2)
+		end)), "adding another pet...")
+		T.Check(not (T.Server(function()
+			return TradeService:Accept(friend)
+		end)), "...resets the delay")
+		T.Wait(Config.Trading.ConfirmDelay + 0.5)
+		T.Check(not data.Pets.Owned[1].Gone, "nothing moved yet")
+		T.Check(select(1, T.Server(function()
+			return TradeService:Accept(friend)
+		end)), "friend accepts")
+		T.Check(#data.Pets.Owned == 4 and #fdata.Pets.Owned == 2, "the accept before the change was reset - still waiting")
+		T.Check(select(1, T.Server(function()
+			return TradeService:Accept(me)
+		end)), "me accepts again")
+		T.Wait(0.5)
+		T.Check(#data.Pets.Owned == 5 and #fdata.Pets.Owned == 1, "pets swapped (" .. #data.Pets.Owned .. " / " .. #fdata.Pets.Owned .. ")")
+		local mineIds, theirIds = {}, {}
+		for _, pet in data.Pets.Owned do
+			table.insert(mineIds, pet.Id)
+		end
+		for _, pet in fdata.Pets.Owned do
+			table.insert(theirIds, pet.Id)
+		end
+		T.Check(table.find(theirIds, "Dragon") ~= nil and table.find(mineIds, "Cat") ~= nil and table.find(mineIds, "Dragon") == nil, "the right pets moved")
+		T.Check(#data.Pets.Equipped == 0, "a traded pet is unequipped for its old owner")
+		local uids = {}
+		for _, pet in data.Pets.Owned do
+			T.Check(not uids[pet.Uid], "uid " .. pet.Uid .. " is unique")
+			uids[pet.Uid] = true
+		end
+		T.Check((data.Stats.Trades or 0) == 1 and (fdata.Stats.Trades or 0) == 1, "trades are counted")
+		-- cancel, decline, leaving
+		T.Server(function()
+			TradeService:Invite(me, friend.UserId)
+			TradeService:Respond(friend, true)
+			TradeService:Add(me, data.Pets.Owned[1].Uid)
+			return TradeService:Cancel(friend)
+		end)
+		T.Check(select(1, T.Server(function()
+			return TradeService:Invite(me, friend.UserId)
+		end)), "a new trade can start after a cancel")
+		T.Server(function()
+			return TradeService:Respond(friend, false)
+		end)
+		T.Check(not (T.Server(function()
+			return TradeService:Add(me, data.Pets.Owned[1].Uid)
+		end)), "a declined invite starts nothing")
+		-- a full storage cancels the trade
+		fdata.Pets.Owned = {}
+		for i = 1, Config.Pets.MaxOwned do
+			table.insert(fdata.Pets.Owned, { Uid = 100 + i, Id = "Dog" })
+		end
+		T.Server(function()
+			TradeService:Invite(me, friend.UserId)
+			TradeService:Respond(friend, true)
+			TradeService:Add(me, data.Pets.Owned[1].Uid)
+		end)
+		T.Wait(Config.Trading.ConfirmDelay + 0.5)
+		local before = #data.Pets.Owned
+		T.Server(function()
+			TradeService:Accept(me)
+			return TradeService:Accept(friend)
+		end)
+		T.Check(#data.Pets.Owned == before, "a trade that would overfill someone's storage is cancelled")
+		-- the remote enforces its rate limit and types
+		local bad = T.Client(function()
+			return { T.Remote("TradeAction"):InvokeServer("Add", "x") }
+		end)
+		T.Check(bad[1] == false, "bad trade input is refused")
+
+		---------------- social ----------------
+		T.Engine.PrivateServer = true
+		DataService:RefreshMultiplier(me)
+		local vip = me:GetAttribute("Multiplier")
+		T.Engine.PrivateServer = false
+		DataService:RefreshMultiplier(me)
+		T.Check(math.abs(vip / me:GetAttribute("Multiplier") - 1 + Config.Social.PrivateServerBonus * -1 - 0) < 1e-6 or math.abs(vip / me:GetAttribute("Multiplier") - (1 + Config.Social.PrivateServerBonus)) < 1e-6, "private servers earn +" .. Config.Social.PrivateServerBonus * 100 .. "%")
+		local claim = T.Server(function()
+			return SocialService:ClaimGroup(me)
+		end)
+		T.Check(not claim, "no group reward while no group is set")
+		Config.Social.GroupId = 5555
+		claim = T.Server(function()
+			return SocialService:ClaimGroup(me)
+		end)
+		T.Check(not claim, "can't claim without being in the group")
+		T.Engine.Groups[me.UserId] = { [5555] = true }
+		cash = data.Cash
+		claim = T.Server(function()
+			return SocialService:ClaimGroup(me)
+		end)
+		T.Check(claim and data.Cash > cash and data.Social.Group, "group members get the reward")
+		T.Check(not (T.Server(function()
+			return SocialService:ClaimGroup(me)
+		end)), "only once")
+		Config.Social.GroupId = 0
+
+		---------------- tutorial ----------------
+		T.Check(me:GetAttribute("TutorialDone") ~= nil, "the tutorial flag is set")
+		data.Tutorial.Done = false
+		data.Purchased = { F1_1 = true }
+		data.Stats.Upgrades = 0
+		data.Wheel.Spins = 0
+		data.DailyStreak = 0
+		cash = data.Cash
+		T.Client(function()
+			T.Remote("TutorialClaim"):FireServer()
+		end)
+		T.Wait(0.5)
+		T.Check(not data.Tutorial.Done and data.Cash == cash, "the tutorial can't be skipped by faking the client")
+		data.Stats.Upgrades = Config.Tutorial.BuyUpgrades
+		data.Wheel.Spins = 1
+		data.DailyStreak = 1
+		T.Client(function()
+			T.Remote("TutorialClaim"):FireServer()
+		end)
+		T.Wait(0.5)
+		T.Check(data.Tutorial.Done and data.Cash > cash and me:GetAttribute("TutorialDone") == true, "finishing it pays")
+		cash = data.Cash
+		T.Client(function()
+			T.Remote("TutorialClaim"):FireServer()
+		end)
+		T.Wait(0.5)
+		T.Check(data.Cash == cash, "...once")
+
+		---------------- boards ----------------
+		local boards = T.Client(function()
+			return { T.Remote("BoardsGet"):InvokeServer() }
+		end)[1]
+		T.Check(boards and #boards.Earned >= 1 and #boards.Rebirths >= 1 and #boards.Hatched >= 1, "the boards list the players here")
+	end,
+})
+
+table.insert(Scenarios, {
+	Name = "new_panels",
+	MaxSeconds = 600,
+	Run = function(T, place)
+		local game, me = T.Boot(place, { Name = "Ui", UserId = 7200, Achievements = true, LiveEvents = true, Tutorial = true })
+		local friend = T.AddPlayer("Pal", { UserId = 7201 })
+		T.Wait(9)
+		local Config = T.Shared("Config")
+		local DataService = T.Service("DataService")
+		local TycoonService = T.Service("TycoonService")
+		local SeasonService = T.Service("SeasonService")
+		local EventService = T.Service("EventService")
+		local PetService = T.Service("PetService")
+		local TradeService = T.Service("TradeService")
+		local UI = T.Controller("UI")
+		local ws = game:GetService("Workspace")
+		local data = DataService:Get(me)
+		local gui = me.PlayerGui
+		local function click(button)
+			T.Client(function()
+				T.Engine.Click(button)
+			end)
+			T.Wait(0.6)
+		end
+		local function openFromMenu(icon, panel)
+			local more = T.FindButton(gui, "➕")
+			T.Check(more ~= nil, "the MORE button exists")
+			click(more)
+			local button = T.FindButton(gui, icon)
+			T.Check(button ~= nil, "MORE lists " .. icon)
+			if button then
+				click(button)
+			end
+			T.Check(UI.Current == panel, panel .. " opens from the menu (current: " .. tostring(UI.Current) .. ")")
+		end
+		local function close()
+			T.Client(function()
+				UI:Close()
+			end)
+			T.Wait(0.3)
+		end
+
+		---------------- the menu ----------------
+		T.Check(T.FindButton(gui, "🛒") ~= nil and T.FindButton(gui, "🐾") ~= nil, "the main menu buttons are on screen")
+		T.Check(T.FindButton(gui, "🎫") == nil, "the extra buttons are hidden until MORE is pressed")
+		local menuScale
+		for _, d in gui:GetDescendants() do
+			if d.Name == "Menu" and d:IsA("Frame") then
+				menuScale = d:FindFirstChildOfClass("UIScale")
+			end
+		end
+		T.Check(menuScale ~= nil, "the menu has a scale")
+		local before = menuScale.Scale
+		me:SetAttribute("UISize", 1.4)
+		T.Wait(0.3)
+		T.Check(menuScale.Scale > before * 1.3, "the UI size setting scales the menu (" .. before .. " -> " .. menuScale.Scale .. ")")
+		T.Client(function()
+			T.Remote("SaveSettings"):FireServer({ UISize = 99 })
+		end)
+		T.Wait(0.3)
+		T.Check(data.Settings.UISize == 1.5, "the saved UI size is clamped")
+		me:SetAttribute("UISize", 1)
+
+		---------------- achievements ----------------
+		data.Stats.Upgrades = 50
+		T.Service("AchievementService"):Check(me)
+		openFromMenu("🏆", "Achievements")
+		T.Wait(0.6)
+		T.Check(T.FindText(gui, "unlocked") ~= nil, "the achievements panel shows the total")
+		T.Check(T.FindText(gui, "COMPLETE") == nil and T.FindText(gui, "Builder") ~= nil, "...and the next goal of each group")
+		close()
+
+		---------------- season ----------------
+		T.Server(function()
+			SeasonService:AddXp(me, "Admin", 300)
+		end)
+		T.Check(me:GetAttribute("SeasonReady") ~= nil and me:GetAttribute("SeasonReady") >= 1, "rewards are waiting")
+		openFromMenu("🎫", "Season")
+		T.Wait(0.8)
+		T.Check(T.FindText(gui, "Season of") ~= nil, "the season panel shows its name")
+		local claimButton = T.FindButton(gui, "^CLAIM$")
+		T.Check(claimButton ~= nil, "a CLAIM button is available")
+		local cash = data.Cash
+		if claimButton then
+			click(claimButton)
+		end
+		T.Check(data.Cash > cash, "claiming from the panel pays")
+		T.Check(T.FindButton(gui, "GET SEASON PASS") ~= nil, "the pass button is shown to free players")
+		close()
+
+		---------------- style ----------------
+		data.Cash = 1e7
+		openFromMenu("✨", "Style")
+		T.Wait(0.6)
+		local buy = T.FindButton(gui, "%$40")
+		T.Check(buy ~= nil, "the Flame Trail shows its price")
+		for _, kind in Config.Cosmetics.Kinds do
+			T.Check(T.FindButton(gui, kind.Name:upper()) ~= nil, kind.Name .. " tab")
+		end
+		if buy then
+			click(buy)
+		end
+		T.Check(data.Cosmetics.Owned.Trail_Flame == true, "buying from the panel works")
+		local wear = T.FindButton(gui, "^WEAR$")
+		T.Check(wear ~= nil, "...then it can be worn")
+		if wear then
+			click(wear)
+		end
+		T.Check(data.Cosmetics.Equipped.Trail == "Trail_Flame" and T.FindButton(gui, "WEARING") ~= nil, "wearing from the panel works")
+		click(T.FindButton(gui, "HATS"))
+		T.Check(T.FindText(gui, "Party Hat") ~= nil, "the Hats tab lists hats")
+		close()
+
+		---------------- pets: event eggs hidden ----------------
+		local petsFrame
+		for _, d in gui:GetDescendants() do
+			if d.Name == "EggSpooky" then
+				petsFrame = d
+			end
+		end
+		T.Check(petsFrame ~= nil and not petsFrame.Visible, "the Spooky Egg is hidden outside its event")
+		EventService:Force("Halloween", true)
+		T.Server(function()
+			PetService:Resync(me)
+		end)
+		T.Wait(0.5)
+		T.Check(petsFrame ~= nil and petsFrame.Visible, "...and shown during it")
+		local hud = T.FindText(gui, "Spooky Season")
+		T.Check(hud ~= nil, "the HUD announces the live event")
+		EventService:Force("Halloween", nil)
+
+		---------------- stats and boards ----------------
+		openFromMenu("📊", "Stats")
+		T.Wait(0.6)
+		T.Check(T.FindText(gui, "Time played") ~= nil and T.FindText(gui, "Achievements") ~= nil, "the stats page lists the numbers")
+		close()
+		openFromMenu("🏅", "Boards")
+		T.Wait(0.6)
+		T.Check(T.FindButton(gui, "RICHEST") ~= nil and T.FindText(gui, "Ui") ~= nil, "the leaderboards show the players")
+		click(T.FindButton(gui, "REBIRTHS"))
+		close()
+
+		---------------- social ----------------
+		openFromMenu("🌐", "Social")
+		T.Wait(0.6)
+		T.Check(T.FindText(gui, "Group reward") ~= nil and T.FindText(gui, "Private") ~= nil, "the social panel has its sections")
+		T.Check(T.FindButton(gui, "INVITE") ~= nil, "...and an invite button")
+		close()
+
+		---------------- trade ----------------
+		PetService:Give(me, "Dog", 2)
+		PetService:Give(friend, "Cat", 1)
+		T.Server(function()
+			PetService:Resync(me)
+		end)
+		T.Wait(0.5)
+		openFromMenu("🤝", "Trade")
+		T.Wait(0.5)
+		local tradeButton = T.FindButton(gui, "TRADE$")
+		T.Check(tradeButton ~= nil and T.FindText(gui, "Pal") ~= nil, "the trade panel lists other players")
+		if tradeButton then
+			click(tradeButton)
+		end
+		T.Check(#T.Sent(friend, "TradeInvited") >= 1, "pressing TRADE sends the other player a request")
+		T.Server(function()
+			return TradeService:Respond(friend, false)
+		end)
+		close()
+		T.Server(function()
+			TradeService:Invite(friend, me.UserId)
+		end)
+		T.Wait(1)
+		local acceptPopup = T.FindButton(gui, "✅ YES")
+		T.Check(acceptPopup ~= nil, "a trade request pops up")
+		if acceptPopup then
+			click(acceptPopup)
+		end
+		T.Wait(1)
+		T.Check(UI.Current == "Trade", "accepting opens the trade window")
+		T.Check(T.FindText(gui, "YOUR OFFER") ~= nil and T.FindText(gui, "Pal") ~= nil, "both offers are shown")
+		local petCard
+		for _, b in T.Buttons(gui) do
+			if b:IsA("TextButton") and b.Text == "" and b.Parent and b.Parent.Name ~= "Content" and T.IsShown(b) then
+				petCard = petCard or b
+			end
+		end
+		T.Check(petCard ~= nil, "my pets are listed")
+		if petCard then
+			click(petCard)
+		end
+		T.Check(select(1, T.Server(function()
+			return TradeService:Add(friend, 1)
+		end)), "the other player offers a pet")
+		T.Wait(0.8)
+		T.Check(T.FindButton(gui, "ACCEPT %(") ~= nil, "Accept shows a countdown after a change")
+		T.Wait(Config.Trading.ConfirmDelay + 1)
+		local accept = T.FindButton(gui, "✅ ACCEPT")
+		T.Check(accept ~= nil, "then Accept is ready")
+		if accept then
+			click(accept)
+		end
+		T.Check(T.FindButton(gui, "WAITING") ~= nil, "waiting for the other side")
+		T.Server(function()
+			return TradeService:Accept(friend)
+		end)
+		T.Wait(1)
+		local cats = 0
+		for _, pet in data.Pets.Owned do
+			cats += pet.Id == "Cat" and 1 or 0
+		end
+		T.Check(cats == 1, "the trade completed and I got the Cat")
+		T.Check(T.FindButton(gui, "✅ ACCEPT") == nil and T.FindButton(gui, "TRADE$") ~= nil, "the window goes back to the player list")
+		close()
+
+		---------------- tutorial ----------------
+		local banner
+		for _, d in gui:GetDescendants() do
+			if d.Name == "Tutorial" and d:IsA("Frame") then
+				banner = d
+			end
+		end
+		T.Check(banner ~= nil and banner.Visible, "the tutorial banner is up for a new player")
+		T.Check(T.FindText(gui, "1/3") ~= nil or T.FindText(gui, "2/3") ~= nil or T.FindText(gui, "3/3") ~= nil, "it shows a step")
+		data.Tutorial.Done = false
+		me:SetAttribute("TutorialDone", false)
+		T.Client(function()
+			T.Remote("SpinWheel"):InvokeServer()
+		end)
+		T.Client(function()
+			T.Remote("ClaimDaily"):InvokeServer()
+		end)
+		DataService:AddCash(me, 1e6, false)
+		for _ = 1, 3 do
+			local target
+			for _, item in T.Shared("TycoonItems").List do
+				if item.Cost > 0 and item.Kind ~= "Secret" and T.Shared("TycoonItems").IsAvailable(item, data.Purchased) then
+					target = item
+					break
+				end
+			end
+			TycoonService:TryPurchase(me, target.Id)
+		end
+		T.Wait(5)
+		T.Check(data.Tutorial.Done == true, "finishing every step completes the tutorial")
+		T.Check(T.FindText(gui, "Well done") ~= nil or not banner.Visible, "the banner says well done")
 	end,
 })
 

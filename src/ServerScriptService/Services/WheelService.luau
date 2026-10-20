@@ -67,6 +67,9 @@ function WheelService:Spin(player: Player): (boolean, number, string)
 	local cash, boost = self:GetPrize(player, segment)
 	data.Wheel.Last = os.time()
 	data.Wheel.Spins += 1
+	if S.ProgressService then
+		S.ProgressService:Record(player, "Spin")
+	end
 	self:_sync(player)
 	if cash > 0 then
 		S.DataService:AddCash(player, cash, false)

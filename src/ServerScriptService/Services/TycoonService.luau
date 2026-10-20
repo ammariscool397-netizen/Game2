@@ -825,6 +825,9 @@ function TycoonService:TryPurchase(player: Player, itemId: string, silent: boole
 	end
 	S.DataService:SpendCash(plot.Owner, price)
 	data.Purchased[itemId] = true
+	if S.ProgressService then
+		S.ProgressService:Record(plot.Owner, "Upgrade")
+	end
 
 	local button = plot.ButtonObjs[itemId]
 	if button and not silent then
@@ -943,6 +946,9 @@ function TycoonService:Rebirth(player: Player, free: boolean?)
 	end
 	local rankBefore = Config.RebirthRank(data.Rebirths)
 	data.Rebirths += 1
+	if S.ProgressService then
+		S.ProgressService:Record(player, "Rebirth")
+	end
 	data.Cash = Config.StartingCash + Config.RebirthPerk(data.Rebirths, "Start")
 	data.Vault = 0
 	data.Purchased = { F1_1 = true }

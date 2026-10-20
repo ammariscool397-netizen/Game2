@@ -27,6 +27,10 @@ local boostLabel: TextLabel
 local floorLabel: TextLabel
 local repairFrame: Frame
 local repairLabel: TextLabel
+local liveById = {}
+for _, event in Config.LiveEvents.List do
+	liveById[event.Id] = event
+end
 local menuButtons: { [string]: TextButton } = {}
 local moreNames: { [string]: boolean } = {}
 local badgeOn: { [string]: boolean } = {}
@@ -189,7 +193,7 @@ function HUD:Init(controllers)
 
 	local morePanel = UIKit.new("Frame", {
 		Name = "MorePanel",
-		Size = UDim2.fromOffset(170, 440),
+		Size = UDim2.fromOffset(250, 500),
 		Position = UDim2.new(0, 96, 0.5, 0),
 		AnchorPoint = Vector2.new(0, 0.5),
 		BackgroundColor3 = Theme.Panel,
@@ -205,16 +209,18 @@ function HUD:Init(controllers)
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		Parent = morePanel,
 	})
-	moreGrid.FillDirectionMaxCells = 2
+	moreGrid.FillDirectionMaxCells = 3
 	moreGrid.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	moreGrid.VerticalAlignment = Enum.VerticalAlignment.Center
 	local moreScale = UIKit.new("UIScale", { Parent = morePanel })
 	local function rescale()
+		-- fits the screen, a little bigger for fingers, and the player's UI size setting
 		local vp = workspace.CurrentCamera.ViewportSize
-		local scale = math.clamp(vp.Y / 860, 0.55, 1.1)
+		local scale = math.clamp(vp.Y / 860, 0.55, 1.1) * (UIKit.IsTouch() and 1.15 or 1) * math.clamp(tonumber(player:GetAttribute("UISize")) or 1, 0.7, 1.5)
 		menuScale.Scale, moreScale.Scale = scale, scale
 	end
 	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
+	player:GetAttributeChangedSignal("UISize"):Connect(rescale)
 	rescale()
 
 	local main = {
@@ -225,6 +231,13 @@ function HUD:Init(controllers)
 		{ "Daily", "🎁", "DAILY", Color3.fromRGB(255, 90, 120) },
 	}
 	local more = {
+		{ "Season", "🎫", "SEASON", Color3.fromRGB(255, 140, 40) },
+		{ "Style", "✨", "STYLE", Color3.fromRGB(255, 100, 190) },
+		{ "Achievements", "🏆", "GOALS", Color3.fromRGB(255, 196, 0) },
+		{ "Trade", "🤝", "TRADE", Color3.fromRGB(0, 200, 255) },
+		{ "Social", "🌐", "SOCIAL", Color3.fromRGB(70, 160, 255) },
+		{ "Boards", "🏅", "RANKS", Color3.fromRGB(255, 190, 40) },
+		{ "Stats", "📊", "STATS", Color3.fromRGB(90, 160, 255) },
 		{ "Duo", "👥", "DUO", Color3.fromRGB(0, 190, 255) },
 		{ "Floors", "🛗", "FLOORS", Color3.fromRGB(0, 160, 220) },
 		{ "Wheel", "🎰", "WHEEL", Color3.fromRGB(255, 120, 60) },
@@ -334,6 +347,15 @@ function HUD:Refresh()
 	local boostEnd = player:GetAttribute("BoostEnd") or 0
 	if boostEnd > now then
 		table.insert(parts, "🚀 2x Boost " .. Util.Clock(boostEnd - now))
+	end
+	local live = workspace:GetAttribute("LiveEvents")
+	if type(live) == "string" and live ~= "" then
+		for id in live:gmatch("[^,]+") do
+			local event = liveById[id]
+			if event then
+				table.insert(parts, event.Icon .. " " .. event.Name .. " " .. event.Multiplier .. "x")
+			end
+		end
 	end
 	local eventMult = workspace:GetAttribute("EventMultiplier") or 1
 	local eventEnds = workspace:GetAttribute("EventEnds") or 0

@@ -2,10 +2,16 @@
 	LeaderboardService - global "Top Earners" board in the lobby
 	(OrderedDataStore, refreshes every 2 minutes).
 ]]
+local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Util = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Util"))
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local Remotes = require(Shared.Remotes)
+
+local BC = Config.Boards
 
 local LeaderboardService = {}
 local S
@@ -26,8 +32,92 @@ local function abbreviate(n: number): string
 	return Util.Money(n)
 end
 
+local boardStores: { [string]: OrderedDataStore } = {}
+pcall(function()
+	for name, storeName in BC.Stores do
+		boardStores[name] = DataStoreService:GetOrderedDataStore(storeName)
+	end
+end)
+
+-- the in-game boards: { Earned = rows, Rebirths = rows, Hatched = rows }, a row is { Name, Value, UserId }
+local boards = { Earned = {}, Rebirths = {}, Hatched = {}, Updated = 0 }
+
+-- rows from the players in this server (used when the DataStores are not available)
+local function onlineRows(valueOf: (any) -> number)
+	local rows = {}
+	for _, player in Players:GetPlayers() do
+		local data = S.DataService:Get(player)
+		if data then
+			table.insert(rows, { Name = player.DisplayName, Value = valueOf(data), UserId = player.UserId })
+		end
+	end
+	table.sort(rows, function(a, b)
+		return a.Value > b.Value
+	end)
+	return rows
+end
+
+local function readStore(store: OrderedDataStore?, decode: ((number) -> number)?)
+	local rows = {}
+	if store then
+		local ok, pages = pcall(function()
+			return store:GetSortedAsync(false, BC.Top)
+		end)
+		if ok and pages then
+			for _, entry in pages:GetCurrentPage() do
+				local userId = tonumber(entry.key)
+				if userId and entry.value > 0 then
+					table.insert(rows, { Name = nameFor(userId), Value = decode and decode(entry.value) or entry.value, UserId = userId })
+				end
+			end
+		end
+	end
+	return rows
+end
+
+function LeaderboardService:RefreshBoards()
+	if not BC.Enabled then
+		return
+	end
+	-- publish what's in this server, then read the top lists
+	for _, player in Players:GetPlayers() do
+		local data = S.DataService:Get(player)
+		if data then
+			if boardStores.Rebirths then
+				pcall(boardStores.Rebirths.SetAsync, boardStores.Rebirths, tostring(player.UserId), data.Rebirths)
+			end
+			if boardStores.Hatched then
+				pcall(boardStores.Hatched.SetAsync, boardStores.Hatched, tostring(player.UserId), data.Pets.Hatched)
+			end
+		end
+	end
+	local earned = readStore(S.DataService:GetEarnedStore(), S.DataService.DecodeEarned)
+	local rebirths = readStore(boardStores.Rebirths)
+	local hatched = readStore(boardStores.Hatched)
+	boards.Earned = #earned > 0 and earned or onlineRows(function(d)
+		return d.TotalEarned
+	end)
+	boards.Rebirths = #rebirths > 0 and rebirths or onlineRows(function(d)
+		return d.Rebirths
+	end)
+	boards.Hatched = #hatched > 0 and hatched or onlineRows(function(d)
+		return d.Pets.Hatched
+	end)
+	boards.Updated = os.time()
+end
+
+function LeaderboardService:GetBoards()
+	if boards.Updated == 0 then
+		Util.Try("Boards", self.RefreshBoards, self)
+	end
+	return boards
+end
+
 function LeaderboardService:Init(services)
 	S = services
+	Remotes.BoardsGet.OnServerInvoke = function()
+		return self:GetBoards()
+	end
 end
 
 function LeaderboardService:_render(rows)
@@ -110,8 +200,13 @@ end
 
 function LeaderboardService:Start()
 	task.wait(5)
+	local lastBoards = 0
 	while true do
 		Util.Try("Leaderboard", self.Refresh, self)
+		if os.clock() - lastBoards >= BC.RefreshSeconds then
+			lastBoards = os.clock()
+			Util.Try("Boards", self.RefreshBoards, self)
+		end
 		task.wait(REFRESH)
 	end
 end

@@ -1188,6 +1188,13 @@ end)
 prop("DataModel", "JobId", function()
 	return "sim-job"
 end)
+-- tests can make this a private (VIP) server: Engine.PrivateServer = true
+prop("DataModel", "PrivateServerId", function()
+	return Engine.PrivateServer and "sim-private" or ""
+end)
+prop("DataModel", "PrivateServerOwnerId", function()
+	return Engine.PrivateServer and 1 or 0
+end)
 
 method("RunService", "IsStudio", function()
 	return Engine.Studio
@@ -1288,8 +1295,12 @@ method("Player", "GetRankInGroup", function(_, groupId)
 	assert(type(groupId) == "number", "GetRankInGroup expects a number")
 	return 0
 end)
-method("Player", "IsInGroup", function()
-	return false
+-- group membership for tests: Engine.Groups[userId] = { [groupId] = true }
+Engine.Groups = {}
+method("Player", "IsInGroup", function(self, groupId)
+	assert(type(groupId) == "number", "IsInGroup expects a number")
+	local mine = Engine.Groups[self.UserId]
+	return mine ~= nil and mine[groupId] == true
 end)
 -- friendships for tests: Engine.Friends[userId] = { [otherUserId] = true }
 Engine.Friends = {}

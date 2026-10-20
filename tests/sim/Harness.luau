@@ -113,6 +113,12 @@ function Harness.Boot(placePath: string, opts)
 	-- the anti-cheat only runs in scenarios that ask for it (opts.AntiCheat): other
 	-- scenarios teleport characters around instantly, which it would rightly flag
 	Harness.Shared("Config").AntiCheat.Enabled = opts.AntiCheat == true
+	-- achievements, calendar events and the tutorial pay cash / change the multiplier at
+	-- unpredictable moments: only scenarios that ask for them (opts.Achievements, opts.LiveEvents,
+	-- opts.Tutorial) get them, so the other scenarios' exact cash checks stay exact
+	Harness.Shared("Config").Achievements.Enabled = opts.Achievements == true
+	Harness.Shared("Config").LiveEvents.Enabled = opts.LiveEvents == true
+	Harness.Shared("Config").Tutorial.Enabled = opts.Tutorial == true
 	if opts.Setup then
 		-- runs before any game script: tweak Config (server copy) etc.
 		local previous = Engine.Context

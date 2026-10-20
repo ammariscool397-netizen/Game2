@@ -230,6 +230,7 @@ end
 -- Command registry
 ---------------------------------------------------------------------------
 local function register(def)
+	def.Aliases = def.Aliases or {}
 	table.insert(commands, def)
 	byName[def.Name:lower()] = def
 	for _, alias in def.Aliases or {} do
@@ -1164,6 +1165,102 @@ local function buildCommands()
 		end,
 	})
 
+	register({
+		Name = "givecosmetic",
+		Aliases = { "cosmetic" },
+		Rank = 3,
+		Args = "<player> <cosmetic id>",
+		Desc = "Give a cosmetic (trail / aura / hat) for free",
+		Run = function(executor, args)
+			local id
+			for key in Config.Cosmetics.ById do
+				if args[2] and key:lower() == args[2]:lower() then
+					id = key
+				end
+			end
+			if not id then
+				local ids = {}
+				for key in Config.Cosmetics.ById do
+					table.insert(ids, key)
+				end
+				table.sort(ids)
+				return "Unknown cosmetic. Ids: " .. table.concat(ids, ", ")
+			end
+			local affected = eachTarget(executor, args[1], false, function(target)
+				S.CosmeticService:Give(target, id, true)
+			end)
+			return "Gave " .. id .. " to " .. namesOf(affected)
+		end,
+	})
+	register({
+		Name = "takecosmetic",
+		Rank = 3,
+		Args = "<player> <cosmetic id>",
+		Desc = "Take a cosmetic away",
+		Run = function(executor, args)
+			local id
+			for key in Config.Cosmetics.ById do
+				if args[2] and key:lower() == args[2]:lower() then
+					id = key
+				end
+			end
+			if not id then
+				return "Unknown cosmetic"
+			end
+			local affected = eachTarget(executor, args[1], false, function(target)
+				S.CosmeticService:Take(target, id)
+			end)
+			return "Took " .. id .. " from " .. namesOf(affected)
+		end,
+	})
+	register({
+		Name = "addxp",
+		Rank = 3,
+		Args = "<player> <amount>",
+		Desc = "Give Season XP",
+		Run = function(executor, args)
+			local amount = parseAmount(args[2])
+			if not amount or amount <= 0 or amount > 1e6 then
+				return "Give an amount between 1 and 1m"
+			end
+			local affected = eachTarget(executor, args[1], false, function(target)
+				S.SeasonService:AddXp(target, "Admin", amount)
+			end)
+			return "Gave " .. amount .. " Season XP to " .. namesOf(affected)
+		end,
+	})
+	register({
+		Name = "event",
+		Aliases = { "liveevent" },
+		Rank = 3,
+		Args = "<list | event id> [on|off|auto]",
+		Desc = "Start / stop a live event (Weekend, Halloween, Winter, Summer) or list them",
+		Run = function(executor, args)
+			if not args[1] or args[1]:lower() == "list" then
+				local lines = {}
+				for _, event in Config.LiveEvents.List do
+					table.insert(lines, event.Id .. (S.EventService:IsActive(event.Id) and " (ON)" or ""))
+				end
+				return "Events: " .. table.concat(lines, ", ")
+			end
+			local event
+			for _, candidate in Config.LiveEvents.List do
+				if candidate.Id:lower() == args[1]:lower() then
+					event = candidate
+				end
+			end
+			if not event then
+				return "Unknown event. Try ;event list"
+			end
+			local mode = (args[2] or "on"):lower()
+			if mode == "auto" then
+				S.EventService:Force(event.Id, nil)
+				return event.Id .. " follows the calendar again"
+			end
+			S.EventService:Force(event.Id, mode ~= "off")
+			return event.Id .. (mode == "off" and " turned off" or " turned on")
+		end,
+	})
 	register({
 		Name = "title",
 		Aliases = { "settitle", "nick" },

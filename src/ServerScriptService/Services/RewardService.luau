@@ -31,6 +31,9 @@ function RewardService:Init(services)
 		if Util.IsFinite(settings.MusicVolume) then
 			data.Settings.MusicVolume = math.clamp(settings.MusicVolume, 0, 1)
 		end
+		if Util.IsFinite(settings.UISize) then
+			data.Settings.UISize = math.clamp(settings.UISize, 0.7, 1.5)
+		end
 		if type(settings.SFX) == "boolean" then
 			data.Settings.SFX = settings.SFX
 		end
@@ -80,6 +83,9 @@ function RewardService:ClaimDaily(player: Player): (boolean, string)
 	local amount = self:GetDailyReward(player, data.DailyStreak)
 	S.DataService:AddCash(player, amount, false)
 	S.DataService:Sync(player)
+	if S.ProgressService then
+		S.ProgressService:Record(player, "Daily")
+	end
 	Remotes.VFX:FireClient(player, "Confetti", {})
 	Remotes.VFX:FireClient(player, "CashBurst", { Amount = amount })
 	return true, "Day " .. data.DailyStreak .. " reward: +" .. Util.Money(amount) .. "!"

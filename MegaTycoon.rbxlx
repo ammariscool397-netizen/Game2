@@ -764,6 +764,15 @@ Config.GamePasses = {
 		Color = Color3.fromRGB(200, 90, 255),
 		Order = 15,
 	},
+	SeasonPass = {
+		Id = 0,
+		Name = "Season Pass",
+		Description = "Unlocks the premium reward track of the Season (cosmetics, pets, big cash).",
+		PriceHint = 399,
+		Icon = "🎫",
+		Color = Color3.fromRGB(255, 140, 40),
+		Order = 17,
+	},
 	GiftBoost = {
 		Id = 0,
 		Name = "Gift Boost",
@@ -800,6 +809,7 @@ Config.GiftProducts = {
 	ShieldPro = 0,
 	RebirthBoost = 0,
 	GiftBoost = 0,
+	SeasonPass = 0,
 	-- cash packs and boosts
 	CashSmall = 0,
 	CashMedium = 0,
@@ -949,8 +959,8 @@ Config.Admin = {
 		{ Id = "Moderation", Name = "Kick & ban", Icon = "🔨", Desc = "kick, ban, unban, strikes", Commands = { "kick", "ban", "unban", "strikes", "clearstrikes" } },
 		{ Id = "Disasters", Name = "Disasters", Icon = "☢️", Desc = "Start any disaster (nuke, tornado...), repair and wreck towers", Commands = { "nuke", "meteors", "tornado", "ufo", "earthquake", "disaster", "stopdisaster", "wreck", "repair" } },
 		{ Id = "Economy", Name = "Cash & progress", Icon = "💰", Desc = "givecash, rebirths, unlock floors, secrets, duo", Commands = { "givecash", "setcash", "takecash", "giverebirth", "rebirth", "unlockall", "unlockfloor", "givesecrets", "resetsecrets", "duo", "unduo" } },
-		{ Id = "Passes", Name = "Give passes & pets", Icon = "🎁", Desc = "givepass, removepass, givepet", Commands = { "givepass", "removepass", "givepet" } },
-		{ Id = "Events", Name = "Events & world", Icon = "🎉", Desc = "cash rain, 2x events, minigames, time, music, announcements", Commands = { "cashrain", "doublecash", "minigame", "time", "m", "music", "stopmusic", "confetti" } },
+		{ Id = "Passes", Name = "Give passes & pets", Icon = "🎁", Desc = "givepass, removepass, givepet", Commands = { "givepass", "removepass", "givepet", "givecosmetic", "takecosmetic" } },
+		{ Id = "Events", Name = "Events & world", Icon = "🎉", Desc = "cash rain, 2x events, minigames, time, music, announcements", Commands = { "cashrain", "doublecash", "minigame", "time", "m", "music", "stopmusic", "confetti", "event", "addxp" } },
 		{ Id = "Fun", Name = "Fun effects", Icon = "✨", Desc = "explode, giant, tiny, sparkles, fire, invisible...", Commands = { "explode", "giant", "tiny", "normal", "sparkles", "fire", "smoke", "unfx", "invisible", "visible", "fling", "launch" } },
 		{ Id = "Titles", Name = "Give titles", Icon = "🏷️", Desc = "Set glowing titles above players' heads", Commands = { "title", "cleartitle" } },
 		{ Id = "AdminTools", Name = "All Admin commands", Icon = "⭐", Desc = "Everything an Admin can do (Mod + Admin ranks)", MaxRank = 2 },
@@ -1212,6 +1222,10 @@ Config.Pets = {
 		{ Id = "Basic", Name = "Basic Egg", Icon = "🥚", IncomeSeconds = 300, MinCash = 2_000, Weights = { Common = 70, Uncommon = 25, Rare = 5 } },
 		{ Id = "Golden", Name = "Golden Egg", Icon = "🌟", IncomeSeconds = 1_800, MinCash = 40_000, Weights = { Uncommon = 40, Rare = 40, Epic = 17, Legendary = 3 } },
 		{ Id = "Cosmic", Name = "Cosmic Egg", Icon = "🪐", IncomeSeconds = 7_200, MinCash = 800_000, Weights = { Epic = 60, Legendary = 35, Mythic = 5 } },
+		-- event eggs: only for sale while their live event runs (Config.LiveEvents). The pets stay yours.
+		{ Id = "Spooky", Name = "Spooky Egg", Icon = "🎃", IncomeSeconds = 1_200, MinCash = 30_000, Event = "Halloween", Weights = { Rare = 55, Epic = 35, Legendary = 10 } },
+		{ Id = "Frosty", Name = "Frosty Egg", Icon = "🧊", IncomeSeconds = 1_200, MinCash = 30_000, Event = "Winter", Weights = { Rare = 55, Epic = 35, Legendary = 10 } },
+		{ Id = "Beach", Name = "Beach Egg", Icon = "🏖️", IncomeSeconds = 1_200, MinCash = 30_000, Event = "Summer", Weights = { Rare = 55, Epic = 35, Legendary = 10 } },
 	},
 	List = {
 		{ Id = "Dog", Name = "Dog", Icon = "🐶", Rarity = "Common" },
@@ -1236,6 +1250,15 @@ Config.Pets = {
 		{ Id = "Alien", Name = "Cosmic Alien", Icon = "👽", Rarity = "Mythic" },
 		{ Id = "Mecha", Name = "Mecha King", Icon = "🤖", Rarity = "Mythic" },
 		{ Id = "Crown", Name = "Golden Crown", Icon = "👑", Rarity = "Mythic" },
+		{ Id = "Ghost", Name = "Friendly Ghost", Icon = "👻", Rarity = "Rare", Event = "Halloween" },
+		{ Id = "Pumpkin", Name = "Jack-o-Lantern", Icon = "🎃", Rarity = "Epic", Event = "Halloween" },
+		{ Id = "Vampire", Name = "Vampire Bat", Icon = "🦇", Rarity = "Legendary", Event = "Halloween" },
+		{ Id = "Snowman", Name = "Snowman", Icon = "⛄", Rarity = "Rare", Event = "Winter" },
+		{ Id = "Reindeer", Name = "Reindeer", Icon = "🦌", Rarity = "Epic", Event = "Winter" },
+		{ Id = "IceDragon", Name = "Ice Dragon", Icon = "🐉", Rarity = "Legendary", Event = "Winter" },
+		{ Id = "Crab", Name = "Beach Crab", Icon = "🦀", Rarity = "Rare", Event = "Summer" },
+		{ Id = "Dolphin", Name = "Dolphin", Icon = "🐬", Rarity = "Epic", Event = "Summer" },
+		{ Id = "Shark", Name = "Surf Shark", Icon = "🦈", Rarity = "Legendary", Event = "Summer" },
 	},
 }
 
@@ -1377,6 +1400,208 @@ function Config.PetsBonus(pets: any): number
 	return total
 end
 
+---------------------------------------------------------------------------
+-- Stats and ACHIEVEMENTS. Stats come from the saved data (see
+-- AchievementService); every achievement pays once, automatically.
+-- Reward: Minutes = minutes of income (never below MinCash), Boost = seconds of
+-- 2x income, Cosmetic = a cosmetic id from Config.Cosmetics.
+-- Fill AchievementBadges[<achievement id>] with a Roblox Badge id to also award
+-- a real badge (0 = none).
+---------------------------------------------------------------------------
+Config.Achievements = { Enabled = true, List = {}, ById = {}, Badges = {} }
+do
+	local tierMinutes = { 1, 2, 4, 8, 15 }
+	local tierCash = { 1_000, 3_000, 10_000, 50_000, 250_000 }
+	local function add(group: string, names: { string }, stat: string, targets: { number }, icon: string, text: string, cosmeticAtEnd: string?)
+		for tier, target in targets do
+			local id = group .. "_" .. tier
+			local reward: { [string]: any } = { Minutes = tierMinutes[math.min(tier, 5)], MinCash = tierCash[math.min(tier, 5)] }
+			if tier >= 3 then
+				reward.Boost = 180 * (tier - 2)
+			end
+			if cosmeticAtEnd and tier == #targets then
+				reward.Cosmetic = cosmeticAtEnd
+			end
+			local roman = { "I", "II", "III", "IV", "V" }
+			local entry = { Id = id, Group = group, Tier = tier, Name = names[1] .. (#targets > 1 and (" " .. roman[tier]) or ""), Stat = stat, Target = target, Icon = icon, Text = text, Reward = reward }
+			table.insert(Config.Achievements.List, entry)
+			Config.Achievements.ById[id] = entry
+			Config.Achievements.Badges[id] = 0
+		end
+	end
+	add("Upgrades", { "Builder" }, "Upgrades", { 10, 50, 150, 300, 500 }, "🏗️", "Buy %s upgrades")
+	add("Rebirths", { "Reborn" }, "Rebirths", { 1, 3, 5, 10 }, "🔄", "Rebirth %s times")
+	add("Earned", { "Tycoon" }, "Earned", { 10_000, 1_000_000, 1_000_000_000, 1e12, 1e15 }, "💰", "Earn %s in total", "Trail_Gold")
+	add("Hatched", { "Egg Hunter" }, "Hatched", { 1, 10, 50, 150 }, "🥚", "Hatch %s eggs")
+	add("Quests", { "Questing" }, "Quests", { 1, 10, 50, 150 }, "📜", "Claim %s quest rewards")
+	add("Spins", { "Lucky" }, "Spins", { 1, 10, 50 }, "🎰", "Spin the Lucky Wheel %s times")
+	add("Survived", { "Survivor" }, "Survived", { 1, 5, 25, 100 }, "🛡️", "Survive %s disasters", "Aura_Inferno")
+	add("Minigames", { "Gamer" }, "MinigameWins", { 1, 5, 25 }, "🎮", "Win %s minigames")
+	add("Secrets", { "Detective" }, "Secrets", { 1, 6, 12 }, "🕵️", "Find %s secrets", "Hat_Dragon")
+	add("Chests", { "Treasure Hunter" }, "Chests", { 1, 10, 50 }, "🏝️", "Open %s island chests")
+	add("Trades", { "Trader" }, "Trades", { 1, 10, 50 }, "🤝", "Complete %s trades")
+	add("Time", { "Regular" }, "Hours", { 1, 5, 24, 100 }, "⏱️", "Play for %s hours")
+	add("Floors", { "Skyscraper" }, "Floors", { 2, 4, 8 }, "🏢", "Unlock floor %s")
+	add("Gifts", { "Generous" }, "GiftsSent", { 1, 5, 25 }, "🎁", "Gift %s items to friends")
+	add("Style", { "Fashionista" }, "Cosmetics", { 1, 5, 15 }, "✨", "Own %s cosmetics")
+	add("Season", { "Seasoned" }, "SeasonLevel", { 10, 30 }, "🎫", "Reach season level %s")
+end
+Config.AchievementBadges = Config.Achievements.Badges
+
+---------------------------------------------------------------------------
+-- SEASON (battle pass). A new season starts every Days days, counted from
+-- StartUnix (UTC). Earn XP by playing; each level unlocks a reward on the free
+-- track, and on the premium track for owners of the Season Pass. Unclaimed
+-- rewards are lost when a season ends. Reward kinds: Cash (Minutes of income,
+-- MinCash), Boost (Seconds), Pet (Id), Cosmetic (Id).
+---------------------------------------------------------------------------
+Config.Season = {
+	Enabled = true,
+	PremiumPass = "SeasonPass",
+	StartUnix = 1767225600, -- 2026-01-01 00:00 UTC
+	Days = 28,
+	Levels = 30,
+	Names = { "Season of Fire", "Season of Frost", "Season of Storms", "Season of Gold", "Season of Stars", "Season of Shadows" },
+	Xp = { Admin = 1, Upgrade = 3, Quest = 60, Hatch = 20, Survive = 40, Minigame = 40, Rebirth = 200, Chest = 40, Daily = 100, Spin = 30, Achievement = 100, Minute = 4 },
+	Free = {},
+	Premium = {},
+}
+function Config.SeasonXpForLevel(level: number): number
+	return 100 + 40 * (level - 1)
+end
+do
+	local S = Config.Season
+	for level = 1, S.Levels do
+		if level % 2 == 1 then
+			S.Free[level] = { Kind = "Cash", Minutes = 1 + level * 0.4, MinCash = 1_000 * level }
+		end
+		S.Premium[level] = { Kind = "Cash", Minutes = 2 + level * 0.8, MinCash = 3_000 * level }
+	end
+	for _, level in { 5, 15, 25 } do
+		S.Free[level] = { Kind = "Boost", Seconds = 300 + level * 30 }
+	end
+	S.Free[10] = { Kind = "Pet", Id = "Tiger" }
+	S.Free[20] = { Kind = "Pet", Id = "Dragon" }
+	S.Free[30] = { Kind = "Pet", Id = "Phoenix" }
+	for _, level in { 4, 8, 12, 16, 22, 26 } do
+		S.Premium[level] = { Kind = "Boost", Seconds = 600 + level * 60 }
+	end
+	S.Premium[5] = { Kind = "Cosmetic", Id = "Trail_Season" }
+	S.Premium[10] = { Kind = "Pet", Id = "Unicorn" }
+	S.Premium[15] = { Kind = "Cosmetic", Id = "Aura_Season" }
+	S.Premium[20] = { Kind = "Pet", Id = "Kraken" }
+	S.Premium[25] = { Kind = "Cosmetic", Id = "Hat_Season" }
+	S.Premium[30] = { Kind = "Pet", Id = "Alien" }
+end
+
+-- (season number, starts, ends, name) for a unix time
+function Config.CurrentSeason(now: number): (number, number, number, string)
+	local length = Config.Season.Days * 86400
+	local number = math.max(0, math.floor((now - Config.Season.StartUnix) / length))
+	local names = Config.Season.Names
+	return number + 1, Config.Season.StartUnix + number * length, Config.Season.StartUnix + (number + 1) * length, names[number % #names + 1]
+end
+
+---------------------------------------------------------------------------
+-- COSMETICS: trails, auras and hats. Buy with cash (Price), with Robux (Robux +
+-- ProductId: create a Developer Product, 0 = simulated in Studio), or they are
+-- rewards (Source = "Season" / "Achievement").
+---------------------------------------------------------------------------
+Config.Cosmetics = {
+	Kinds = {
+		{ Id = "Trail", Name = "Trails", Icon = "🌈" },
+		{ Id = "Aura", Name = "Auras", Icon = "✨" },
+		{ Id = "Hat", Name = "Hats", Icon = "🎩" },
+	},
+	List = {
+		{ Id = "Trail_Flame", Kind = "Trail", Name = "Flame Trail", Icon = "🔥", Price = 40_000, C1 = Color3.fromRGB(255, 120, 0), C2 = Color3.fromRGB(255, 230, 0) },
+		{ Id = "Trail_Ocean", Kind = "Trail", Name = "Ocean Trail", Icon = "🌊", Price = 120_000, C1 = Color3.fromRGB(0, 150, 255), C2 = Color3.fromRGB(0, 255, 220) },
+		{ Id = "Trail_Toxic", Kind = "Trail", Name = "Toxic Trail", Icon = "☣️", Price = 350_000, C1 = Color3.fromRGB(80, 255, 60), C2 = Color3.fromRGB(20, 120, 20) },
+		{ Id = "Trail_Galaxy", Kind = "Trail", Name = "Galaxy Trail", Icon = "🌌", Price = 2_000_000, C1 = Color3.fromRGB(140, 60, 255), C2 = Color3.fromRGB(255, 80, 200) },
+		{ Id = "Trail_Rainbow", Kind = "Trail", Name = "Rainbow Trail", Icon = "🌈", Robux = 99, ProductId = 0, Rainbow = true, C1 = Color3.fromRGB(255, 80, 80), C2 = Color3.fromRGB(80, 80, 255) },
+		{ Id = "Trail_Season", Kind = "Trail", Name = "Season Trail", Icon = "🎫", Source = "Season", C1 = Color3.fromRGB(255, 140, 40), C2 = Color3.fromRGB(255, 60, 120) },
+		{ Id = "Trail_Gold", Kind = "Trail", Name = "Golden Trail", Icon = "🏆", Source = "Achievement", C1 = Color3.fromRGB(255, 215, 0), C2 = Color3.fromRGB(255, 255, 160) },
+		{ Id = "Aura_Sparkle", Kind = "Aura", Name = "Sparkles", Icon = "✨", Price = 25_000, Color = Color3.fromRGB(255, 240, 150), Rate = 10 },
+		{ Id = "Aura_Hearts", Kind = "Aura", Name = "Love Aura", Icon = "💖", Price = 90_000, Color = Color3.fromRGB(255, 100, 170), Rate = 8 },
+		{ Id = "Aura_Snow", Kind = "Aura", Name = "Snowfall", Icon = "❄️", Price = 220_000, Color = Color3.fromRGB(235, 245, 255), Rate = 14 },
+		{ Id = "Aura_Lightning", Kind = "Aura", Name = "Storm Aura", Icon = "⚡", Price = 900_000, Color = Color3.fromRGB(140, 200, 255), Rate = 24 },
+		{ Id = "Aura_Void", Kind = "Aura", Name = "Void Aura", Icon = "🕳️", Robux = 149, ProductId = 0, Color = Color3.fromRGB(150, 60, 255), Rate = 18 },
+		{ Id = "Aura_Season", Kind = "Aura", Name = "Season Aura", Icon = "🎫", Source = "Season", Color = Color3.fromRGB(255, 120, 40), Rate = 16 },
+		{ Id = "Aura_Inferno", Kind = "Aura", Name = "Inferno Aura", Icon = "🔥", Source = "Achievement", Color = Color3.fromRGB(255, 70, 0), Rate = 26 },
+		{ Id = "Hat_Party", Kind = "Hat", Name = "Party Hat", Icon = "🎉", Price = 60_000, Shape = "Cone", Color = Color3.fromRGB(255, 90, 200) },
+		{ Id = "Hat_Halo", Kind = "Hat", Name = "Halo", Icon = "😇", Price = 600_000, Shape = "Halo", Color = Color3.fromRGB(255, 240, 140) },
+		{ Id = "Hat_Horns", Kind = "Hat", Name = "Devil Horns", Icon = "😈", Price = 250_000, Shape = "Horns", Color = Color3.fromRGB(200, 30, 30) },
+		{ Id = "Hat_TopHat", Kind = "Hat", Name = "Top Hat", Icon = "🎩", Price = 400_000, Shape = "TopHat", Color = Color3.fromRGB(30, 30, 40) },
+		{ Id = "Hat_Crown", Kind = "Hat", Name = "Royal Crown", Icon = "👑", Price = 1_500_000, Shape = "Crown", Color = Color3.fromRGB(255, 200, 30) },
+		{ Id = "Hat_Wizard", Kind = "Hat", Name = "Wizard Hat", Icon = "🧙", Robux = 99, ProductId = 0, Shape = "Wizard", Color = Color3.fromRGB(110, 60, 220) },
+		{ Id = "Hat_Season", Kind = "Hat", Name = "Season Crown", Icon = "🎫", Source = "Season", Shape = "Crown", Color = Color3.fromRGB(255, 120, 40) },
+		{ Id = "Hat_Dragon", Kind = "Hat", Name = "Dragon Horns", Icon = "🐲", Source = "Achievement", Shape = "Horns", Color = Color3.fromRGB(60, 220, 120) },
+	},
+	ById = {},
+}
+for _, cosmetic in Config.Cosmetics.List do
+	Config.Cosmetics.ById[cosmetic.Id] = cosmetic
+end
+
+---------------------------------------------------------------------------
+-- LIVE EVENTS: automatic, by the calendar (UTC). While one runs, everyone earns
+-- Multiplier x, and its event egg (Config.Pets.Eggs with Event = Id) is on sale.
+-- Weekly = the days of the week (1 = Sunday) with the hour they start; Dates =
+-- an every-year window {month, day}.
+---------------------------------------------------------------------------
+Config.LiveEvents = {
+	Enabled = true,
+	List = {
+		{ Id = "Weekend", Name = "Weekend Bonanza", Icon = "🎉", Multiplier = 2, Color = Color3.fromRGB(255, 140, 40), Weekly = { [6] = 18, [7] = 0, [1] = 0 }, Text = "2x cash from Friday evening to Sunday night (UTC)!" },
+		{ Id = "Halloween", Name = "Spooky Season", Icon = "🎃", Multiplier = 2, Color = Color3.fromRGB(255, 120, 20), Dates = { From = { 10, 24 }, To = { 11, 2 } }, Text = "2x cash and the Spooky Egg with ghost pets!" },
+		{ Id = "Winter", Name = "Winter Festival", Icon = "⛄", Multiplier = 2, Color = Color3.fromRGB(150, 210, 255), Dates = { From = { 12, 15 }, To = { 1, 3 } }, Text = "2x cash and the Frosty Egg with ice pets!" },
+		{ Id = "Summer", Name = "Summer Splash", Icon = "🏖️", Multiplier = 1.5, Color = Color3.fromRGB(255, 210, 60), Dates = { From = { 7, 1 }, To = { 7, 14 } }, Text = "1.5x cash and the Beach Egg with sea pets!" },
+	},
+}
+
+---------------------------------------------------------------------------
+-- Social: free reward for joining your Roblox group (set GroupId), the private
+-- server bonus, and friends. Roblox can't check "liked" / "favorited" games, so
+-- there is no reward for those.
+---------------------------------------------------------------------------
+Config.Social = {
+	GroupId = 0,
+	GroupLink = "Search the group on Roblox and press Join",
+	GroupReward = { Minutes = 20, MinCash = 30_000, BoostSeconds = 30 * 60 },
+	PrivateServerBonus = 0.25, -- +25% income in VIP / private servers
+}
+
+---------------------------------------------------------------------------
+-- Trading pets. Both players must accept; any change resets the accepts and
+-- the Accept button waits ConfirmDelay seconds again.
+---------------------------------------------------------------------------
+Config.Trading = {
+	Enabled = true,
+	MaxPets = 6, -- pets per side
+	ConfirmDelay = 3,
+	InviteTimeout = 30,
+	TradeTimeout = 300, -- a trade nobody finishes is cancelled
+}
+
+---------------------------------------------------------------------------
+-- First-time tutorial. Each step is checked by the server before it pays.
+---------------------------------------------------------------------------
+Config.Tutorial = {
+	Enabled = true,
+	BuyUpgrades = 3,
+	Reward = { Minutes = 3, MinCash = 2_000 },
+}
+
+---------------------------------------------------------------------------
+-- Global leaderboards (OrderedDataStores, refreshed every few minutes)
+---------------------------------------------------------------------------
+Config.Boards = {
+	Enabled = true,
+	Top = 25,
+	RefreshSeconds = 180,
+	Stores = { Rebirths = "MegaTycoon_Board_Rebirths_v1", Hatched = "MegaTycoon_Board_Hatched_v1" },
+}
+
 -- can this pass ("Pass") or product ("Product") be gifted? Server events (nukes, cash rain) can't.
 function Config.CanGift(kind: any, key: any): boolean
 	if kind == "Pass" then
@@ -1428,6 +1653,9 @@ local EVENTS = {
 	"WeeklyUpdate", -- server -> client  { Days, DayFlags, Claimed, ResetsIn }
 	"PetUpdate", -- server -> client  { Owned, Equipped, Slots, Eggs }
 	"GiftItem", -- client -> server  ("Pass"|"Product", key, targetUserId)
+	"TradeInvited", -- server -> client  { FromName, FromUserId, Timeout }
+	"TradeUpdate", -- server -> client  trade state (nil = no trade)
+	"TutorialClaim", -- client -> server  (finished the tutorial; the server checks)
 }
 
 local FUNCTIONS = {
@@ -1443,6 +1671,16 @@ local FUNCTIONS = {
 	"ActivateShield", -- () -> ok, message
 	"Travel", -- (island id or "Plaza") -> ok, message
 	"ClaimWeekly", -- (milestone index) -> ok, message
+	"AchievementsGet", -- () -> { List = { {Id, Progress, Done} }, Done }
+	"SeasonGet", -- () -> season state
+	"SeasonClaim", -- (track "Free"|"Premium", level) -> ok, message
+	"CosmeticsGet", -- () -> { Owned, Equipped }
+	"CosmeticsAction", -- (action "Buy"|"Equip"|"Unequip", id|kind) -> ok, message
+	"TradeAction", -- (action, arg) -> ok, message   (Invite userId | Respond bool | Add uid | Remove uid | Accept | Cancel)
+	"StatsGet", -- () -> list of {Label, Value}
+	"BoardsGet", -- () -> { Earned, Rebirths, Hatched }
+	"SocialGet", -- () -> { Group, Claimed, Private }
+	"SocialAction", -- ("ClaimGroup") -> ok, message
 	"PetAction", -- (action, arg) -> ok, message   (Hatch eggId | Equip uid | Unequip uid | Sell uid | EquipBest | Refresh)
 }
 
@@ -2239,6 +2477,45 @@ function UIKit.Label(props: { [string]: any })
 	return label
 end
 
+-- removes the GuiObjects inside a container (lists you refill)
+function UIKit.Clear(container: Instance)
+	for _, child in container:GetChildren() do
+		if child:IsA("GuiObject") then
+			child:Destroy()
+		end
+	end
+end
+
+-- a rounded list row (alternating colours)
+function UIKit.Row(parent: Instance, order: number, height: number?)
+	local frame = UIKit.new("Frame", {
+		Size = UDim2.new(1, -10, 0, height or 56),
+		BackgroundColor3 = order % 2 == 0 and UIKit.Theme.PanelLight or UIKit.Theme.Panel,
+		LayoutOrder = order,
+		ZIndex = 7,
+		Parent = parent,
+	})
+	UIKit.Corner(frame, 10)
+	return frame
+end
+
+-- a progress bar; returns (bar, set(fraction))
+function UIKit.Bar(parent: Instance, size: UDim2, position: UDim2, color: Color3)
+	local bar = UIKit.new("Frame", { Size = size, Position = position, BackgroundColor3 = Color3.fromRGB(20, 22, 34), ZIndex = 8, Parent = parent })
+	UIKit.Corner(bar, 8)
+	local fill = UIKit.new("Frame", { Size = UDim2.fromScale(0, 1), BackgroundColor3 = color, ZIndex = 9, Parent = bar })
+	UIKit.Corner(fill, 8)
+	return bar, function(fraction: number)
+		fill.Size = UDim2.fromScale(math.clamp(fraction, 0, 1), 1)
+	end
+end
+
+-- is this a touch device without a keyboard (phones, tablets)?
+function UIKit.IsTouch(): boolean
+	local UserInputService = game:GetService("UserInputService")
+	return UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+end
+
 -- A chunky "game style" button with hover + press animation and click sound
 function UIKit.Button(props: { [string]: any })
 	local color: Color3 = props.Color or UIKit.Theme.Accent
@@ -2647,6 +2924,14 @@ local ORDER = {
 	"PetService",
 	"IslandService",
 	"WeeklyService",
+	"ProgressService",
+	"AchievementService",
+	"SeasonService",
+	"CosmeticService",
+	"EventService",
+	"TradeService",
+	"SocialService",
+	"TutorialService",
 	"DisasterService",
 	"AdminService",
 	"StaffService",
@@ -2701,6 +2986,239 @@ print("[MegaTycoon] Server started - v" .. require(game:GetService("ReplicatedSt
         <string name="Name">Services</string>
       </Properties>
       <Item class="ModuleScript" referent="14">
+        <Properties>
+          <string name="Name">AchievementService</string>
+          <string name="Source"><![CDATA[--[[
+	AchievementService - achievements (Config.Achievements) and the stats page.
+	Stats are read from the saved data; an achievement pays its reward once, the
+	moment its stat reaches the target (checked shortly after anything happens,
+	and every few seconds).
+]]
+local BadgeService = game:GetService("BadgeService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local Remotes = require(Shared.Remotes)
+local TycoonItems = require(Shared.TycoonItems)
+
+local AchievementService = {}
+local S
+
+local dirty: { [Player]: boolean } = {}
+
+local function count(map: any): number
+	local n = 0
+	for _ in map do
+		n += 1
+	end
+	return n
+end
+
+-- the value of one stat for a player's data
+function AchievementService:GetStat(player: Player, data, stat: string): number
+	if stat == "Upgrades" then
+		-- bought in total (a rebirth resets what you own), never less than what you own now
+		local n = 0
+		for id in data.Purchased do
+			local item = TycoonItems.ById[id]
+			if item and item.Kind ~= "Secret" then
+				n += 1
+			end
+		end
+		data.Stats.Upgrades = math.max(data.Stats.Upgrades or 0, n)
+		return data.Stats.Upgrades
+	elseif stat == "Rebirths" then
+		return data.Rebirths
+	elseif stat == "Earned" then
+		return data.TotalEarned
+	elseif stat == "Hatched" then
+		return data.Pets.Hatched
+	elseif stat == "Quests" then
+		return data.Stats.Quests or 0
+	elseif stat == "Spins" then
+		return data.Wheel.Spins
+	elseif stat == "Survived" then
+		return data.Stats.Survived or 0
+	elseif stat == "MinigameWins" then
+		return data.MinigameWins
+	elseif stat == "Secrets" then
+		return count(data.Secrets)
+	elseif stat == "Chests" then
+		return data.Stats.Chests or 0
+	elseif stat == "Trades" then
+		return data.Stats.Trades or 0
+	elseif stat == "GiftsSent" then
+		return data.Stats.GiftsSent or 0
+	elseif stat == "Hours" then
+		return data.PlayTime / 3600
+	elseif stat == "Floors" then
+		local top = 1
+		for id in data.Purchased do
+			local item = TycoonItems.ById[id]
+			if item and item.Kind == "Unlock" and item.Floor > top then
+				top = item.Floor
+			end
+		end
+		data.Stats.Floors = math.max(data.Stats.Floors or 1, top)
+		return data.Stats.Floors
+	elseif stat == "Cosmetics" then
+		return count(data.Cosmetics.Owned)
+	elseif stat == "SeasonLevel" then
+		return S.SeasonService and S.SeasonService:GetLevel(player) or 0
+	end
+	return 0
+end
+
+function AchievementService:Dirty(player: Player)
+	dirty[player] = true
+end
+
+function AchievementService:_reward(player: Player, data, achievement)
+	local reward = achievement.Reward
+	local parts = {}
+	if reward.Minutes then
+		local cash = math.floor(math.max((reward.MinCash or 0) * (1 + data.Rebirths), S.TycoonService:GetIncome(player) * reward.Minutes * 60))
+		S.DataService:AddCash(player, cash, false)
+		table.insert(parts, "+" .. Util.Money(cash))
+	end
+	if reward.Boost then
+		S.DataService:AddBoost(player, reward.Boost)
+		table.insert(parts, "2x for " .. Util.FormatTime(reward.Boost))
+	end
+	if reward.Cosmetic and S.CosmeticService then
+		local cosmetic = Config.Cosmetics.ById[reward.Cosmetic]
+		S.CosmeticService:Give(player, reward.Cosmetic, true)
+		table.insert(parts, (cosmetic and cosmetic.Icon or "✨") .. " " .. (cosmetic and cosmetic.Name or reward.Cosmetic))
+	end
+	return table.concat(parts, "  ")
+end
+
+-- checks every achievement; rewards the ones that are done now
+function AchievementService:Check(player: Player)
+	local data = S.DataService:Get(player)
+	if not data or not Config.Achievements.Enabled then
+		return
+	end
+	local values = {}
+	for _, achievement in Config.Achievements.List do
+		if not data.Achievements[achievement.Id] then
+			local value = values[achievement.Stat]
+			if value == nil then
+				value = self:GetStat(player, data, achievement.Stat)
+				values[achievement.Stat] = value
+			end
+			if value >= achievement.Target then
+				data.Achievements[achievement.Id] = true
+				local text = self:_reward(player, data, achievement)
+				Remotes.Notify:FireClient(player, { Text = "🏆 Achievement: " .. achievement.Name .. "  " .. text, Type = "success", Duration = 7 })
+				Remotes.VFX:FireClient(player, "Confetti", {})
+				local badge = Config.Achievements.Badges[achievement.Id]
+				if badge and badge ~= 0 then
+					task.spawn(function()
+						pcall(BadgeService.AwardBadge, BadgeService, player.UserId, badge)
+					end)
+				end
+				if S.ProgressService then
+					S.ProgressService:Record(player, "Achievement")
+				end
+			end
+		end
+	end
+	player:SetAttribute("Achievements", count(data.Achievements))
+end
+
+-- for the Achievements panel: every stat value and which achievements are done
+function AchievementService:GetState(player: Player)
+	local data = S.DataService:Get(player)
+	if not data then
+		return nil
+	end
+	local stats = {}
+	for _, achievement in Config.Achievements.List do
+		if stats[achievement.Stat] == nil then
+			stats[achievement.Stat] = self:GetStat(player, data, achievement.Stat)
+		end
+	end
+	local done = {}
+	for id in data.Achievements do
+		done[id] = true
+	end
+	return { Stats = stats, Done = done, DoneCount = count(done), Total = #Config.Achievements.List }
+end
+
+-- for the Stats page
+function AchievementService:GetStatsPage(player: Player)
+	local data = S.DataService:Get(player)
+	if not data then
+		return nil
+	end
+	local function stat(name: string): number
+		return self:GetStat(player, data, name)
+	end
+	local joined = player:GetAttribute("JoinedAt")
+	local played = data.PlayTime + (type(joined) == "number" and math.max(0, os.time() - joined) or 0)
+	local season = S.SeasonService and S.SeasonService:GetLevel(player) or 0
+	return {
+		{ Label = "⏱️ Time played", Value = Util.FormatTime(played) },
+		{ Label = "💰 Total earned", Value = Util.Money(stat("Earned")) },
+		{ Label = "🏗️ Upgrades bought", Value = tostring(stat("Upgrades")) .. " / " .. tostring(TycoonItems.BuyableCount) },
+		{ Label = "🏢 Highest floor", Value = tostring(stat("Floors")) },
+		{ Label = "🔄 Rebirths", Value = tostring(stat("Rebirths")) },
+		{ Label = "🥚 Eggs hatched", Value = tostring(stat("Hatched")) },
+		{ Label = "🐾 Pets owned", Value = tostring(#data.Pets.Owned) .. " / " .. tostring(Config.Pets.MaxOwned) },
+		{ Label = "📜 Quests claimed", Value = tostring(stat("Quests")) },
+		{ Label = "🎰 Wheel spins", Value = tostring(stat("Spins")) },
+		{ Label = "🛡️ Disasters survived", Value = tostring(stat("Survived")) },
+		{ Label = "🎮 Minigames won", Value = tostring(stat("MinigameWins")) },
+		{ Label = "🕵️ Secrets found", Value = tostring(stat("Secrets")) .. " / " .. tostring(#Config.Secrets) },
+		{ Label = "🏝️ Chests opened", Value = tostring(stat("Chests")) },
+		{ Label = "🤝 Trades", Value = tostring(stat("Trades")) },
+		{ Label = "✨ Cosmetics", Value = tostring(stat("Cosmetics")) .. " / " .. tostring(#Config.Cosmetics.List) },
+		{ Label = "🎫 Season level", Value = tostring(season) .. " / " .. tostring(Config.Season.Levels) },
+		{ Label = "🏆 Achievements", Value = tostring(count(data.Achievements)) .. " / " .. tostring(#Config.Achievements.List) },
+	}
+end
+
+function AchievementService:Init(services)
+	S = services
+	Remotes.AchievementsGet.OnServerInvoke = function(player)
+		return self:GetState(player)
+	end
+	Remotes.StatsGet.OnServerInvoke = function(player)
+		return self:GetStatsPage(player)
+	end
+	S.DataService.PlayerLoaded:Connect(function(player)
+		player:SetAttribute("JoinedAt", os.time())
+		dirty[player] = true
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		dirty[player] = nil
+	end)
+end
+
+function AchievementService:Start()
+	local tick = 0
+	while true do
+		task.wait(2)
+		tick += 1
+		for _, player in Players:GetPlayers() do
+			-- derived stats (earnings, time played) change without an event: re-check now and then
+			if dirty[player] or tick % 10 == 0 then
+				dirty[player] = nil
+				Util.Try("Achievements", self.Check, self, player)
+			end
+		end
+	end
+end
+
+return AchievementService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="15">
         <Properties>
           <string name="Name">AdminService</string>
           <string name="Source"><![CDATA[--[[
@@ -2935,6 +3453,7 @@ end
 -- Command registry
 ---------------------------------------------------------------------------
 local function register(def)
+	def.Aliases = def.Aliases or {}
 	table.insert(commands, def)
 	byName[def.Name:lower()] = def
 	for _, alias in def.Aliases or {} do
@@ -3870,6 +4389,102 @@ local function buildCommands()
 	})
 
 	register({
+		Name = "givecosmetic",
+		Aliases = { "cosmetic" },
+		Rank = 3,
+		Args = "<player> <cosmetic id>",
+		Desc = "Give a cosmetic (trail / aura / hat) for free",
+		Run = function(executor, args)
+			local id
+			for key in Config.Cosmetics.ById do
+				if args[2] and key:lower() == args[2]:lower() then
+					id = key
+				end
+			end
+			if not id then
+				local ids = {}
+				for key in Config.Cosmetics.ById do
+					table.insert(ids, key)
+				end
+				table.sort(ids)
+				return "Unknown cosmetic. Ids: " .. table.concat(ids, ", ")
+			end
+			local affected = eachTarget(executor, args[1], false, function(target)
+				S.CosmeticService:Give(target, id, true)
+			end)
+			return "Gave " .. id .. " to " .. namesOf(affected)
+		end,
+	})
+	register({
+		Name = "takecosmetic",
+		Rank = 3,
+		Args = "<player> <cosmetic id>",
+		Desc = "Take a cosmetic away",
+		Run = function(executor, args)
+			local id
+			for key in Config.Cosmetics.ById do
+				if args[2] and key:lower() == args[2]:lower() then
+					id = key
+				end
+			end
+			if not id then
+				return "Unknown cosmetic"
+			end
+			local affected = eachTarget(executor, args[1], false, function(target)
+				S.CosmeticService:Take(target, id)
+			end)
+			return "Took " .. id .. " from " .. namesOf(affected)
+		end,
+	})
+	register({
+		Name = "addxp",
+		Rank = 3,
+		Args = "<player> <amount>",
+		Desc = "Give Season XP",
+		Run = function(executor, args)
+			local amount = parseAmount(args[2])
+			if not amount or amount <= 0 or amount > 1e6 then
+				return "Give an amount between 1 and 1m"
+			end
+			local affected = eachTarget(executor, args[1], false, function(target)
+				S.SeasonService:AddXp(target, "Admin", amount)
+			end)
+			return "Gave " .. amount .. " Season XP to " .. namesOf(affected)
+		end,
+	})
+	register({
+		Name = "event",
+		Aliases = { "liveevent" },
+		Rank = 3,
+		Args = "<list | event id> [on|off|auto]",
+		Desc = "Start / stop a live event (Weekend, Halloween, Winter, Summer) or list them",
+		Run = function(executor, args)
+			if not args[1] or args[1]:lower() == "list" then
+				local lines = {}
+				for _, event in Config.LiveEvents.List do
+					table.insert(lines, event.Id .. (S.EventService:IsActive(event.Id) and " (ON)" or ""))
+				end
+				return "Events: " .. table.concat(lines, ", ")
+			end
+			local event
+			for _, candidate in Config.LiveEvents.List do
+				if candidate.Id:lower() == args[1]:lower() then
+					event = candidate
+				end
+			end
+			if not event then
+				return "Unknown event. Try ;event list"
+			end
+			local mode = (args[2] or "on"):lower()
+			if mode == "auto" then
+				S.EventService:Force(event.Id, nil)
+				return event.Id .. " follows the calendar again"
+			end
+			S.EventService:Force(event.Id, mode ~= "off")
+			return event.Id .. (mode == "off" and " turned off" or " turned on")
+		end,
+	})
+	register({
 		Name = "title",
 		Aliases = { "settitle", "nick" },
 		Rank = Config.Admin.TitleRank,
@@ -4197,7 +4812,7 @@ return AdminService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="15">
+      <Item class="ModuleScript" referent="16">
         <Properties>
           <string name="Name">AntiCheatService</string>
           <string name="Source"><![CDATA[--[[
@@ -4635,7 +5250,7 @@ return AntiCheatService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="16">
+      <Item class="ModuleScript" referent="17">
         <Properties>
           <string name="Name">BuildKit</string>
           <string name="Source"><![CDATA[--[[ BuildKit - helpers to build geometry from code (no assets needed) ]]
@@ -4787,7 +5402,367 @@ return BuildKit
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="17">
+      <Item class="ModuleScript" referent="18">
+        <Properties>
+          <string name="Name">CosmeticService</string>
+          <string name="Source"><![CDATA[--[[
+	CosmeticService - trails, auras and hats (Config.Cosmetics). Owned and
+	equipped cosmetics are saved. One of each kind can be worn at a time. They
+	are built on the character on the server, so everybody sees them.
+]]
+local MarketplaceService = game:GetService("MarketplaceService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local Remotes = require(Shared.Remotes)
+
+local CC = Config.Cosmetics
+
+local CosmeticService = {}
+local S
+
+local lastAction: { [Player]: number } = {}
+
+local function count(map: any): number
+	local n = 0
+	for _ in map do
+		n += 1
+	end
+	return n
+end
+
+---------------------------------------------------------------------------
+-- Building the visuals
+---------------------------------------------------------------------------
+local function part(name: string, size: Vector3, color: Color3, material: Enum.Material, shape: Enum.PartType?): Part
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Size = size
+	p.Color = color
+	p.Material = material
+	p.Shape = shape or Enum.PartType.Block
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.Massless = true
+	p.Anchored = false
+	return p
+end
+
+-- parts of a hat, as { Part, offset from the top of the head }
+local function hatParts(shape: string, color: Color3): { { Part: Part, Offset: CFrame } }
+	local list = {}
+	local function add(p: Part, offset: CFrame)
+		table.insert(list, { Part = p, Offset = offset })
+	end
+	local upright = CFrame.Angles(0, 0, math.rad(90)) -- cylinders lie along X: stand them up
+	local function disc(name: string, radius: number, height: number, y: number, c: Color3, material: Enum.Material?)
+		add(part(name, Vector3.new(height, radius * 2, radius * 2), c, material or Enum.Material.SmoothPlastic, Enum.PartType.Cylinder), CFrame.new(0, y, 0) * upright)
+	end
+	if shape == "Cone" then
+		for i = 1, 4 do
+			disc("Layer" .. i, 1.15 - (i - 1) * 0.28, 0.5, 0.25 + (i - 1) * 0.5, color)
+		end
+		add(part("Pom", Vector3.new(0.5, 0.5, 0.5), Color3.new(1, 1, 1), Enum.Material.SmoothPlastic, Enum.PartType.Ball), CFrame.new(0, 2.3, 0))
+	elseif shape == "Wizard" then
+		disc("Brim", 1.6, 0.15, 0.1, color)
+		for i = 1, 5 do
+			disc("Layer" .. i, 1.0 - (i - 1) * 0.2, 0.55, 0.45 + (i - 1) * 0.55, color)
+		end
+		add(part("Star", Vector3.new(0.45, 0.45, 0.45), Color3.fromRGB(255, 230, 90), Enum.Material.Neon, Enum.PartType.Ball), CFrame.new(0, 3.2, 0))
+	elseif shape == "TopHat" then
+		disc("Brim", 1.5, 0.15, 0.1, color)
+		disc("Tube", 0.95, 1.4, 0.85, color)
+		disc("Band", 0.98, 0.3, 0.4, Color3.fromRGB(200, 40, 40))
+	elseif shape == "Crown" then
+		disc("Ring", 1.05, 0.5, 0.25, color, Enum.Material.Metal)
+		for i = 0, 4 do
+			local angle = i / 5 * math.pi * 2
+			add(part("Spike" .. i, Vector3.new(0.35, 0.8, 0.35), color, Enum.Material.Metal), CFrame.new(math.cos(angle) * 0.95, 0.9, math.sin(angle) * 0.95))
+			add(part("Gem" .. i, Vector3.new(0.3, 0.3, 0.3), Color3.fromRGB(255, 60, 90), Enum.Material.Neon, Enum.PartType.Ball), CFrame.new(math.cos(angle) * 0.95, 1.4, math.sin(angle) * 0.95))
+		end
+	elseif shape == "Halo" then
+		for i = 0, 11 do
+			local angle = i / 12 * math.pi * 2
+			add(part("Bead" .. i, Vector3.new(0.35, 0.2, 0.5), color, Enum.Material.Neon), CFrame.new(math.cos(angle) * 1.25, 1.5, math.sin(angle) * 1.25) * CFrame.Angles(0, -angle, 0))
+		end
+	elseif shape == "Horns" then
+		for side = -1, 1, 2 do
+			add(part("HornBase", Vector3.new(0.4, 0.6, 0.4), color, Enum.Material.SmoothPlastic), CFrame.new(side * 0.6, 0.35, 0) * CFrame.Angles(0, 0, math.rad(-side * 15)))
+			add(part("HornTip", Vector3.new(0.25, 0.6, 0.25), color, Enum.Material.SmoothPlastic), CFrame.new(side * 0.85, 0.95, 0) * CFrame.Angles(0, 0, math.rad(-side * 30)))
+		end
+	end
+	return list
+end
+
+local function buildHat(character: Model, cosmetic)
+	local head = character:FindFirstChild("Head") :: BasePart?
+	if not head then
+		return
+	end
+	local model = Instance.new("Model")
+	model.Name = "Cosmetic_Hat"
+	for _, entry in hatParts(cosmetic.Shape, cosmetic.Color) do
+		local p = entry.Part
+		-- offsets are from the top of the head
+		p.CFrame = head.CFrame * CFrame.new(0, head.Size.Y / 2, 0) * entry.Offset
+		p.Parent = model
+		local weld = Instance.new("WeldConstraint")
+		weld.Part0 = head
+		weld.Part1 = p
+		weld.Parent = p
+	end
+	model.Parent = character
+end
+
+local function buildTrail(root: BasePart, cosmetic)
+	local top = Instance.new("Attachment")
+	top.Name = "CosmeticTrailTop"
+	top.Position = Vector3.new(0, 0.9, 0)
+	top.Parent = root
+	local bottom = Instance.new("Attachment")
+	bottom.Name = "CosmeticTrailBottom"
+	bottom.Position = Vector3.new(0, -0.9, 0)
+	bottom.Parent = root
+	local trail = Instance.new("Trail")
+	trail.Name = "Cosmetic_Trail"
+	trail.Attachment0 = top
+	trail.Attachment1 = bottom
+	trail.Lifetime = 0.7
+	trail.LightEmission = 1
+	trail.FaceCamera = true
+	if cosmetic.Rainbow then
+		trail.Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 70, 70)),
+			ColorSequenceKeypoint.new(0.2, Color3.fromRGB(255, 200, 40)),
+			ColorSequenceKeypoint.new(0.4, Color3.fromRGB(80, 255, 90)),
+			ColorSequenceKeypoint.new(0.6, Color3.fromRGB(60, 200, 255)),
+			ColorSequenceKeypoint.new(0.8, Color3.fromRGB(120, 80, 255)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 80, 200)),
+		})
+	else
+		trail.Color = ColorSequence.new(cosmetic.C1, cosmetic.C2)
+	end
+	trail.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) })
+	trail.Parent = root
+end
+
+local function buildAura(root: BasePart, cosmetic)
+	local emitter = Instance.new("ParticleEmitter")
+	emitter.Name = "Cosmetic_Aura"
+	emitter.Texture = "rbxasset://textures/particles/sparkles_main.dds"
+	emitter.Color = ColorSequence.new(cosmetic.Color)
+	emitter.LightEmission = 1
+	emitter.Rate = cosmetic.Rate or 12
+	emitter.Lifetime = NumberRange.new(0.8, 1.4)
+	emitter.Speed = NumberRange.new(1, 3)
+	emitter.SpreadAngle = Vector2.new(180, 180)
+	emitter.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.7), NumberSequenceKeypoint.new(1, 0) })
+	emitter.Parent = root
+end
+
+local function clearVisuals(character: Model, kind: string?)
+	for _, descendant in character:GetDescendants() do
+		local name = descendant.Name
+		if (kind == nil and name:sub(1, 9) == "Cosmetic_") or (kind ~= nil and name == "Cosmetic_" .. kind) then
+			descendant:Destroy()
+		end
+	end
+	if kind == nil or kind == "Trail" then
+		for _, descendant in character:GetDescendants() do
+			if descendant.Name == "CosmeticTrailTop" or descendant.Name == "CosmeticTrailBottom" then
+				descendant:Destroy()
+			end
+		end
+	end
+end
+
+-- (re)builds what the player wears on their current character
+function CosmeticService:Apply(player: Player)
+	local character = player.Character
+	local data = S.DataService:Get(player)
+	if not character or not data then
+		return
+	end
+	local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not root then
+		return
+	end
+	clearVisuals(character, nil)
+	for _, kind in CC.Kinds do
+		local cosmetic = CC.ById[data.Cosmetics.Equipped[kind.Id]]
+		if cosmetic and data.Cosmetics.Owned[cosmetic.Id] then
+			if kind.Id == "Trail" then
+				buildTrail(root, cosmetic)
+			elseif kind.Id == "Aura" then
+				buildAura(root, cosmetic)
+			else
+				buildHat(character, cosmetic)
+			end
+		end
+	end
+	player:SetAttribute("CosmeticHat", data.Cosmetics.Equipped.Hat)
+	player:SetAttribute("CosmeticTrail", data.Cosmetics.Equipped.Trail)
+	player:SetAttribute("CosmeticAura", data.Cosmetics.Equipped.Aura)
+end
+
+---------------------------------------------------------------------------
+-- Owning
+---------------------------------------------------------------------------
+function CosmeticService:Give(player: Player, id: string, announce: boolean?): boolean
+	local data = S.DataService:Get(player)
+	local cosmetic = CC.ById[id]
+	if not data or not cosmetic then
+		return false
+	end
+	local fresh = not data.Cosmetics.Owned[id]
+	data.Cosmetics.Owned[id] = true
+	if fresh and announce then
+		Remotes.Notify:FireClient(player, { Text = "✨ New cosmetic: " .. cosmetic.Icon .. " " .. cosmetic.Name .. "! Equip it in the Style menu.", Type = "success", Duration = 6 })
+	end
+	if S.ProgressService then
+		S.ProgressService:Record(player, "Cosmetic", 0)
+	end
+	return fresh
+end
+
+function CosmeticService:Take(player: Player, id: string): boolean
+	local data = S.DataService:Get(player)
+	if not data or not data.Cosmetics.Owned[id] then
+		return false
+	end
+	data.Cosmetics.Owned[id] = nil
+	for kind, equipped in data.Cosmetics.Equipped do
+		if equipped == id then
+			data.Cosmetics.Equipped[kind] = nil
+		end
+	end
+	self:Apply(player)
+	return true
+end
+
+function CosmeticService:Equip(player: Player, id: any): (boolean, string)
+	local data = S.DataService:Get(player)
+	local cosmetic = type(id) == "string" and CC.ById[id]
+	if not data or not cosmetic then
+		return false, "Unknown cosmetic."
+	end
+	if not data.Cosmetics.Owned[id] then
+		return false, "You don't own that yet."
+	end
+	data.Cosmetics.Equipped[cosmetic.Kind] = id
+	self:Apply(player)
+	return true, "Wearing " .. cosmetic.Name .. "!"
+end
+
+function CosmeticService:Unequip(player: Player, kind: any): (boolean, string)
+	local data = S.DataService:Get(player)
+	if not data or type(kind) ~= "string" or data.Cosmetics.Equipped[kind] == nil then
+		return false, "Nothing to take off."
+	end
+	data.Cosmetics.Equipped[kind] = nil
+	self:Apply(player)
+	return true, "Taken off."
+end
+
+local function canSimulate()
+	return RunService:IsStudio() and Config.Monetization.SimulateUnconfiguredInStudio
+end
+
+function CosmeticService:Buy(player: Player, id: any): (boolean, string)
+	local data = S.DataService:Get(player)
+	local cosmetic = type(id) == "string" and CC.ById[id]
+	if not data or not cosmetic then
+		return false, "Unknown cosmetic."
+	end
+	if data.Cosmetics.Owned[id] then
+		return false, "You already own it!"
+	end
+	if cosmetic.Source then
+		return false, "You can't buy this one - it's a " .. string.lower(cosmetic.Source) .. " reward."
+	end
+	if cosmetic.Price then
+		if not S.DataService:SpendCash(player, cosmetic.Price) then
+			return false, "You need " .. Util.Money(cosmetic.Price) .. "!"
+		end
+		self:Give(player, id)
+		return true, "Bought " .. cosmetic.Name .. "!"
+	end
+	-- Robux
+	if cosmetic.ProductId and cosmetic.ProductId ~= 0 then
+		MarketplaceService:PromptProductPurchase(player, cosmetic.ProductId)
+		return true, "Follow the purchase prompt..."
+	elseif canSimulate() then
+		self:Give(player, id)
+		return true, "[Studio] Simulated purchase of " .. cosmetic.Name
+	end
+	return false, "This cosmetic isn't available yet!"
+end
+
+function CosmeticService:GetState(player: Player)
+	local data = S.DataService:Get(player)
+	if not data then
+		return nil
+	end
+	return { Owned = Util.DeepCopy(data.Cosmetics.Owned), Equipped = Util.DeepCopy(data.Cosmetics.Equipped), Count = count(data.Cosmetics.Owned) }
+end
+
+function CosmeticService:Init(services)
+	S = services
+	Remotes.CosmeticsGet.OnServerInvoke = function(player)
+		return self:GetState(player)
+	end
+	Remotes.CosmeticsAction.OnServerInvoke = function(player, action, arg)
+		local now = os.clock()
+		if lastAction[player] and now - lastAction[player] < 0.25 then
+			return false, "Slow down!"
+		end
+		lastAction[player] = now
+		if action == "Buy" then
+			return self:Buy(player, arg)
+		elseif action == "Equip" then
+			return self:Equip(player, arg)
+		elseif action == "Unequip" then
+			return self:Unequip(player, arg)
+		end
+		return false, "Unknown action."
+	end
+	local function watch(player: Player)
+		player.CharacterAdded:Connect(function()
+			task.wait(0.3)
+			if player.Parent then
+				self:Apply(player)
+			end
+		end)
+	end
+	Players.PlayerAdded:Connect(watch)
+	for _, player in Players:GetPlayers() do
+		watch(player)
+	end
+	S.DataService.PlayerLoaded:Connect(function(player)
+		-- drop equipped cosmetics that no longer exist
+		local data = S.DataService:Get(player)
+		for kind, id in data.Cosmetics.Equipped do
+			if not CC.ById[id] or not data.Cosmetics.Owned[id] then
+				data.Cosmetics.Equipped[kind] = nil
+			end
+		end
+		self:Apply(player)
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		lastAction[player] = nil
+	end)
+end
+
+return CosmeticService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="19">
         <Properties>
           <string name="Name">DataService</string>
           <string name="Source"><![CDATA[--[[
@@ -4845,7 +5820,13 @@ local TEMPLATE = {
 	Pets = { Owned = {}, Equipped = {}, NextUid = 1, Hatched = 0 }, -- see PetService
 	Chests = {}, -- island chest id -> when you last opened it (see IslandService)
 	Weekly = { Week = 0, Days = {}, Claimed = {} }, -- days joined this week + milestones claimed (see WeeklyService)
-	Settings = { MusicVolume = Config.Music.DefaultVolume, SFX = true, LowGraphics = false, Guide = true, AutoBuild = true },
+	Stats = { Survived = 0, Chests = 0, Trades = 0, GiftsSent = 0, Quests = 0, Upgrades = 0, Floors = 1 }, -- counters that aren't saved anywhere else (see AchievementService)
+	Achievements = {}, -- achievement id -> true once rewarded
+	Season = { Id = 0, XP = 0, Free = {}, Premium = {} }, -- see SeasonService
+	Cosmetics = { Owned = {}, Equipped = {} }, -- see CosmeticService
+	Tutorial = { Done = false },
+	Social = { Group = false }, -- joined-the-group reward claimed
+	Settings = { MusicVolume = Config.Music.DefaultVolume, SFX = true, LowGraphics = false, Guide = true, AutoBuild = true, UISize = 1 },
 }
 
 local profiles: { [Player]: any } = {}
@@ -5329,6 +6310,10 @@ function DataService:GetMultiplier(player: Player, permanentOnly: boolean?): num
 	if Util.IsFinite(event) and event > 0 then
 		mult *= event
 	end
+	local live = workspace:GetAttribute("LiveEventMult") -- calendar events (EventService)
+	if Util.IsFinite(live) and live > 0 then
+		mult *= live
+	end
 	return mult * self:GetSocialBonus(host)
 end
 
@@ -5339,6 +6324,9 @@ function DataService:GetSocialBonus(host: Player): number
 		bonus *= 1 + Config.Bonuses.PremiumPercent / 100
 	end
 	local friends = math.min(tonumber(host:GetAttribute("FriendsHere")) or 0, Config.Bonuses.MaxFriends)
+	if game.PrivateServerId ~= "" and game.PrivateServerOwnerId ~= 0 then
+		bonus *= 1 + Config.Social.PrivateServerBonus -- VIP / private servers
+	end
 	return bonus * (1 + friends * Config.Bonuses.FriendPercent / 100)
 end
 
@@ -5405,6 +6393,7 @@ function DataService:Sync(player: Player)
 	player:SetAttribute("LowGraphics", data.Settings.LowGraphics)
 	player:SetAttribute("Guide", data.Settings.Guide)
 	player:SetAttribute("AutoBuild", data.Settings.AutoBuild)
+	player:SetAttribute("UISize", data.Settings.UISize)
 	local found = {}
 	for id in data.Secrets do
 		table.insert(found, id)
@@ -5546,7 +6535,7 @@ return DataService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="18">
+      <Item class="ModuleScript" referent="20">
         <Properties>
           <string name="Name">DisasterService</string>
           <string name="Source"><![CDATA[--[[
@@ -6514,6 +7503,9 @@ function DisasterService:_run(kind: string, by: string?)
 		local humanoid = getHumanoid(player)
 		if player.Parent and player.Character == character and humanoid and humanoid.Health > 0 and S.QuestService then
 			S.QuestService:Progress(player, "Survive", 1)
+			if S.ProgressService then
+				S.ProgressService:Record(player, "Survive")
+			end
 		end
 	end
 	broadcast({ Phase = "End", Kind = kind })
@@ -6595,7 +7587,7 @@ return DisasterService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="19">
+      <Item class="ModuleScript" referent="21">
         <Properties>
           <string name="Name">DuoService</string>
           <string name="Source"><![CDATA[--[[
@@ -6739,7 +7731,150 @@ return DuoService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="20">
+      <Item class="ModuleScript" referent="22">
+        <Properties>
+          <string name="Name">EventService</string>
+          <string name="Source"><![CDATA[--[[
+	EventService - calendar events (Config.LiveEvents): the weekend bonus and
+	yearly holidays. While events run, everybody earns the biggest multiplier
+	(workspace attribute "LiveEventMult") and the event eggs are on sale.
+	Admins can force an event on or off with ;event.
+]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local Remotes = require(Shared.Remotes)
+
+local LE = Config.LiveEvents
+
+local EventService = {}
+local S
+
+local forced: { [string]: boolean? } = {} -- admin overrides: true = on, false = off
+local lastActive: { [string]: boolean } = {}
+local booted = false
+
+-- the clock (tests replace this to pretend it is another date)
+EventService.Clock = function(): number
+	return os.time()
+end
+
+local function inDates(dates, month: number, day: number): boolean
+	local from = dates.From[1] * 100 + dates.From[2]
+	local to = dates.To[1] * 100 + dates.To[2]
+	local today = month * 100 + day
+	if from <= to then
+		return today >= from and today <= to
+	end
+	return today >= from or today <= to -- a window over New Year
+end
+
+-- is an event running at this unix time (UTC)?
+function EventService:IsRunningAt(event, time: number): boolean
+	local date = os.date("!*t", time)
+	if event.Weekly then
+		local startHour = event.Weekly[date.wday]
+		return startHour ~= nil and date.hour >= startHour
+	end
+	if event.Dates then
+		return inDates(event.Dates, date.month, date.day)
+	end
+	return false
+end
+
+function EventService:IsActive(id: string): boolean
+	local override = forced[id]
+	if override ~= nil then
+		return override == true
+	end
+	if not LE.Enabled then
+		return false
+	end
+	for _, event in LE.List do
+		if event.Id == id then
+			return self:IsRunningAt(event, self.Clock())
+		end
+	end
+	return false
+end
+
+function EventService:GetActive()
+	local list = {}
+	for _, event in LE.List do
+		if self:IsActive(event.Id) then
+			table.insert(list, event)
+		end
+	end
+	return list
+end
+
+function EventService:Force(id: string, state: boolean?)
+	forced[id] = state
+	self:Update()
+end
+
+function EventService:GetEvent(id: string)
+	for _, event in LE.List do
+		if event.Id == id then
+			return event
+		end
+	end
+	return nil
+end
+
+-- sets the multiplier and tells everyone when an event starts or ends
+function EventService:Update()
+	local multiplier, ids = 1, {}
+	local active = {}
+	for _, event in self:GetActive() do
+		multiplier = math.max(multiplier, event.Multiplier)
+		table.insert(ids, event.Id)
+		active[event.Id] = true
+	end
+	local changed = multiplier ~= (workspace:GetAttribute("LiveEventMult") or 1)
+	workspace:SetAttribute("LiveEventMult", multiplier)
+	workspace:SetAttribute("LiveEvents", table.concat(ids, ","))
+	if booted then
+		for _, event in LE.List do
+			if active[event.Id] and not lastActive[event.Id] then
+				Remotes.Announce:FireAllClients({ Title = event.Icon .. " " .. event.Name:upper() .. "!", Text = event.Text, Color = event.Color })
+				Remotes.VFX:FireAllClients("Confetti", {})
+			elseif lastActive[event.Id] and not active[event.Id] then
+				Remotes.Announce:FireAllClients({ Title = event.Icon .. " " .. event.Name .. " is over", Text = "See you next time!", Color = Color3.fromRGB(200, 200, 200) })
+			end
+		end
+	end
+	lastActive = active
+	if changed and S.DataService then
+		for _, player in Players:GetPlayers() do
+			S.DataService:RefreshMultiplier(player)
+		end
+	end
+end
+
+function EventService:Init(services)
+	S = services
+	workspace:SetAttribute("LiveEventMult", 1)
+	workspace:SetAttribute("LiveEvents", "")
+	self:Update()
+	booted = true
+end
+
+function EventService:Start()
+	while true do
+		task.wait(30)
+		Util.Try("Live events", self.Update, self)
+	end
+end
+
+return EventService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="23">
         <Properties>
           <string name="Name">GiftService</string>
           <string name="Source"><![CDATA[--[[
@@ -6883,7 +8018,7 @@ return GiftService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="21">
+      <Item class="ModuleScript" referent="24">
         <Properties>
           <string name="Name">IslandService</string>
           <string name="Source"><![CDATA[--[[
@@ -6977,6 +8112,9 @@ function IslandService:OpenChest(player: Player, entry)
 		return
 	end
 	data.Chests[entry.Id] = os.time()
+	if S.ProgressService then
+		S.ProgressService:Record(player, "Chest")
+	end
 	local wallet = S.DataService:GetWallet(player)
 	local rebirths = wallet and wallet.Rebirths or 0
 	local cash = math.floor(math.max(island.MinCash * (1 + rebirths), S.TycoonService:GetIncome(player) * island.IncomeSeconds))
@@ -7070,17 +8208,23 @@ return IslandService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="22">
+      <Item class="ModuleScript" referent="25">
         <Properties>
           <string name="Name">LeaderboardService</string>
           <string name="Source"><![CDATA[--[[
 	LeaderboardService - global "Top Earners" board in the lobby
 	(OrderedDataStore, refreshes every 2 minutes).
 ]]
+local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Util = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Util"))
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local Remotes = require(Shared.Remotes)
+
+local BC = Config.Boards
 
 local LeaderboardService = {}
 local S
@@ -7101,8 +8245,92 @@ local function abbreviate(n: number): string
 	return Util.Money(n)
 end
 
+local boardStores: { [string]: OrderedDataStore } = {}
+pcall(function()
+	for name, storeName in BC.Stores do
+		boardStores[name] = DataStoreService:GetOrderedDataStore(storeName)
+	end
+end)
+
+-- the in-game boards: { Earned = rows, Rebirths = rows, Hatched = rows }, a row is { Name, Value, UserId }
+local boards = { Earned = {}, Rebirths = {}, Hatched = {}, Updated = 0 }
+
+-- rows from the players in this server (used when the DataStores are not available)
+local function onlineRows(valueOf: (any) -> number)
+	local rows = {}
+	for _, player in Players:GetPlayers() do
+		local data = S.DataService:Get(player)
+		if data then
+			table.insert(rows, { Name = player.DisplayName, Value = valueOf(data), UserId = player.UserId })
+		end
+	end
+	table.sort(rows, function(a, b)
+		return a.Value > b.Value
+	end)
+	return rows
+end
+
+local function readStore(store: OrderedDataStore?, decode: ((number) -> number)?)
+	local rows = {}
+	if store then
+		local ok, pages = pcall(function()
+			return store:GetSortedAsync(false, BC.Top)
+		end)
+		if ok and pages then
+			for _, entry in pages:GetCurrentPage() do
+				local userId = tonumber(entry.key)
+				if userId and entry.value > 0 then
+					table.insert(rows, { Name = nameFor(userId), Value = decode and decode(entry.value) or entry.value, UserId = userId })
+				end
+			end
+		end
+	end
+	return rows
+end
+
+function LeaderboardService:RefreshBoards()
+	if not BC.Enabled then
+		return
+	end
+	-- publish what's in this server, then read the top lists
+	for _, player in Players:GetPlayers() do
+		local data = S.DataService:Get(player)
+		if data then
+			if boardStores.Rebirths then
+				pcall(boardStores.Rebirths.SetAsync, boardStores.Rebirths, tostring(player.UserId), data.Rebirths)
+			end
+			if boardStores.Hatched then
+				pcall(boardStores.Hatched.SetAsync, boardStores.Hatched, tostring(player.UserId), data.Pets.Hatched)
+			end
+		end
+	end
+	local earned = readStore(S.DataService:GetEarnedStore(), S.DataService.DecodeEarned)
+	local rebirths = readStore(boardStores.Rebirths)
+	local hatched = readStore(boardStores.Hatched)
+	boards.Earned = #earned > 0 and earned or onlineRows(function(d)
+		return d.TotalEarned
+	end)
+	boards.Rebirths = #rebirths > 0 and rebirths or onlineRows(function(d)
+		return d.Rebirths
+	end)
+	boards.Hatched = #hatched > 0 and hatched or onlineRows(function(d)
+		return d.Pets.Hatched
+	end)
+	boards.Updated = os.time()
+end
+
+function LeaderboardService:GetBoards()
+	if boards.Updated == 0 then
+		Util.Try("Boards", self.RefreshBoards, self)
+	end
+	return boards
+end
+
 function LeaderboardService:Init(services)
 	S = services
+	Remotes.BoardsGet.OnServerInvoke = function()
+		return self:GetBoards()
+	end
 end
 
 function LeaderboardService:_render(rows)
@@ -7185,8 +8413,13 @@ end
 
 function LeaderboardService:Start()
 	task.wait(5)
+	local lastBoards = 0
 	while true do
 		Util.Try("Leaderboard", self.Refresh, self)
+		if os.clock() - lastBoards >= BC.RefreshSeconds then
+			lastBoards = os.clock()
+			Util.Try("Boards", self.RefreshBoards, self)
+		end
 		task.wait(REFRESH)
 	end
 end
@@ -7195,7 +8428,7 @@ return LeaderboardService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="23">
+      <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">MinigameService</string>
           <string name="Source"><![CDATA[--[[
@@ -7888,6 +9121,9 @@ function MinigameService:RunGame(key: string)
 			if S.QuestService then
 				S.QuestService:Progress(player, "Minigame", 1)
 			end
+			if S.ProgressService then
+				S.ProgressService:Record(player, "Minigame")
+			end
 			local data = S.DataService:Get(player)
 			if data and r.Reward > 0 then
 				S.DataService:AddCash(player, r.Reward, false)
@@ -7936,7 +9172,7 @@ return MinigameService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="24">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">MonetizationService</string>
           <string name="Source"><![CDATA[--[[
@@ -7974,6 +9210,14 @@ end
 for key, product in Config.Products do
 	if product.Id ~= 0 then
 		productKeyById[product.Id] = key
+	end
+end
+
+-- cosmetic developer products -> the cosmetic
+local cosmeticByProductId: { [number]: string } = {}
+for id, cosmetic in Config.Cosmetics.ById do
+	if cosmetic.ProductId and cosmetic.ProductId ~= 0 then
+		cosmeticByProductId[cosmetic.ProductId] = id
 	end
 end
 
@@ -8130,6 +9374,9 @@ function MonetizationService:_applyPass(player: Player, key: string, announce: b
 	end
 	player:SetAttribute("Pass_" .. key, true)
 	S.DataService:RefreshMultiplier(player)
+	if key == Config.Season.PremiumPass and S.SeasonService then
+		S.SeasonService:Sync(player)
+	end
 	if S.TycoonService then
 		if key == "AutoCollect" then
 			S.TycoonService:CollectVault(player)
@@ -8280,6 +9527,9 @@ function MonetizationService:_deliverGift(buyer: Player, target: Player, kind: s
 		end
 		Remotes.Notify:FireClient(target, { Text = "🎁 " .. buyer.DisplayName .. " sent you " .. entry.Name .. "!", Type = "success", Duration = 6 })
 	end
+	if S.ProgressService then
+		S.ProgressService:Record(buyer, "Gift")
+	end
 	Remotes.Notify:FireClient(buyer, { Text = "🎁 " .. target.DisplayName .. " got your gift: " .. entry.Name .. "!", Type = "success", Duration = 6 })
 	return true
 end
@@ -8359,7 +9609,8 @@ end
 function MonetizationService:_processReceipt(receipt)
 	local gift = giftById[receipt.ProductId]
 	local key = productKeyById[receipt.ProductId]
-	if not key and not gift then
+	local cosmeticId = cosmeticByProductId[receipt.ProductId]
+	if not key and not gift and not cosmeticId then
 		warn("[Monetization] Unknown product id " .. tostring(receipt.ProductId))
 		return Enum.ProductPurchaseDecision.NotProcessedYet
 	end
@@ -8382,7 +9633,10 @@ function MonetizationService:_processReceipt(receipt)
 	end
 
 	local granted
-	if gift then
+	if cosmeticId then
+		S.CosmeticService:Give(player, cosmeticId, true)
+		granted = true
+	elseif gift then
 		granted = self:_receiveGift(player, receipt.ProductId, gift)
 	else
 		granted = self:_grantProduct(player, key)
@@ -8404,7 +9658,7 @@ return MonetizationService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="25">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">ObbyService</string>
           <string name="Source"><![CDATA[--[[
@@ -8732,7 +9986,7 @@ return ObbyService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">PetService</string>
           <string name="Source"><![CDATA[--[[
@@ -8825,7 +10079,7 @@ function PetService:_roll(egg, lucky: boolean?)
 	end
 	local options = {}
 	for _, pet in PC.List do
-		if pet.Rarity == rarity then
+		if pet.Rarity == rarity and pet.Event == egg.Event then
 			table.insert(options, pet)
 		end
 	end
@@ -8840,7 +10094,7 @@ function PetService:_state(player: Player)
 	end
 	local eggs = {}
 	for _, egg in PC.Eggs do
-		table.insert(eggs, { Id = egg.Id, Cost = self:GetEggCost(player, egg) })
+		table.insert(eggs, { Id = egg.Id, Cost = self:GetEggCost(player, egg), Active = egg.Event == nil or S.EventService:IsActive(egg.Event) })
 	end
 	local owned = {}
 	for _, pet in data.Pets.Owned do
@@ -8886,6 +10140,11 @@ function PetService:_clean(data)
 end
 
 -- gives pets (hatching and the admin command); returns how many fit
+-- re-send the pets and refresh the income after another service changed them (trading)
+function PetService:Resync(player: Player)
+	self:_sync(player)
+end
+
 function PetService:Give(player: Player, petId: string, count: number?): number
 	local data = S.DataService:Get(player)
 	if not data or not Config.PetById[petId] then
@@ -8918,6 +10177,9 @@ function PetService:Hatch(player: Player, eggId: any): (boolean, string)
 	if not egg then
 		return false, "Unknown egg."
 	end
+	if egg.Event and not S.EventService:IsActive(egg.Event) then
+		return false, egg.Name .. " is only on sale during its event!"
+	end
 	if #data.Pets.Owned >= PC.MaxOwned then
 		return false, "Your pet storage is full (" .. PC.MaxOwned .. ") - sell some pets!"
 	end
@@ -8928,6 +10190,9 @@ function PetService:Hatch(player: Player, eggId: any): (boolean, string)
 	local pet = self:_roll(egg, S.MonetizationService:HasPass(player, "PetLuck"))
 	self:Give(player, pet.Id, 1)
 	data.Pets.Hatched += 1
+	if S.ProgressService then
+		S.ProgressService:Record(player, "Hatch")
+	end
 	if S.QuestService then
 		S.QuestService:Progress(player, "Hatch", 1)
 	end
@@ -9061,7 +10326,56 @@ return PetService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="30">
+        <Properties>
+          <string name="Name">ProgressService</string>
+          <string name="Source"><![CDATA[--[[
+	ProgressService - one place to say "the player just did X".
+	Services call ProgressService:Record(player, event). It counts the few things
+	that aren't saved anywhere else (Stats), gives Season XP, and asks the
+	achievements to re-check.
+
+	Events: Upgrade Quest Hatch Survive Minigame Rebirth Chest Daily Spin Trade Gift Achievement
+]]
+local ProgressService = {}
+local S
+
+-- event -> the counter in data.Stats it increases
+local COUNTERS = {
+	Upgrade = "Upgrades",
+	Survive = "Survived",
+	Chest = "Chests",
+	Quest = "Quests",
+	Trade = "Trades",
+	Gift = "GiftsSent",
+}
+
+function ProgressService:Record(player: Player, event: string, amount: number?)
+	local data = S.DataService:Get(player)
+	if not data then
+		return
+	end
+	local counter = COUNTERS[event]
+	if counter then
+		data.Stats[counter] = (data.Stats[counter] or 0) + (amount or 1)
+	end
+	if S.SeasonService then
+		S.SeasonService:AddXp(player, event, amount)
+	end
+	if S.AchievementService then
+		S.AchievementService:Dirty(player)
+	end
+end
+
+function ProgressService:Init(services)
+	S = services
+end
+
+return ProgressService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">QuestService</string>
           <string name="Source"><![CDATA[--[[
@@ -9346,6 +10660,9 @@ function QuestService:Claim(player: Player, which: any): (boolean, string)
 	local cash, boost = self:_reward(player, quest)
 	table.remove(list, slot)
 	data.Quests.Claimed += 1
+	if S.ProgressService then
+		S.ProgressService:Record(player, "Quest")
+	end
 	S.DataService:AddCash(player, cash, false)
 	local text = "+" .. Util.Money(cash)
 	if boost then
@@ -9403,7 +10720,7 @@ return QuestService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">RewardService</string>
           <string name="Source"><![CDATA[--[[
@@ -9438,6 +10755,9 @@ function RewardService:Init(services)
 		end
 		if Util.IsFinite(settings.MusicVolume) then
 			data.Settings.MusicVolume = math.clamp(settings.MusicVolume, 0, 1)
+		end
+		if Util.IsFinite(settings.UISize) then
+			data.Settings.UISize = math.clamp(settings.UISize, 0.7, 1.5)
 		end
 		if type(settings.SFX) == "boolean" then
 			data.Settings.SFX = settings.SFX
@@ -9488,6 +10808,9 @@ function RewardService:ClaimDaily(player: Player): (boolean, string)
 	local amount = self:GetDailyReward(player, data.DailyStreak)
 	S.DataService:AddCash(player, amount, false)
 	S.DataService:Sync(player)
+	if S.ProgressService then
+		S.ProgressService:Record(player, "Daily")
+	end
 	Remotes.VFX:FireClient(player, "Confetti", {})
 	Remotes.VFX:FireClient(player, "CashBurst", { Amount = amount })
 	return true, "Day " .. data.DailyStreak .. " reward: +" .. Util.Money(amount) .. "!"
@@ -9533,7 +10856,208 @@ return RewardService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="33">
+        <Properties>
+          <string name="Name">SeasonService</string>
+          <string name="Source"><![CDATA[--[[
+	SeasonService - the Season (battle pass), see Config.Season. XP comes from
+	playing (ProgressService events + a little every minute); levels unlock
+	rewards on the free track and the premium track (Season Pass owners).
+	A new season starts every Config.Season.Days days and resets everyone's XP.
+]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local Remotes = require(Shared.Remotes)
+
+local SC = Config.Season
+
+local SeasonService = {}
+local S
+
+-- the player's season data, started fresh when a new season began
+function SeasonService:_season(data)
+	local number = Config.CurrentSeason(os.time())
+	if data.Season.Id ~= number then
+		data.Season = { Id = number, XP = 0, Free = {}, Premium = {} }
+	end
+	return data.Season
+end
+
+-- (level, xp into the level, xp the next level needs)
+function SeasonService:LevelOf(xp: number): (number, number, number)
+	local level, remaining = 0, xp
+	while level < SC.Levels do
+		local need = Config.SeasonXpForLevel(level + 1)
+		if remaining < need then
+			return level, remaining, need
+		end
+		remaining -= need
+		level += 1
+	end
+	return SC.Levels, 0, 0
+end
+
+function SeasonService:GetLevel(player: Player): number
+	local data = S.DataService:Get(player)
+	if not data then
+		return 0
+	end
+	return (self:LevelOf(self:_season(data).XP))
+end
+
+function SeasonService:HasPremium(player: Player): boolean
+	return S.MonetizationService:HasPass(player, SC.PremiumPass)
+end
+
+-- rewards waiting to be claimed
+function SeasonService:Sync(player: Player)
+	local data = S.DataService:Get(player)
+	if not data then
+		return
+	end
+	local season = self:_season(data)
+	local level = self:LevelOf(season.XP)
+	local ready = 0
+	for l = 1, level do
+		if SC.Free[l] and not season.Free[tostring(l)] then
+			ready += 1
+		end
+		if SC.Premium[l] and not season.Premium[tostring(l)] and self:HasPremium(player) then
+			ready += 1
+		end
+	end
+	player:SetAttribute("SeasonLevel", level)
+	player:SetAttribute("SeasonReady", ready)
+end
+
+function SeasonService:AddXp(player: Player, event: string, amount: number?)
+	local perEvent = SC.Xp[event]
+	local data = S.DataService:Get(player)
+	if not SC.Enabled or not perEvent or not data then
+		return
+	end
+	local season = self:_season(data)
+	local before = self:LevelOf(season.XP)
+	season.XP += perEvent * (amount or 1)
+	local after = self:LevelOf(season.XP)
+	if after > before then
+		Remotes.Notify:FireClient(player, { Text = "🎫 Season level " .. after .. "! New rewards are waiting.", Type = "success", Duration = 5 })
+	end
+	self:Sync(player)
+end
+
+function SeasonService:GetState(player: Player)
+	local data = S.DataService:Get(player)
+	if not data then
+		return nil
+	end
+	local season = self:_season(data)
+	local number, _, ends, name = Config.CurrentSeason(os.time())
+	local level, into, need = self:LevelOf(season.XP)
+	return {
+		Number = number,
+		Name = name,
+		EndsAt = ends,
+		XP = season.XP,
+		Level = level,
+		Into = into,
+		Need = need,
+		Premium = self:HasPremium(player),
+		Free = season.Free,
+		PremiumClaimed = season.Premium,
+	}
+end
+
+function SeasonService:_give(player: Player, data, reward): string
+	if reward.Kind == "Cash" then
+		local cash = math.floor(math.max((reward.MinCash or 0) * (1 + data.Rebirths), S.TycoonService:GetIncome(player) * reward.Minutes * 60))
+		S.DataService:AddCash(player, cash, false)
+		Remotes.VFX:FireClient(player, "CashBurst", { Amount = cash })
+		return "+" .. Util.Money(cash)
+	elseif reward.Kind == "Boost" then
+		S.DataService:AddBoost(player, reward.Seconds)
+		return "2x cash for " .. Util.FormatTime(reward.Seconds)
+	elseif reward.Kind == "Pet" then
+		local pet = Config.PetById[reward.Id]
+		if S.PetService:Give(player, reward.Id, 1) > 0 then
+			return pet.Icon .. " " .. pet.Name
+		end
+		-- storage full: pay what the pet is worth instead
+		local value = S.PetService:GetSellValue(player, reward.Id)
+		S.DataService:AddCash(player, value, false)
+		return "(pets full) +" .. Util.Money(value) .. " instead of " .. pet.Name
+	elseif reward.Kind == "Cosmetic" then
+		local cosmetic = Config.Cosmetics.ById[reward.Id]
+		S.CosmeticService:Give(player, reward.Id, true)
+		return cosmetic.Icon .. " " .. cosmetic.Name
+	end
+	return ""
+end
+
+function SeasonService:Claim(player: Player, track: any, level: any): (boolean, string)
+	local data = S.DataService:Get(player)
+	if not data then
+		return false, "Data still loading..."
+	end
+	if (track ~= "Free" and track ~= "Premium") or type(level) ~= "number" or level ~= math.floor(level) then
+		return false, "Unknown reward."
+	end
+	local reward = SC[track][level]
+	if not reward then
+		return false, "Unknown reward."
+	end
+	local season = self:_season(data)
+	if self:LevelOf(season.XP) < level then
+		return false, "Reach season level " .. level .. " first!"
+	end
+	if track == "Premium" and not self:HasPremium(player) then
+		return false, "The premium track needs the Season Pass."
+	end
+	local claimed = track == "Free" and season.Free or season.Premium
+	if claimed[tostring(level)] then
+		return false, "Already claimed."
+	end
+	claimed[tostring(level)] = true
+	local text = self:_give(player, data, reward)
+	Remotes.VFX:FireClient(player, "Confetti", {})
+	self:Sync(player)
+	return true, "🎫 Level " .. level .. ": " .. text
+end
+
+function SeasonService:Init(services)
+	S = services
+	Remotes.SeasonGet.OnServerInvoke = function(player)
+		return self:GetState(player)
+	end
+	Remotes.SeasonClaim.OnServerInvoke = function(player, track, level)
+		if not SC.Enabled then
+			return false, "The season is paused."
+		end
+		return self:Claim(player, track, level)
+	end
+	S.DataService.PlayerLoaded:Connect(function(player)
+		self:Sync(player)
+	end)
+end
+
+function SeasonService:Start()
+	while true do
+		task.wait(60)
+		for _, player in Players:GetPlayers() do
+			Util.Try("Season minute", self.AddXp, self, player, "Minute")
+		end
+	end
+end
+
+return SeasonService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">SecretService</string>
           <string name="Source"><![CDATA[--[[
@@ -9686,7 +11210,7 @@ return SecretService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">ShieldService</string>
           <string name="Source"><![CDATA[--[[
@@ -9797,7 +11321,94 @@ return ShieldService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="36">
+        <Properties>
+          <string name="Name">SocialService</string>
+          <string name="Source"><![CDATA[--[[
+	SocialService - the free reward for joining the game's Roblox group
+	(Config.Social.GroupId) and the private-server info. The group check runs on
+	the server, and the reward can only be claimed once per account.
+]]
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local Remotes = require(Shared.Remotes)
+
+local SC = Config.Social
+
+local SocialService = {}
+local S
+
+local function inGroup(player: Player): boolean
+	if SC.GroupId == 0 then
+		return false
+	end
+	local ok, result = pcall(player.IsInGroup, player, SC.GroupId)
+	return ok and result == true
+end
+
+function SocialService:GetState(player: Player)
+	local data = S.DataService:Get(player)
+	if not data then
+		return nil
+	end
+	return {
+		GroupId = SC.GroupId,
+		GroupLink = SC.GroupLink,
+		InGroup = inGroup(player),
+		Claimed = data.Social.Group,
+		Reward = SC.GroupReward,
+		Private = game.PrivateServerId ~= "" and game.PrivateServerOwnerId ~= 0,
+		PrivateBonus = SC.PrivateServerBonus,
+	}
+end
+
+function SocialService:ClaimGroup(player: Player): (boolean, string)
+	local data = S.DataService:Get(player)
+	if not data then
+		return false, "Data still loading..."
+	end
+	if SC.GroupId == 0 then
+		return false, "There's no group reward set up."
+	end
+	if data.Social.Group then
+		return false, "You already claimed the group reward."
+	end
+	if not inGroup(player) then
+		return false, "Join the group first, then press Claim again!"
+	end
+	data.Social.Group = true
+	local reward = SC.GroupReward
+	local cash = math.floor(math.max(reward.MinCash * (1 + data.Rebirths), S.TycoonService:GetIncome(player) * reward.Minutes * 60))
+	S.DataService:AddCash(player, cash, false)
+	if reward.BoostSeconds then
+		S.DataService:AddBoost(player, reward.BoostSeconds)
+	end
+	Remotes.VFX:FireClient(player, "Confetti", {})
+	Remotes.VFX:FireClient(player, "CashBurst", { Amount = cash })
+	return true, "Thanks for joining! +" .. Util.Money(cash) .. (reward.BoostSeconds and (" & 2x for " .. Util.FormatTime(reward.BoostSeconds)) or "")
+end
+
+function SocialService:Init(services)
+	S = services
+	Remotes.SocialGet.OnServerInvoke = function(player)
+		return self:GetState(player)
+	end
+	Remotes.SocialAction.OnServerInvoke = function(player, action)
+		if action == "ClaimGroup" then
+			return self:ClaimGroup(player)
+		end
+		return false, "Unknown action."
+	end
+end
+
+return SocialService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">StaffService</string>
           <string name="Source"><![CDATA[--[[
@@ -10206,7 +11817,428 @@ return StaffService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="38">
+        <Properties>
+          <string name="Name">TradeService</string>
+          <string name="Source"><![CDATA[--[[
+	TradeService - trade pets with another player in the same server.
+	Flow: Invite -> the other player Responds (accept) -> both Add pets -> both
+	press Accept -> the pets swap. Any change to either offer resets both accepts
+	and the Accept button waits Config.Trading.ConfirmDelay seconds again (so
+	nobody can swap an offer at the last moment). Cash can't be traded.
+	The swap happens in one step on the server; both saves follow right away.
+]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Remotes = require(Shared.Remotes)
+
+local TC = Config.Trading
+
+local TradeService = {}
+local S
+
+type Trade = {
+	A: Player,
+	B: Player,
+	Offer: { [Player]: { number } }, -- pet uids
+	Accepted: { [Player]: boolean },
+	ReadyAt: number, -- os.clock when Accept is allowed
+	ReadyAtServer: number, -- the same, as server unix time (for the clients' countdown)
+	Started: number,
+}
+
+local trades: { [Player]: Trade } = {} -- both players point at the same trade
+local invites: { [Player]: { From: Player, Expires: number } } = {} -- by the invited player
+local lastAction: { [Player]: number } = {}
+
+local function findOwned(data, uid: number)
+	for index, pet in data.Pets.Owned do
+		if pet.Uid == uid then
+			return pet, index
+		end
+	end
+	return nil, nil
+end
+
+local function other(trade: Trade, player: Player): Player
+	return trade.A == player and trade.B or trade.A
+end
+
+function TradeService:_view(trade: Trade, player: Player)
+	local partner = other(trade, player)
+	local function list(owner: Player)
+		local data = S.DataService:Get(owner)
+		local pets = {}
+		for _, uid in trade.Offer[owner] do
+			local pet = data and findOwned(data, uid)
+			if pet then
+				table.insert(pets, { Uid = pet.Uid, Id = pet.Id })
+			end
+		end
+		return pets
+	end
+	return {
+		Partner = { Name = partner.DisplayName, UserId = partner.UserId },
+		Mine = list(player),
+		Theirs = list(partner),
+		MyAccepted = trade.Accepted[player] == true,
+		TheirAccepted = trade.Accepted[partner] == true,
+		ReadyAt = trade.ReadyAtServer,
+		MaxPets = TC.MaxPets,
+	}
+end
+
+function TradeService:_send(trade: Trade)
+	for _, player in { trade.A, trade.B } do
+		if player.Parent then
+			Remotes.TradeUpdate:FireClient(player, self:_view(trade, player))
+		end
+	end
+end
+
+-- ends a trade; `reason` is shown to both
+function TradeService:_end(trade: Trade, reason: string?, kind: string?)
+	trades[trade.A], trades[trade.B] = nil, nil
+	for _, player in { trade.A, trade.B } do
+		if player.Parent then
+			Remotes.TradeUpdate:FireClient(player, nil)
+			if reason then
+				Remotes.Notify:FireClient(player, { Text = reason, Type = kind or "info", Duration = 5 })
+			end
+		end
+	end
+end
+
+function TradeService:_changed(trade: Trade)
+	trade.Accepted = {}
+	trade.ReadyAt = os.clock() + TC.ConfirmDelay
+	trade.ReadyAtServer = os.time() + TC.ConfirmDelay
+	self:_send(trade)
+end
+
+function TradeService:Invite(player: Player, targetUserId: any): (boolean, string)
+	if type(targetUserId) ~= "number" then
+		return false, "Pick a player."
+	end
+	local target = Players:GetPlayerByUserId(targetUserId)
+	if not target or target == player then
+		return false, "That player isn't here."
+	end
+	if not S.DataService:IsLoaded(player) or not S.DataService:IsLoaded(target) then
+		return false, "Data still loading..."
+	end
+	if trades[player] then
+		return false, "Finish your current trade first."
+	end
+	if trades[target] then
+		return false, target.DisplayName .. " is already trading."
+	end
+	invites[target] = { From = player, Expires = os.clock() + TC.InviteTimeout }
+	Remotes.TradeInvited:FireClient(target, { FromName = player.DisplayName, FromUserId = player.UserId, Timeout = TC.InviteTimeout })
+	return true, "Trade request sent to " .. target.DisplayName .. "."
+end
+
+function TradeService:Respond(player: Player, accept: any): (boolean, string)
+	local invite = invites[player]
+	invites[player] = nil
+	if not invite or invite.Expires < os.clock() or not invite.From.Parent then
+		return false, "That request has expired."
+	end
+	local from = invite.From
+	if accept ~= true then
+		Remotes.Notify:FireClient(from, { Text = player.DisplayName .. " declined your trade.", Type = "info" })
+		return true, "Declined."
+	end
+	if trades[from] or trades[player] then
+		return false, "One of you is already trading."
+	end
+	local trade: Trade = {
+		A = from,
+		B = player,
+		Offer = { [from] = {}, [player] = {} },
+		Accepted = {},
+		ReadyAt = os.clock() + TC.ConfirmDelay,
+		ReadyAtServer = os.time() + TC.ConfirmDelay,
+		Started = os.clock(),
+	}
+	trades[from], trades[player] = trade, trade
+	self:_send(trade)
+	return true, "Trading with " .. from.DisplayName .. "!"
+end
+
+function TradeService:Add(player: Player, uid: any): (boolean, string)
+	local trade = trades[player]
+	local data = S.DataService:Get(player)
+	if not trade or not data or type(uid) ~= "number" then
+		return false, "You're not trading."
+	end
+	if not findOwned(data, uid) then
+		return false, "You don't have that pet."
+	end
+	local offer = trade.Offer[player]
+	if table.find(offer, uid) then
+		return false, "Already in the trade."
+	end
+	if #offer >= TC.MaxPets then
+		return false, "You can offer up to " .. TC.MaxPets .. " pets."
+	end
+	table.insert(offer, uid)
+	self:_changed(trade)
+	return true, ""
+end
+
+function TradeService:Remove(player: Player, uid: any): (boolean, string)
+	local trade = trades[player]
+	local index = trade and type(uid) == "number" and table.find(trade.Offer[player], uid)
+	if not trade or not index then
+		return false, "That pet isn't in the trade."
+	end
+	table.remove(trade.Offer[player], index)
+	self:_changed(trade)
+	return true, ""
+end
+
+function TradeService:Accept(player: Player): (boolean, string)
+	local trade = trades[player]
+	if not trade then
+		return false, "You're not trading."
+	end
+	if #trade.Offer[trade.A] + #trade.Offer[trade.B] == 0 then
+		return false, "Add a pet first."
+	end
+	if os.clock() < trade.ReadyAt then
+		return false, "Wait a moment and check the offer carefully!"
+	end
+	trade.Accepted[player] = true
+	if trade.Accepted[trade.A] and trade.Accepted[trade.B] then
+		return self:_execute(trade)
+	end
+	self:_send(trade)
+	return true, "Waiting for " .. other(trade, player).DisplayName .. "..."
+end
+
+function TradeService:_execute(trade: Trade): (boolean, string)
+	local a, b = trade.A, trade.B
+	local dataA, dataB = S.DataService:Get(a), S.DataService:Get(b)
+	if not dataA or not dataB then
+		self:_end(trade, "The trade was cancelled.", "error")
+		return false, "Trade cancelled."
+	end
+	-- everything must still be true right now
+	local movingA, movingB = {}, {}
+	for _, uid in trade.Offer[a] do
+		local pet = findOwned(dataA, uid)
+		if not pet then
+			self:_end(trade, "The trade was cancelled: a pet is gone.", "error")
+			return false, "Trade cancelled."
+		end
+		table.insert(movingA, pet)
+	end
+	for _, uid in trade.Offer[b] do
+		local pet = findOwned(dataB, uid)
+		if not pet then
+			self:_end(trade, "The trade was cancelled: a pet is gone.", "error")
+			return false, "Trade cancelled."
+		end
+		table.insert(movingB, pet)
+	end
+	local maxOwned = Config.Pets.MaxOwned
+	if #dataA.Pets.Owned - #movingA + #movingB > maxOwned or #dataB.Pets.Owned - #movingB + #movingA > maxOwned then
+		self:_end(trade, "The trade was cancelled: someone's pet storage would be full.", "error")
+		return false, "Trade cancelled."
+	end
+
+	local function take(data, moving)
+		for _, pet in moving do
+			local _, index = findOwned(data, pet.Uid)
+			if index then
+				table.remove(data.Pets.Owned, index)
+			end
+			local equipped = table.find(data.Pets.Equipped, pet.Uid)
+			if equipped then
+				table.remove(data.Pets.Equipped, equipped)
+			end
+		end
+	end
+	local function receive(data, moving)
+		for _, pet in moving do
+			table.insert(data.Pets.Owned, { Uid = data.Pets.NextUid, Id = pet.Id })
+			data.Pets.NextUid += 1
+		end
+	end
+	-- copy the ids first (take() removes the records)
+	local idsA, idsB = {}, {}
+	for _, pet in movingA do
+		table.insert(idsA, { Id = pet.Id, Uid = pet.Uid })
+	end
+	for _, pet in movingB do
+		table.insert(idsB, { Id = pet.Id, Uid = pet.Uid })
+	end
+	take(dataA, idsA)
+	take(dataB, idsB)
+	receive(dataA, idsB)
+	receive(dataB, idsA)
+
+	trades[a], trades[b] = nil, nil
+	for _, player in { a, b } do
+		Remotes.TradeUpdate:FireClient(player, nil)
+		Remotes.Notify:FireClient(player, { Text = "🤝 Trade complete with " .. other(trade, player).DisplayName .. "!", Type = "success", Duration = 6 })
+		Remotes.VFX:FireClient(player, "Confetti", {})
+		S.PetService:Resync(player)
+		if S.ProgressService then
+			S.ProgressService:Record(player, "Trade")
+		end
+	end
+	-- save both right away so a crash can't duplicate or lose pets
+	task.spawn(function()
+		S.DataService:Save(a)
+		S.DataService:Save(b)
+	end)
+	return true, "Trade complete!"
+end
+
+function TradeService:Cancel(player: Player): (boolean, string)
+	local trade = trades[player]
+	if not trade then
+		return false, "You're not trading."
+	end
+	self:_end(trade, "❌ " .. player.DisplayName .. " cancelled the trade.", "info")
+	return true, "Trade cancelled."
+end
+
+function TradeService:Init(services)
+	S = services
+	Remotes.TradeAction.OnServerInvoke = function(player, action, arg)
+		if not TC.Enabled then
+			return false, "Trading is turned off."
+		end
+		local now = os.clock()
+		if lastAction[player] and now - lastAction[player] < 0.2 then
+			return false, "Slow down!"
+		end
+		lastAction[player] = now
+		if action == "Invite" then
+			return self:Invite(player, arg)
+		elseif action == "Respond" then
+			return self:Respond(player, arg)
+		elseif action == "Add" then
+			return self:Add(player, arg)
+		elseif action == "Remove" then
+			return self:Remove(player, arg)
+		elseif action == "Accept" then
+			return self:Accept(player)
+		elseif action == "Cancel" then
+			return self:Cancel(player)
+		end
+		return false, "Unknown action."
+	end
+	Players.PlayerRemoving:Connect(function(player)
+		local trade = trades[player]
+		if trade then
+			self:_end(trade, "❌ " .. player.DisplayName .. " left - the trade was cancelled.", "info")
+		end
+		invites[player] = nil
+		lastAction[player] = nil
+		for target, invite in invites do
+			if invite.From == player then
+				invites[target] = nil
+			end
+		end
+	end)
+end
+
+function TradeService:Start()
+	while true do
+		task.wait(5)
+		local seen = {}
+		for _, trade in trades do
+			if not seen[trade] then
+				seen[trade] = true
+				if os.clock() - trade.Started > TC.TradeTimeout then
+					self:_end(trade, "⌛ The trade timed out.", "info")
+				end
+			end
+		end
+		for target, invite in invites do
+			if invite.Expires < os.clock() then
+				invites[target] = nil
+			end
+		end
+	end
+end
+
+return TradeService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="39">
+        <Properties>
+          <string name="Name">TutorialService</string>
+          <string name="Source"><![CDATA[--[[
+	TutorialService - pays the reward of the first-time tutorial. The client
+	shows the steps; the server checks them from the saved data before paying
+	(buy a few upgrades, spin the wheel, claim the daily reward), once per account.
+]]
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local Remotes = require(Shared.Remotes)
+
+local TC = Config.Tutorial
+
+local TutorialService = {}
+local S
+
+local function owned(data): number
+	local n = 0
+	for _ in data.Purchased do
+		n += 1
+	end
+	return n
+end
+
+function TutorialService:Claim(player: Player)
+	local data = S.DataService:Get(player)
+	if not TC.Enabled or not data or data.Tutorial.Done then
+		return
+	end
+	local boughtEnough = math.max(owned(data) - 1, data.Stats.Upgrades or 0) >= TC.BuyUpgrades
+	if not boughtEnough or data.Wheel.Spins < 1 or data.DailyStreak < 1 then
+		return -- the client is wrong or cheating: nothing happens
+	end
+	data.Tutorial.Done = true
+	player:SetAttribute("TutorialDone", true)
+	local cash = math.floor(math.max(TC.Reward.MinCash * (1 + data.Rebirths), S.TycoonService:GetIncome(player) * TC.Reward.Minutes * 60))
+	S.DataService:AddCash(player, cash, false)
+	Remotes.Notify:FireClient(player, { Text = "🎓 Tutorial complete! +" .. Util.Money(cash), Type = "success", Duration = 7 })
+	Remotes.VFX:FireClient(player, "Confetti", {})
+	Remotes.VFX:FireClient(player, "CashBurst", { Amount = cash })
+end
+
+function TutorialService:Init(services)
+	S = services
+	Remotes.TutorialClaim.OnServerEvent:Connect(function(player)
+		self:Claim(player)
+	end)
+	S.DataService.PlayerLoaded:Connect(function(player, data)
+		-- players who already got far don't need the tutorial
+		if not data.Tutorial.Done and (data.Wheel.Spins > 0 and data.DailyStreak > 0 and owned(data) > TC.BuyUpgrades) then
+			data.Tutorial.Done = true
+		end
+		player:SetAttribute("TutorialDone", data.Tutorial.Done or not TC.Enabled)
+	end)
+end
+
+return TutorialService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">TycoonBuilder</string>
           <string name="Source"><![CDATA[--[[
@@ -11041,7 +13073,7 @@ return TycoonBuilder
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">TycoonService</string>
           <string name="Source"><![CDATA[--[[
@@ -11871,6 +13903,9 @@ function TycoonService:TryPurchase(player: Player, itemId: string, silent: boole
 	end
 	S.DataService:SpendCash(plot.Owner, price)
 	data.Purchased[itemId] = true
+	if S.ProgressService then
+		S.ProgressService:Record(plot.Owner, "Upgrade")
+	end
 
 	local button = plot.ButtonObjs[itemId]
 	if button and not silent then
@@ -11989,6 +14024,9 @@ function TycoonService:Rebirth(player: Player, free: boolean?)
 	end
 	local rankBefore = Config.RebirthRank(data.Rebirths)
 	data.Rebirths += 1
+	if S.ProgressService then
+		S.ProgressService:Record(player, "Rebirth")
+	end
 	data.Cash = Config.StartingCash + Config.RebirthPerk(data.Rebirths, "Start")
 	data.Vault = 0
 	data.Purchased = { F1_1 = true }
@@ -12288,7 +14326,7 @@ return TycoonService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">WeeklyService</string>
           <string name="Source"><![CDATA[--[[
@@ -12448,7 +14486,7 @@ return WeeklyService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">WheelService</string>
           <string name="Source"><![CDATA[--[[
@@ -12520,6 +14558,9 @@ function WheelService:Spin(player: Player): (boolean, number, string)
 	local cash, boost = self:GetPrize(player, segment)
 	data.Wheel.Last = os.time()
 	data.Wheel.Spins += 1
+	if S.ProgressService then
+		S.ProgressService:Record(player, "Spin")
+	end
 	self:_sync(player)
 	if cash > 0 then
 		S.DataService:AddCash(player, cash, false)
@@ -12569,7 +14610,7 @@ return WheelService
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">WorldBuilder</string>
           <string name="Source"><![CDATA[--[[
@@ -13442,22 +15483,22 @@ return WorldBuilder
       </Item>
     </Item>
   </Item>
-  <Item class="SoundService" referent="37">
+  <Item class="SoundService" referent="45">
     <Properties>
       <string name="Name">SoundService</string>
     </Properties>
   </Item>
-  <Item class="StarterPlayer" referent="38">
+  <Item class="StarterPlayer" referent="46">
     <Properties>
       <string name="Name">StarterPlayer</string>
       <float name="CharacterJumpPower">50</float>
       <float name="CharacterWalkSpeed">16</float>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="39">
+    <Item class="StarterPlayerScripts" referent="47">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="40">
+      <Item class="LocalScript" referent="48">
         <Properties>
           <string name="Name">Client</string>
           <string name="Source"><![CDATA[--[[
@@ -13485,6 +15526,13 @@ local ORDER = {
 	"Pets",
 	"Travel",
 	"Weekly",
+	"Achievements",
+	"Season",
+	"Style",
+	"Trade",
+	"Social",
+	"Records",
+	"Tutorial",
 	"Guide",
 	"DropVisuals",
 	"Admin",
@@ -13529,11 +15577,130 @@ end
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="41">
+      <Item class="Folder" referent="49">
         <Properties>
           <string name="Name">Controllers</string>
         </Properties>
-        <Item class="ModuleScript" referent="42">
+        <Item class="ModuleScript" referent="50">
+          <Properties>
+            <string name="Name">Achievements</string>
+            <string name="Source"><![CDATA[--[[ Achievements (client) - the achievements panel: one row per group with the next goal ]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local UIKit = require(Shared.UIKit)
+local Remotes = require(Shared.Remotes)
+
+local player = Players.LocalPlayer
+local Theme = UIKit.Theme
+
+local Achievements = {}
+local C
+
+local summary: TextLabel
+local setOverall: (number) -> ()
+local list: ScrollingFrame
+
+local function amount(stat: string, value: number): string
+	if stat == "Earned" then
+		return Util.Money(value)
+	elseif stat == "Hours" then
+		return string.format("%.1f", value)
+	end
+	return Util.Abbreviate(math.floor(value))
+end
+
+local function rewardText(reward): string
+	local parts = {}
+	if reward.Minutes then
+		table.insert(parts, "💵 " .. reward.Minutes .. " min of income")
+	end
+	if reward.Boost then
+		table.insert(parts, "⚡ 2x " .. Util.FormatTime(reward.Boost))
+	end
+	if reward.Cosmetic then
+		local cosmetic = Config.Cosmetics.ById[reward.Cosmetic]
+		table.insert(parts, (cosmetic and cosmetic.Icon or "✨") .. " " .. (cosmetic and cosmetic.Name or reward.Cosmetic))
+	end
+	return table.concat(parts, "  ")
+end
+
+local function render(state)
+	UIKit.Clear(list)
+	summary.Text = string.format("🏆 %d / %d unlocked", state.DoneCount, state.Total)
+	setOverall(state.DoneCount / math.max(state.Total, 1))
+	local groups, order = {}, {}
+	for _, achievement in Config.Achievements.List do
+		if not groups[achievement.Group] then
+			groups[achievement.Group] = {}
+			table.insert(order, achievement.Group)
+		end
+		table.insert(groups[achievement.Group], achievement)
+	end
+	for index, group in order do
+		local tiers = groups[group]
+		local current, doneCount = nil, 0
+		for _, achievement in tiers do
+			if state.Done[achievement.Id] then
+				doneCount += 1
+			elseif not current then
+				current = achievement
+			end
+		end
+		local row = UIKit.Row(list, index, 74)
+		local shown = current or tiers[#tiers]
+		UIKit.Label({ Text = shown.Icon, Size = UDim2.fromOffset(50, 50), Position = UDim2.fromOffset(8, 12), ZIndex = 8, Parent = row })
+		UIKit.Label({ Text = shown.Name .. (current == nil and "  ✓" or ""), Size = UDim2.new(0.45, -60, 0, 24), Position = UDim2.fromOffset(64, 6), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = current and Theme.Text or Theme.Green, ZIndex = 8, Parent = row })
+		UIKit.Label({ Text = shown.Text:format(amount(shown.Stat, shown.Target)), Size = UDim2.new(0.45, -60, 0, 18), Position = UDim2.fromOffset(64, 30), TextXAlignment = Enum.TextXAlignment.Left, Font = Theme.BodyFont, TextColor3 = Theme.SubText, Stroke = false, ZIndex = 8, Parent = row })
+		local dots = {}
+		for _, achievement in tiers do
+			table.insert(dots, state.Done[achievement.Id] and "●" or "○")
+		end
+		UIKit.Label({ Text = table.concat(dots, " "), Size = UDim2.new(0.45, -60, 0, 16), Position = UDim2.fromOffset(64, 50), TextXAlignment = Enum.TextXAlignment.Left, Font = Theme.BodyFont, TextColor3 = Theme.Accent, Stroke = false, ZIndex = 8, Parent = row })
+		if current then
+			local value = state.Stats[current.Stat] or 0
+			local _, set = UIKit.Bar(row, UDim2.new(0.4, 0, 0, 18), UDim2.new(0.55, 0, 0, 14), Theme.Green)
+			set(value / current.Target)
+			UIKit.Label({ Text = amount(current.Stat, value) .. " / " .. amount(current.Stat, current.Target), Size = UDim2.new(0.4, 0, 0, 16), Position = UDim2.new(0.55, 0, 0, 14), Font = Theme.BodyFont, ZIndex = 10, Parent = row })
+			UIKit.Label({ Text = rewardText(current.Reward), Size = UDim2.new(0.4, 0, 0, 18), Position = UDim2.new(0.55, 0, 0, 40), Font = Theme.BodyFont, TextColor3 = Theme.Accent, Stroke = false, ZIndex = 8, Parent = row })
+		else
+			UIKit.Label({ Text = "COMPLETE", Size = UDim2.new(0.35, 0, 0, 30), Position = UDim2.new(0.6, 0, 0.5, -15), TextColor3 = Theme.Green, ZIndex = 8, Parent = row })
+		end
+	end
+end
+
+local function refresh()
+	local state = Remotes.AchievementsGet:InvokeServer()
+	if state then
+		render(state)
+	end
+end
+
+function Achievements:Init(controllers)
+	C = controllers
+	local _, content = C.UI:MakePanel("Achievements", "🏆 ACHIEVEMENTS", Theme.Accent, 760, 580, refresh)
+	summary = UIKit.Label({ Text = "", Size = UDim2.new(0.5, 0, 0, 26), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 7, Parent = content })
+	local bar, set = UIKit.Bar(content, UDim2.new(0.5, -10, 0, 18), UDim2.new(0.5, 10, 0, 4), Theme.Accent)
+	bar.ZIndex = 7
+	setOverall = set
+	list = UIKit.Scroll({ Size = UDim2.new(1, 0, 1, -40), Position = UDim2.fromOffset(0, 36), Parent = content })
+	UIKit.List(list, 6)
+	UIKit.new("UIPadding", { PaddingRight = UDim.new(0, 8), Parent = list })
+	player:GetAttributeChangedSignal("Achievements"):Connect(function()
+		if C.UI.Current == "Achievements" then
+			task.spawn(refresh)
+		end
+	end)
+end
+
+return Achievements
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">Admin</string>
             <string name="Source"><![CDATA[--[[
@@ -14316,7 +16483,7 @@ return Admin
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="43">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">Animator</string>
             <string name="Source"><![CDATA[--[[
@@ -14523,7 +16690,7 @@ return Animator
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="44">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">Build</string>
             <string name="Source"><![CDATA[--[[
@@ -14977,7 +17144,7 @@ return Build
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="45">
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">ChatTags</string>
             <string name="Source"><![CDATA[--[[ ChatTags - [Owner] / [Admin] / [VIP] / rebirth tags in the chat ]]
@@ -15067,7 +17234,7 @@ return ChatTags
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="46">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">Disasters</string>
             <string name="Source"><![CDATA[--[[
@@ -15984,7 +18151,7 @@ return Disasters
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">DropVisuals</string>
             <string name="Source"><![CDATA[--[[
@@ -16259,7 +18426,7 @@ return DropVisuals
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">Duo</string>
             <string name="Source"><![CDATA[--[[ Duo (client) - invite players to build one tower together + invite popups ]]
@@ -16458,7 +18625,7 @@ return Duo
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">Gifts</string>
             <string name="Source"><![CDATA[--[[ Gifts (client) - the playtime gift button (bottom right) ]]
@@ -16557,7 +18724,7 @@ return Gifts
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">Guide</string>
             <string name="Source"><![CDATA[--[[
@@ -16738,7 +18905,7 @@ return Guide
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="60">
           <Properties>
             <string name="Name">HUD</string>
             <string name="Source"><![CDATA[--[[ HUD - cash counter, income, multiplier/boost info, floor indicator,
@@ -16770,6 +18937,10 @@ local boostLabel: TextLabel
 local floorLabel: TextLabel
 local repairFrame: Frame
 local repairLabel: TextLabel
+local liveById = {}
+for _, event in Config.LiveEvents.List do
+	liveById[event.Id] = event
+end
 local menuButtons: { [string]: TextButton } = {}
 local moreNames: { [string]: boolean } = {}
 local badgeOn: { [string]: boolean } = {}
@@ -16932,7 +19103,7 @@ function HUD:Init(controllers)
 
 	local morePanel = UIKit.new("Frame", {
 		Name = "MorePanel",
-		Size = UDim2.fromOffset(170, 440),
+		Size = UDim2.fromOffset(250, 500),
 		Position = UDim2.new(0, 96, 0.5, 0),
 		AnchorPoint = Vector2.new(0, 0.5),
 		BackgroundColor3 = Theme.Panel,
@@ -16948,16 +19119,18 @@ function HUD:Init(controllers)
 		SortOrder = Enum.SortOrder.LayoutOrder,
 		Parent = morePanel,
 	})
-	moreGrid.FillDirectionMaxCells = 2
+	moreGrid.FillDirectionMaxCells = 3
 	moreGrid.HorizontalAlignment = Enum.HorizontalAlignment.Center
 	moreGrid.VerticalAlignment = Enum.VerticalAlignment.Center
 	local moreScale = UIKit.new("UIScale", { Parent = morePanel })
 	local function rescale()
+		-- fits the screen, a little bigger for fingers, and the player's UI size setting
 		local vp = workspace.CurrentCamera.ViewportSize
-		local scale = math.clamp(vp.Y / 860, 0.55, 1.1)
+		local scale = math.clamp(vp.Y / 860, 0.55, 1.1) * (UIKit.IsTouch() and 1.15 or 1) * math.clamp(tonumber(player:GetAttribute("UISize")) or 1, 0.7, 1.5)
 		menuScale.Scale, moreScale.Scale = scale, scale
 	end
 	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(rescale)
+	player:GetAttributeChangedSignal("UISize"):Connect(rescale)
 	rescale()
 
 	local main = {
@@ -16968,6 +19141,13 @@ function HUD:Init(controllers)
 		{ "Daily", "🎁", "DAILY", Color3.fromRGB(255, 90, 120) },
 	}
 	local more = {
+		{ "Season", "🎫", "SEASON", Color3.fromRGB(255, 140, 40) },
+		{ "Style", "✨", "STYLE", Color3.fromRGB(255, 100, 190) },
+		{ "Achievements", "🏆", "GOALS", Color3.fromRGB(255, 196, 0) },
+		{ "Trade", "🤝", "TRADE", Color3.fromRGB(0, 200, 255) },
+		{ "Social", "🌐", "SOCIAL", Color3.fromRGB(70, 160, 255) },
+		{ "Boards", "🏅", "RANKS", Color3.fromRGB(255, 190, 40) },
+		{ "Stats", "📊", "STATS", Color3.fromRGB(90, 160, 255) },
 		{ "Duo", "👥", "DUO", Color3.fromRGB(0, 190, 255) },
 		{ "Floors", "🛗", "FLOORS", Color3.fromRGB(0, 160, 220) },
 		{ "Wheel", "🎰", "WHEEL", Color3.fromRGB(255, 120, 60) },
@@ -17078,6 +19258,15 @@ function HUD:Refresh()
 	if boostEnd > now then
 		table.insert(parts, "🚀 2x Boost " .. Util.Clock(boostEnd - now))
 	end
+	local live = workspace:GetAttribute("LiveEvents")
+	if type(live) == "string" and live ~= "" then
+		for id in live:gmatch("[^,]+") do
+			local event = liveById[id]
+			if event then
+				table.insert(parts, event.Icon .. " " .. event.Name .. " " .. event.Multiplier .. "x")
+			end
+		end
+	end
 	local eventMult = workspace:GetAttribute("EventMultiplier") or 1
 	local eventEnds = workspace:GetAttribute("EventEnds") or 0
 	if eventMult ~= 1 and eventEnds > now then
@@ -17130,7 +19319,7 @@ return HUD
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="61">
           <Properties>
             <string name="Name">Minigame</string>
             <string name="Source"><![CDATA[--[[ Minigame (client) - join popup, countdown, in-game HUD and results ]]
@@ -17365,7 +19554,7 @@ return Minigame
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="62">
           <Properties>
             <string name="Name">Music</string>
             <string name="Source"><![CDATA[--[[
@@ -17585,7 +19774,7 @@ return Music
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">Notifications</string>
             <string name="Source"><![CDATA[--[[ Notifications - toast messages (top right) + big announcement banners ]]
@@ -17775,7 +19964,7 @@ return Notifications
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="64">
           <Properties>
             <string name="Name">Panels</string>
             <string name="Source"><![CDATA[--[[ Panels - Rebirth, Daily Rewards, Codes and Settings menus ]]
@@ -18018,7 +20207,8 @@ end
 
 ---------------------------------------------------------------------------
 local function buildSettings()
-	local _, content = C.UI:MakePanel("Settings", "⚙️ SETTINGS", Color3.fromRGB(130, 140, 160), 520, 520)
+	local _, outer = C.UI:MakePanel("Settings", "⚙️ SETTINGS", Color3.fromRGB(130, 140, 160), 520, 520)
+	local content = UIKit.Scroll({ Size = UDim2.fromScale(1, 1), Parent = outer }) -- scrolls on small screens
 	UIKit.List(content, 10)
 
 	local function row(order: number, text: string)
@@ -18127,6 +20317,26 @@ local function buildSettings()
 	player:GetAttributeChangedSignal("AutoBuild"):Connect(refreshAuto)
 	refreshAuto()
 
+	-- UI size (phones: make the buttons bigger)
+	local sizeRow = row(7, "📱 UI Size")
+	local sizeLabel = UIKit.Label({ Text = "", Size = UDim2.fromOffset(60, 30), Position = UDim2.new(1, -150, 0, 11), ZIndex = 8, Parent = sizeRow })
+	local function setSize(value: number)
+		value = math.clamp(math.floor(value * 10 + 0.5) / 10, 0.7, 1.5)
+		player:SetAttribute("UISize", value) -- instant locally; the server saves it
+		Remotes.SaveSettings:FireServer({ UISize = value })
+		sizeLabel.Text = math.floor(value * 100 + 0.5) .. "%"
+	end
+	UIKit.Button({ Text = "-", Color = Theme.Red, Size = UDim2.fromOffset(40, 36), Position = UDim2.new(1, -196, 0, 8), ZIndex = 8, Parent = sizeRow, Callback = function()
+		setSize((player:GetAttribute("UISize") or 1) - 0.1)
+	end })
+	UIKit.Button({ Text = "+", Color = Theme.Green, Size = UDim2.fromOffset(40, 36), Position = UDim2.new(1, -84, 0, 8), ZIndex = 8, Parent = sizeRow, Callback = function()
+		setSize((player:GetAttribute("UISize") or 1) + 0.1)
+	end })
+	sizeLabel.Text = math.floor((player:GetAttribute("UISize") or 1) * 100 + 0.5) .. "%"
+	player:GetAttributeChangedSignal("UISize"):Connect(function()
+		sizeLabel.Text = math.floor((player:GetAttribute("UISize") or 1) * 100 + 0.5) .. "%"
+	end)
+
 	UIKit.Label({ Text = Config.GameName .. " v" .. Config.Version, Size = UDim2.new(1, 0, 0, 20), Font = Theme.BodyFont, TextColor3 = Theme.SubText, LayoutOrder = 9, ZIndex = 7, Parent = content })
 
 	player:GetAttributeChangedSignal("SFX"):Connect(function()
@@ -18210,7 +20420,7 @@ return Panels
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="65">
           <Properties>
             <string name="Name">Pets</string>
             <string name="Source"><![CDATA[--[[
@@ -18332,10 +20542,21 @@ local function render()
 		return
 	end
 	infoLabel.Text = string.format("🐾 %d/%d equipped  •  +%sx income  •  %d pets", #state.Equipped, state.Slots, tostring(state.Bonus), #state.Owned)
+	local active = 0
+	for _, egg in state.Eggs do
+		if egg.Active ~= false then
+			active += 1
+		end
+	end
 	for _, egg in state.Eggs do
 		local entry = eggButtons[egg.Id]
 		if entry then
 			entry.Cost.Text = Util.Money(egg.Cost)
+			local frame = entry.Button.Parent
+			if frame then
+				frame.Visible = egg.Active ~= false
+				frame.Size = UDim2.new(1 / math.max(active, 1), -6, 1, 0)
+			end
 		end
 	end
 	for _, child in grid:GetChildren() do
@@ -18402,7 +20623,7 @@ function Pets:Init(controllers)
 	local eggRow = UIKit.new("Frame", { Name = "Eggs", Size = UDim2.new(1, 0, 0, 110), Position = UDim2.fromOffset(0, 34), BackgroundTransparency = 1, ZIndex = 6, Parent = content })
 	UIKit.List(eggRow, 8, Enum.FillDirection.Horizontal, Enum.HorizontalAlignment.Left)
 	for i, egg in PC.Eggs do
-		local frame = UIKit.new("Frame", { Name = "Egg" .. egg.Id, Size = UDim2.new(1 / #PC.Eggs, -6, 1, 0), BackgroundColor3 = Theme.Panel, LayoutOrder = i, ZIndex = 7, Parent = eggRow })
+		local frame = UIKit.new("Frame", { Name = "Egg" .. egg.Id, Size = UDim2.new(1 / 3, -6, 1, 0), Visible = egg.Event == nil, BackgroundColor3 = Theme.Panel, LayoutOrder = i, ZIndex = 7, Parent = eggRow })
 		UIKit.Corner(frame, 10)
 		UIKit.Stroke(frame, Theme.Accent, 2, 0.3)
 		UIKit.Label({ Text = egg.Icon .. " " .. egg.Name, Size = UDim2.new(1, -8, 0, 26), Position = UDim2.fromOffset(4, 4), ZIndex = 8, Parent = frame })
@@ -18475,7 +20696,7 @@ return Pets
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="66">
           <Properties>
             <string name="Name">Quests</string>
             <string name="Source"><![CDATA[--[[ Quests (client) - the quest tracker in the bottom-right corner ]]
@@ -18651,7 +20872,257 @@ return Quests
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="67">
+          <Properties>
+            <string name="Name">Records</string>
+            <string name="Source"><![CDATA[--[[ Records (client) - the Stats page and the global Leaderboards panel ]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Util = require(Shared.Util)
+local UIKit = require(Shared.UIKit)
+local Remotes = require(Shared.Remotes)
+
+local player = Players.LocalPlayer
+local Theme = UIKit.Theme
+
+local Records = {}
+local C
+
+local statsList: ScrollingFrame
+local boardList: ScrollingFrame
+local boardTabs: { [string]: TextButton } = {}
+local boardData
+local currentBoard = "Earned"
+
+local BOARDS = {
+	{ Id = "Earned", Name = "💰 RICHEST", Money = true },
+	{ Id = "Rebirths", Name = "🔄 REBIRTHS" },
+	{ Id = "Hatched", Name = "🥚 EGGS HATCHED" },
+}
+
+local function refreshStats()
+	local lines = Remotes.StatsGet:InvokeServer()
+	UIKit.Clear(statsList)
+	for i, line in lines or {} do
+		local row = UIKit.Row(statsList, i, 44)
+		UIKit.Label({ Text = line.Label, Size = UDim2.new(0.6, -12, 1, -10), Position = UDim2.fromOffset(12, 5), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 8, Parent = row })
+		UIKit.Label({ Text = line.Value, Size = UDim2.new(0.4, -12, 1, -10), Position = UDim2.new(0.6, 0, 0, 5), TextXAlignment = Enum.TextXAlignment.Right, TextColor3 = Theme.Accent, ZIndex = 8, Parent = row })
+	end
+end
+
+local function renderBoard()
+	if not boardData then
+		return
+	end
+	for id, button in boardTabs do
+		button.BackgroundColor3 = id == currentBoard and Theme.Accent or Theme.PanelLight
+	end
+	UIKit.Clear(boardList)
+	local rows = boardData[currentBoard] or {}
+	local money = currentBoard == "Earned"
+	local medals = { "🥇", "🥈", "🥉" }
+	for i, entry in rows do
+		local row = UIKit.Row(boardList, i, 42)
+		if entry.UserId == player.UserId then
+			UIKit.Stroke(row, Theme.Green, 2)
+		end
+		UIKit.Label({ Text = medals[i] or ("#" .. i), Size = UDim2.new(0.14, 0, 1, -8), Position = UDim2.fromOffset(4, 4), ZIndex = 8, Parent = row })
+		UIKit.Label({ Text = entry.Name, Size = UDim2.new(0.5, 0, 1, -8), Position = UDim2.new(0.14, 0, 0, 4), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 8, Parent = row })
+		UIKit.Label({ Text = money and Util.Money(entry.Value) or Util.Abbreviate(entry.Value), Size = UDim2.new(0.34, -8, 1, -8), Position = UDim2.new(0.66, 0, 0, 4), TextXAlignment = Enum.TextXAlignment.Right, TextColor3 = Theme.Green, ZIndex = 8, Parent = row })
+	end
+	if #rows == 0 then
+		UIKit.Label({ Text = "No scores yet - be the first!", Size = UDim2.new(1, -10, 0, 40), Font = Theme.BodyFont, TextColor3 = Theme.SubText, ZIndex = 8, Parent = boardList })
+	end
+end
+
+local function refreshBoards()
+	boardData = Remotes.BoardsGet:InvokeServer()
+	renderBoard()
+end
+
+function Records:Init(controllers)
+	C = controllers
+	local _, stats = C.UI:MakePanel("Stats", "📊 YOUR STATS", Color3.fromRGB(90, 160, 255), 560, 580, refreshStats)
+	statsList = UIKit.Scroll({ Size = UDim2.fromScale(1, 1), Parent = stats })
+	UIKit.List(statsList, 5)
+	UIKit.new("UIPadding", { PaddingRight = UDim.new(0, 8), Parent = statsList })
+
+	local _, boards = C.UI:MakePanel("Boards", "🏅 LEADERBOARDS", Color3.fromRGB(255, 190, 40), 620, 600, refreshBoards)
+	local tabs = UIKit.new("Frame", { Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, ZIndex = 6, Parent = boards })
+	UIKit.List(tabs, 8, Enum.FillDirection.Horizontal, Enum.HorizontalAlignment.Left)
+	for i, board in BOARDS do
+		boardTabs[board.Id] = UIKit.Button({ Text = board.Name, Color = Theme.PanelLight, Size = UDim2.new(0.32, 0, 0, 40), LayoutOrder = i, ZIndex = 7, Parent = tabs, Callback = function()
+			currentBoard = board.Id
+			renderBoard()
+		end })
+	end
+	boardList = UIKit.Scroll({ Size = UDim2.new(1, 0, 1, -52), Position = UDim2.fromOffset(0, 50), Parent = boards })
+	UIKit.List(boardList, 5)
+	UIKit.new("UIPadding", { PaddingRight = UDim.new(0, 8), Parent = boardList })
+end
+
+return Records
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="68">
+          <Properties>
+            <string name="Name">Season</string>
+            <string name="Source"><![CDATA[--[[ Season (client) - the season pass panel: a free and a premium reward for every level ]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local UIKit = require(Shared.UIKit)
+local Remotes = require(Shared.Remotes)
+
+local player = Players.LocalPlayer
+local Theme = UIKit.Theme
+local SC = Config.Season
+
+local Season = {}
+local C
+
+local titleLabel: TextLabel
+local levelLabel: TextLabel
+local setXp: (number) -> ()
+local passButton: TextButton
+local list: ScrollingFrame
+local lastState
+
+local function rewardText(reward): string
+	if reward.Kind == "Cash" then
+		return "💵 " .. string.format("%g", reward.Minutes) .. " min income"
+	elseif reward.Kind == "Boost" then
+		return "⚡ 2x " .. Util.FormatTime(reward.Seconds)
+	elseif reward.Kind == "Pet" then
+		local pet = Config.PetById[reward.Id]
+		return pet.Icon .. " " .. pet.Name
+	elseif reward.Kind == "Cosmetic" then
+		local cosmetic = Config.Cosmetics.ById[reward.Id]
+		return cosmetic.Icon .. " " .. cosmetic.Name
+	end
+	return "?"
+end
+
+local render
+
+local function claim(track: string, level: number)
+	local ok, message = Remotes.SeasonClaim:InvokeServer(track, level)
+	C.Notifications:Toast(tostring(message), ok and "success" or "error", 4)
+	local state = Remotes.SeasonGet:InvokeServer()
+	if state then
+		render(state)
+	end
+end
+
+-- one reward cell
+local function cell(row: Frame, track: string, level: number, state, x: number)
+	local reward = SC[track][level]
+	local holder = UIKit.new("Frame", { Size = UDim2.new(0.38, 0, 1, -8), Position = UDim2.new(x, 0, 0, 4), BackgroundTransparency = 1, ZIndex = 8, Parent = row })
+	if not reward then
+		UIKit.Label({ Text = "-", Size = UDim2.fromScale(1, 0.5), Position = UDim2.fromScale(0, 0.25), TextColor3 = Theme.SubText, ZIndex = 8, Parent = holder })
+		return
+	end
+	local claimedSet = track == "Free" and state.Free or state.PremiumClaimed
+	local claimed = claimedSet[tostring(level)] == true
+	UIKit.Label({ Text = rewardText(reward), Size = UDim2.new(1, -92, 1, 0), TextXAlignment = Enum.TextXAlignment.Left, Font = Theme.BodyFont, ZIndex = 8, Parent = holder })
+	local text, color, active = "CLAIM", Theme.Green, true
+	if claimed then
+		text, color, active = "✓", Theme.SubText, false
+	elseif state.Level < level then
+		text, color, active = "🔒 " .. level, Color3.fromRGB(70, 72, 96), false
+	elseif track == "Premium" and not state.Premium then
+		text, color, active = "🎫", Color3.fromRGB(150, 90, 30), false
+	end
+	UIKit.Button({ Text = text, Color = color, Size = UDim2.fromOffset(84, 36), Position = UDim2.new(1, -86, 0.5, -18), ZIndex = 9, Parent = holder, Callback = function()
+		if active then
+			claim(track, level)
+		end
+	end })
+end
+
+render = function(state)
+	lastState = state
+	titleLabel.Text = "🎫 " .. state.Name .. "   ⏳ " .. Util.FormatTime(math.max(0, state.EndsAt - Util.ServerNow()))
+	if state.Level >= SC.Levels then
+		levelLabel.Text = "Level " .. SC.Levels .. " - MAX!"
+		setXp(1)
+	else
+		levelLabel.Text = string.format("Level %d   %d / %d XP", state.Level, state.Into, state.Need)
+		setXp(state.Into / state.Need)
+	end
+	passButton.Visible = not state.Premium
+	UIKit.Clear(list)
+	for level = 1, SC.Levels do
+		local row = UIKit.Row(list, level, 50)
+		UIKit.Label({ Text = tostring(level), Size = UDim2.new(0.1, 0, 1, 0), TextColor3 = state.Level >= level and Theme.Accent or Theme.SubText, ZIndex = 8, Parent = row })
+		cell(row, "Free", level, state, 0.1)
+		cell(row, "Premium", level, state, 0.5)
+	end
+end
+
+local function refresh()
+	local state = Remotes.SeasonGet:InvokeServer()
+	if state then
+		render(state)
+	end
+end
+
+function Season:Init(controllers)
+	C = controllers
+	local _, content = C.UI:MakePanel("Season", "🎫 SEASON", Color3.fromRGB(255, 140, 40), 820, 600, refresh)
+	titleLabel = UIKit.Label({ Text = "", Size = UDim2.new(0.62, 0, 0, 28), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 7, Parent = content })
+	levelLabel = UIKit.Label({ Text = "", Size = UDim2.new(0.62, 0, 0, 20), Position = UDim2.fromOffset(0, 30), TextXAlignment = Enum.TextXAlignment.Left, Font = Theme.BodyFont, ZIndex = 7, Parent = content })
+	local bar, set = UIKit.Bar(content, UDim2.new(0.62, 0, 0, 14), UDim2.fromOffset(0, 54), Theme.Accent2)
+	bar.ZIndex = 7
+	setXp = set
+	passButton = UIKit.Button({ Text = "🎫 GET SEASON PASS", Color = Color3.fromRGB(255, 140, 40), Size = UDim2.new(0.36, 0, 0, 44), Position = UDim2.new(0.64, 0, 0, 8), ZIndex = 8, Parent = content, Callback = function()
+		Remotes.BuyPass:FireServer(SC.PremiumPass)
+	end })
+	UIKit.Label({ Text = "LEVEL", Size = UDim2.new(0.1, 0, 0, 18), Position = UDim2.fromOffset(0, 74), Font = Theme.BodyFont, TextColor3 = Theme.SubText, ZIndex = 7, Parent = content })
+	UIKit.Label({ Text = "FREE", Size = UDim2.new(0.38, 0, 0, 18), Position = UDim2.new(0.1, 0, 0, 74), Font = Theme.BodyFont, TextColor3 = Theme.Green, ZIndex = 7, Parent = content })
+	UIKit.Label({ Text = "PREMIUM 🎫", Size = UDim2.new(0.38, 0, 0, 18), Position = UDim2.new(0.5, 0, 0, 74), Font = Theme.BodyFont, TextColor3 = Theme.Accent, ZIndex = 7, Parent = content })
+	list = UIKit.Scroll({ Size = UDim2.new(1, 0, 1, -98), Position = UDim2.fromOffset(0, 96), Parent = content })
+	UIKit.List(list, 5)
+	UIKit.new("UIPadding", { PaddingRight = UDim.new(0, 8), Parent = list })
+	for _, attr in { "SeasonLevel", "Pass_" .. SC.PremiumPass } do
+		player:GetAttributeChangedSignal(attr):Connect(function()
+			if C.UI.Current == "Season" then
+				task.spawn(refresh)
+			end
+		end)
+	end
+end
+
+function Season:Start()
+	-- the badge on the menu: rewards waiting
+	local function badge()
+		if C.HUD and C.HUD.SetBadge then
+			local ready = player:GetAttribute("SeasonReady") or 0
+			C.HUD:SetBadge("Season", ready > 0, tostring(ready))
+		end
+	end
+	player:GetAttributeChangedSignal("SeasonReady"):Connect(badge)
+	badge()
+	-- the countdown
+	while true do
+		task.wait(1)
+		if C.UI.Current == "Season" and lastState then
+			titleLabel.Text = "🎫 " .. lastState.Name .. "   ⏳ " .. Util.FormatTime(math.max(0, lastState.EndsAt - Util.ServerNow()))
+		end
+	end
+end
+
+return Season
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="69">
           <Properties>
             <string name="Name">Shield</string>
             <string name="Source"><![CDATA[--[[
@@ -18767,7 +21238,7 @@ return Shield
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="59">
+        <Item class="ModuleScript" referent="70">
           <Properties>
             <string name="Name">Shop</string>
             <string name="Source"><![CDATA[--[[ Shop - Robux panel with Game Passes and Developer Products ]]
@@ -18999,7 +21470,519 @@ return Shop
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="60">
+        <Item class="ModuleScript" referent="71">
+          <Properties>
+            <string name="Name">Social</string>
+            <string name="Source"><![CDATA[--[[ Social (client) - group reward, friends who are in the game (join them), invite friends, private-server info ]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local SocialService = game:GetService("SocialService")
+local TeleportService = game:GetService("TeleportService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local UIKit = require(Shared.UIKit)
+local Remotes = require(Shared.Remotes)
+
+local player = Players.LocalPlayer
+local Theme = UIKit.Theme
+
+local Social = {}
+local C
+
+local scroll: ScrollingFrame
+
+local function section(order: number, text: string)
+	return UIKit.Label({ Text = text, Size = UDim2.new(1, -10, 0, 28), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = Theme.Accent, LayoutOrder = order, ZIndex = 8, Parent = scroll })
+end
+
+local function note(order: number, text: string, height: number?, color: Color3?)
+	local label = UIKit.new("TextLabel", {
+		Text = text,
+		Size = UDim2.new(1, -10, 0, height or 40),
+		BackgroundTransparency = 1,
+		TextWrapped = true,
+		TextSize = 15,
+		Font = Theme.BodyFont,
+		TextColor3 = color or Theme.SubText,
+		TextXAlignment = Enum.TextXAlignment.Left,
+		TextYAlignment = Enum.TextYAlignment.Top,
+		LayoutOrder = order,
+		ZIndex = 8,
+		Parent = scroll,
+	})
+	return label
+end
+
+local function refresh()
+	UIKit.Clear(scroll)
+	local state = Remotes.SocialGet:InvokeServer()
+	if not state then
+		return
+	end
+	local order = 0
+	local function nextOrder()
+		order += 1
+		return order
+	end
+
+	section(nextOrder(), "👥 Group reward")
+	if state.GroupId == 0 then
+		note(nextOrder(), "A group reward hasn't been set up yet.")
+	elseif state.Claimed then
+		note(nextOrder(), "✓ You already claimed the group reward. Thank you!", 30, Theme.Green)
+	else
+		note(nextOrder(), "Join our Roblox group for free cash and a 2x boost! " .. state.GroupLink, 44)
+		local row = UIKit.Row(scroll, nextOrder(), 50)
+		UIKit.Label({ Text = state.InGroup and "You're in the group - claim it!" or "Join the group, then press Claim", Size = UDim2.new(1, -190, 1, -16), Position = UDim2.fromOffset(12, 8), TextXAlignment = Enum.TextXAlignment.Left, Font = Theme.BodyFont, ZIndex = 8, Parent = row })
+		UIKit.Button({ Text = "🎁 CLAIM", Color = Theme.Green, Size = UDim2.fromOffset(160, 38), Position = UDim2.new(1, -170, 0, 6), ZIndex = 8, Parent = row, Callback = function()
+			local ok, message = Remotes.SocialAction:InvokeServer("ClaimGroup")
+			C.Notifications:Toast(tostring(message), ok and "success" or "error", 4)
+			refresh()
+		end })
+	end
+
+	section(nextOrder(), "🏠 Private server")
+	if state.Private then
+		note(nextOrder(), "✓ You're in a private server: +" .. math.floor(state.PrivateBonus * 100) .. "% income!", 30, Theme.Green)
+	else
+		note(nextOrder(), "Private (VIP) servers earn +" .. math.floor(state.PrivateBonus * 100) .. "% income. Find them on the game's page.", 44)
+	end
+
+	section(nextOrder(), "🧑‍🤝‍🧑 Friends")
+	local here = math.min(tonumber(player:GetAttribute("FriendsHere")) or 0, Config.Bonuses.MaxFriends)
+	note(nextOrder(), here > 0 and ("👫 " .. here .. " friend(s) here: +" .. here * Config.Bonuses.FriendPercent .. "% income!") or ("Play with friends: +" .. Config.Bonuses.FriendPercent .. "% income for each friend in your server (up to " .. Config.Bonuses.MaxFriends .. ")."), 44)
+	local inviteRow = UIKit.Row(scroll, nextOrder(), 50)
+	UIKit.Label({ Text = "Invite friends to play", Size = UDim2.new(1, -190, 1, -16), Position = UDim2.fromOffset(12, 8), TextXAlignment = Enum.TextXAlignment.Left, Font = Theme.BodyFont, ZIndex = 8, Parent = inviteRow })
+	UIKit.Button({ Text = "📨 INVITE", Color = Theme.Accent2, Size = UDim2.fromOffset(160, 38), Position = UDim2.new(1, -170, 0, 6), ZIndex = 8, Parent = inviteRow, Callback = function()
+		local ok = pcall(function()
+			if SocialService:CanSendGameInviteAsync(player) then
+				SocialService:PromptGameInvite(player)
+			else
+				C.Notifications:Toast("You can't send invites right now.", "error", 3)
+			end
+		end)
+		if not ok then
+			C.Notifications:Toast("Invites only work in the live game.", "info", 3)
+		end
+	end })
+
+	-- friends currently playing this game in another server
+	local ok, friends = pcall(function()
+		return player:GetFriendsOnline(50)
+	end)
+	local joinable = 0
+	if ok and type(friends) == "table" then
+		for _, friend in friends do
+			if friend.PlaceId == game.PlaceId and friend.GameId and friend.GameId ~= game.JobId then
+				joinable += 1
+				local row = UIKit.Row(scroll, nextOrder(), 50)
+				UIKit.Label({ Text = tostring(friend.DisplayName or friend.UserName), Size = UDim2.new(1, -190, 1, -16), Position = UDim2.fromOffset(12, 8), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 8, Parent = row })
+				UIKit.Button({ Text = "➡ JOIN", Color = Theme.Green, Size = UDim2.fromOffset(160, 38), Position = UDim2.new(1, -170, 0, 6), ZIndex = 8, Parent = row, Callback = function()
+					local teleported = pcall(function()
+						TeleportService:TeleportToPlaceInstance(friend.PlaceId, friend.GameId, player)
+					end)
+					if not teleported then
+						C.Notifications:Toast("Couldn't join right now.", "error", 3)
+					end
+				end })
+			end
+		end
+	end
+	if joinable == 0 then
+		note(nextOrder(), "None of your friends are playing in another server right now.", 30)
+	end
+end
+
+function Social:Init(controllers)
+	C = controllers
+	local _, content = C.UI:MakePanel("Social", "🌐 SOCIAL", Color3.fromRGB(70, 160, 255), 640, 560, refresh)
+	scroll = UIKit.Scroll({ Size = UDim2.fromScale(1, 1), Parent = content })
+	UIKit.List(scroll, 6)
+	UIKit.new("UIPadding", { PaddingRight = UDim.new(0, 8), Parent = scroll })
+end
+
+return Social
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="72">
+          <Properties>
+            <string name="Name">Style</string>
+            <string name="Source"><![CDATA[--[[ Style (client) - cosmetics: trails, auras and hats. Buy, wear and take off. ]]
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local UIKit = require(Shared.UIKit)
+local Remotes = require(Shared.Remotes)
+
+local ROBUX = utf8.char(0xE002)
+local Theme = UIKit.Theme
+local CC = Config.Cosmetics
+
+local Style = {}
+local C
+
+local grid: ScrollingFrame
+local info: TextLabel
+local tabButtons: { [string]: TextButton } = {}
+local currentKind = CC.Kinds[1].Id
+local state
+
+local render
+
+local function act(action: string, arg: string)
+	local ok, message = Remotes.CosmeticsAction:InvokeServer(action, arg)
+	if message and message ~= "" then
+		C.Notifications:Toast(tostring(message), ok and "success" or "error", 3)
+	end
+	state = Remotes.CosmeticsGet:InvokeServer()
+	render()
+end
+
+render = function()
+	if not state then
+		return
+	end
+	info.Text = string.format("✨ %d / %d collected", state.Count, #CC.List)
+	for kind, button in tabButtons do
+		button.BackgroundColor3 = kind == currentKind and Theme.Accent or Theme.PanelLight
+	end
+	UIKit.Clear(grid)
+	local order = 0
+	for _, cosmetic in CC.List do
+		if cosmetic.Kind == currentKind then
+			order += 1
+			local owned = state.Owned[cosmetic.Id] == true
+			local worn = state.Equipped[cosmetic.Kind] == cosmetic.Id
+			local card = UIKit.new("Frame", { BackgroundColor3 = Theme.PanelLight, LayoutOrder = order, ZIndex = 7, Parent = grid })
+			UIKit.Corner(card, 12)
+			UIKit.Stroke(card, worn and Theme.Green or (owned and Theme.Accent2 or Color3.fromRGB(70, 72, 96)), 3)
+			UIKit.Label({ Text = cosmetic.Icon, Size = UDim2.new(1, 0, 0, 56), Position = UDim2.fromOffset(0, 6), ZIndex = 8, Parent = card })
+			UIKit.Label({ Text = cosmetic.Name, Size = UDim2.new(1, -8, 0, 22), Position = UDim2.fromOffset(4, 64), ZIndex = 8, Parent = card })
+			local text, color, callback = "", Theme.Green, nil
+			if worn then
+				text, color = "WEARING ✓", Theme.Green
+				callback = function()
+					act("Unequip", cosmetic.Kind)
+				end
+			elseif owned then
+				text, color = "WEAR", Theme.Accent2
+				callback = function()
+					act("Equip", cosmetic.Id)
+				end
+			elseif cosmetic.Price then
+				text, color = Util.Money(cosmetic.Price), Theme.Green
+				callback = function()
+					act("Buy", cosmetic.Id)
+				end
+			elseif cosmetic.Robux then
+				text, color = ROBUX .. " " .. cosmetic.Robux, Color3.fromRGB(0, 160, 90)
+				callback = function()
+					act("Buy", cosmetic.Id)
+				end
+			else
+				text, color = cosmetic.Source == "Season" and "🎫 SEASON" or "🏆 ACHIEVEMENT", Color3.fromRGB(80, 82, 110)
+			end
+			UIKit.Button({ Text = text, Color = color, Size = UDim2.new(1, -16, 0, 34), Position = UDim2.new(0, 8, 1, -42), ZIndex = 9, Parent = card, Callback = function()
+				if callback then
+					callback()
+				end
+			end })
+		end
+	end
+end
+
+local function refresh()
+	state = Remotes.CosmeticsGet:InvokeServer()
+	render()
+end
+
+function Style:Init(controllers)
+	C = controllers
+	local _, content = C.UI:MakePanel("Style", "✨ STYLE", Color3.fromRGB(255, 100, 190), 780, 560, refresh)
+	local tabs = UIKit.new("Frame", { Size = UDim2.new(1, 0, 0, 44), BackgroundTransparency = 1, ZIndex = 6, Parent = content })
+	UIKit.List(tabs, 8, Enum.FillDirection.Horizontal, Enum.HorizontalAlignment.Left)
+	for i, kind in CC.Kinds do
+		tabButtons[kind.Id] = UIKit.Button({ Text = kind.Icon .. " " .. kind.Name:upper(), Color = Theme.PanelLight, Size = UDim2.fromOffset(170, 40), LayoutOrder = i, ZIndex = 7, Parent = tabs, Callback = function()
+			currentKind = kind.Id
+			render()
+		end })
+	end
+	info = UIKit.Label({ Text = "", Size = UDim2.new(0.3, 0, 0, 30), Position = UDim2.new(1, 0, 0, 6), AnchorPoint = Vector2.new(1, 0), Font = Theme.BodyFont, TextXAlignment = Enum.TextXAlignment.Right, ZIndex = 7, Parent = content })
+	grid = UIKit.Scroll({ Size = UDim2.new(1, 0, 1, -52), Position = UDim2.fromOffset(0, 50), Parent = content })
+	local layout = UIKit.new("UIGridLayout", { CellSize = UDim2.fromOffset(160, 150), CellPadding = UDim2.fromOffset(10, 10), SortOrder = Enum.SortOrder.LayoutOrder, Parent = grid })
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	UIKit.new("UIPadding", { PaddingTop = UDim.new(0, 6), PaddingRight = UDim.new(0, 8), Parent = grid })
+end
+
+return Style
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="73">
+          <Properties>
+            <string name="Name">Trade</string>
+            <string name="Source"><![CDATA[--[[ Trade (client) - trade pets with another player: player list, the two offers, your pets, Accept ]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local UIKit = require(Shared.UIKit)
+local Remotes = require(Shared.Remotes)
+
+local player = Players.LocalPlayer
+local Theme = UIKit.Theme
+local RARITIES = Config.Pets.Rarities
+
+local Trade = {}
+Trade.State = nil :: any
+local C
+
+local listView: ScrollingFrame
+local tradeView: Frame
+local mineGrid: ScrollingFrame
+local theirsGrid: ScrollingFrame
+local petsGrid: ScrollingFrame
+local statusLabel: TextLabel
+local acceptButton: TextButton
+local mineTitle: TextLabel
+local theirsTitle: TextLabel
+local popup: Frame
+local popupText: TextLabel
+local popupTimer: TextLabel
+local popupToken = 0
+
+local function act(action: string, arg: any?)
+	local ok, message = Remotes.TradeAction:InvokeServer(action, arg)
+	if message and message ~= "" and not ok then
+		C.Notifications:Toast(tostring(message), "error", 3)
+	end
+	return ok
+end
+
+local function petCard(parent: Instance, order: number, pet, onClick: (() -> ())?)
+	local def = Config.PetById[pet.Id]
+	local rarity = RARITIES[def.Rarity]
+	local button = UIKit.new("TextButton", { Text = "", BackgroundColor3 = Theme.Panel, AutoButtonColor = false, LayoutOrder = order, ZIndex = 8, Parent = parent })
+	UIKit.Corner(button, 10)
+	UIKit.Stroke(button, rarity.Color, 2)
+	UIKit.Label({ Text = def.Icon, Size = UDim2.new(1, 0, 0, 34), Position = UDim2.fromOffset(0, 2), ZIndex = 9, Parent = button })
+	UIKit.Label({ Text = def.Name, Size = UDim2.new(1, -4, 0, 16), Position = UDim2.fromOffset(2, 38), Font = Theme.BodyFont, TextColor3 = rarity.Color, ZIndex = 9, Parent = button })
+	UIKit.Label({ Text = "+" .. tostring(rarity.Bonus) .. "x", Size = UDim2.new(1, -4, 0, 14), Position = UDim2.fromOffset(2, 54), Font = Theme.BodyFont, TextColor3 = Theme.SubText, Stroke = false, ZIndex = 9, Parent = button })
+	if onClick then
+		button.Activated:Connect(function()
+			UIKit.PlaySound("Click", 0.4)
+			onClick()
+		end)
+	end
+	return button
+end
+
+local function fillPlayers()
+	UIKit.Clear(listView)
+	local order = 0
+	for _, other in Players:GetPlayers() do
+		if other ~= player then
+			order += 1
+			local row = UIKit.Row(listView, order, 52)
+			UIKit.Label({ Text = other.DisplayName, Size = UDim2.new(1, -200, 0, 28), Position = UDim2.fromOffset(12, 12), TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 8, Parent = row })
+			UIKit.Button({ Text = "🤝 TRADE", Color = Theme.Accent2, Size = UDim2.fromOffset(150, 38), Position = UDim2.new(1, -160, 0, 7), ZIndex = 8, Parent = row, Callback = function()
+				local ok = act("Invite", other.UserId)
+				if ok then
+					C.Notifications:Toast("Trade request sent to " .. other.DisplayName .. ".", "info", 3)
+				end
+			end })
+		end
+	end
+	if order == 0 then
+		UIKit.Label({ Text = "Nobody else is in your server right now.", Size = UDim2.new(1, -10, 0, 40), Font = Theme.BodyFont, TextColor3 = Theme.SubText, ZIndex = 8, Parent = listView })
+	end
+end
+
+local function renderTrade()
+	local state = Trade.State
+	listView.Visible = state == nil
+	tradeView.Visible = state ~= nil
+	if not state then
+		fillPlayers()
+		return
+	end
+	mineTitle.Text = "YOUR OFFER" .. (state.MyAccepted and "  ✔" or "")
+	theirsTitle.Text = state.Partner.Name:upper() .. "'S OFFER" .. (state.TheirAccepted and "  ✔" or "")
+	UIKit.Clear(mineGrid)
+	UIKit.Clear(theirsGrid)
+	UIKit.Clear(petsGrid)
+	local offered = {}
+	for i, pet in state.Mine do
+		offered[pet.Uid] = true
+		petCard(mineGrid, i, pet, function()
+			act("Remove", pet.Uid)
+		end)
+	end
+	for i, pet in state.Theirs do
+		petCard(theirsGrid, i, pet, nil)
+	end
+	local pets = C.Pets.State and C.Pets.State.Owned or {}
+	local order = 0
+	for _, pet in pets do
+		if not offered[pet.Uid] then
+			order += 1
+			petCard(petsGrid, order, pet, function()
+				act("Add", pet.Uid)
+			end)
+		end
+	end
+end
+
+local function updateAccept()
+	local state = Trade.State
+	if not state then
+		return
+	end
+	local wait = state.ReadyAt - Util.ServerNow()
+	if state.MyAccepted then
+		acceptButton.Text = "WAITING..."
+		acceptButton.BackgroundColor3 = Color3.fromRGB(80, 82, 110)
+		statusLabel.Text = state.TheirAccepted and "" or "Waiting for " .. state.Partner.Name .. " to accept..."
+	elseif wait > 0 then
+		acceptButton.Text = "ACCEPT (" .. math.ceil(wait) .. ")"
+		acceptButton.BackgroundColor3 = Color3.fromRGB(80, 82, 110)
+		statusLabel.Text = "Check the offers carefully!"
+	else
+		acceptButton.Text = "✅ ACCEPT"
+		acceptButton.BackgroundColor3 = Theme.Green
+		statusLabel.Text = state.TheirAccepted and (state.Partner.Name .. " accepted - your turn!") or "Add pets, then press Accept."
+	end
+end
+
+function Trade:Init(controllers)
+	C = controllers
+	local _, content = C.UI:MakePanel("Trade", "🤝 TRADE", Theme.Accent2, 860, 600, function()
+		renderTrade()
+	end)
+
+	listView = UIKit.Scroll({ Size = UDim2.new(1, 0, 1, 0), Parent = content })
+	UIKit.List(listView, 6)
+	UIKit.new("UIPadding", { PaddingRight = UDim.new(0, 8), Parent = listView })
+
+	tradeView = UIKit.new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, Visible = false, ZIndex = 6, Parent = content })
+	local function box(x: number, title: string)
+		local label = UIKit.Label({ Text = title, Size = UDim2.new(0.5, -6, 0, 26), Position = UDim2.new(x, 0, 0, 0), ZIndex = 7, Parent = tradeView })
+		local scroll = UIKit.Scroll({ Size = UDim2.new(0.5, -6, 0, 150), Position = UDim2.new(x, 0, 0, 28), Parent = tradeView })
+		local frameBg = UIKit.new("Frame", { Size = UDim2.new(0.5, -6, 0, 150), Position = UDim2.new(x, 0, 0, 28), BackgroundColor3 = Theme.Background, ZIndex = 6, Parent = tradeView })
+		UIKit.Corner(frameBg, 10)
+		scroll.ZIndex = 7
+		local layout = UIKit.new("UIGridLayout", { CellSize = UDim2.fromOffset(84, 74), CellPadding = UDim2.fromOffset(6, 6), SortOrder = Enum.SortOrder.LayoutOrder, Parent = scroll })
+		layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+		return label, scroll
+	end
+	mineTitle, mineGrid = box(0, "YOUR OFFER")
+	theirsTitle, theirsGrid = box(0.5, "THEIR OFFER")
+	UIKit.Label({ Text = "YOUR PETS (tap to offer)", Size = UDim2.new(1, 0, 0, 24), Position = UDim2.fromOffset(0, 188), TextXAlignment = Enum.TextXAlignment.Left, Font = Theme.BodyFont, ZIndex = 7, Parent = tradeView })
+	petsGrid = UIKit.Scroll({ Size = UDim2.new(1, 0, 1, -300), Position = UDim2.fromOffset(0, 214), Parent = tradeView })
+	local layout = UIKit.new("UIGridLayout", { CellSize = UDim2.fromOffset(84, 74), CellPadding = UDim2.fromOffset(6, 6), SortOrder = Enum.SortOrder.LayoutOrder, Parent = petsGrid })
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+	statusLabel = UIKit.Label({ Text = "", Size = UDim2.new(0.5, 0, 0, 24), Position = UDim2.new(0, 0, 1, -76), TextXAlignment = Enum.TextXAlignment.Left, Font = Theme.BodyFont, ZIndex = 7, Parent = tradeView })
+	acceptButton = UIKit.Button({ Text = "✅ ACCEPT", Color = Theme.Green, Size = UDim2.new(0.34, 0, 0, 44), Position = UDim2.new(0.3, 0, 1, -48), ZIndex = 8, Parent = tradeView, Callback = function()
+		act("Accept")
+	end })
+	UIKit.Button({ Text = "❌ CANCEL", Color = Theme.Red, Size = UDim2.new(0.3, 0, 0, 44), Position = UDim2.new(0.68, 0, 1, -48), ZIndex = 8, Parent = tradeView, Callback = function()
+		act("Cancel")
+	end })
+
+	-- the trade request popup
+	popup = UIKit.new("Frame", { Name = "TradePopup", Size = UDim2.fromOffset(380, 100), Position = UDim2.new(0.5, 0, 0, -140), AnchorPoint = Vector2.new(0.5, 0), BackgroundColor3 = Theme.Panel, ZIndex = 30, Parent = C.UI.Gui })
+	UIKit.Corner(popup, 14)
+	UIKit.Stroke(popup, Theme.Accent2, 3)
+	popupText = UIKit.Label({ Text = "", Size = UDim2.new(1, -90, 0, 40), Position = UDim2.fromOffset(12, 6), ZIndex = 31, Parent = popup })
+	popupTimer = UIKit.Label({ Text = "", Size = UDim2.fromOffset(60, 40), Position = UDim2.new(1, -70, 0, 6), TextColor3 = Theme.Accent, ZIndex = 31, Parent = popup })
+	local function respond(accept: boolean)
+		popupToken += 1
+		TweenService:Create(popup, TweenInfo.new(0.3), { Position = UDim2.new(0.5, 0, 0, -140) }):Play()
+		act("Respond", accept)
+	end
+	UIKit.Button({ Text = "✅ YES", Color = Theme.Green, Size = UDim2.fromOffset(170, 38), Position = UDim2.fromOffset(12, 52), ZIndex = 31, Parent = popup, Callback = function()
+		respond(true)
+	end })
+	UIKit.Button({ Text = "✖ NO", Color = Theme.Red, Size = UDim2.fromOffset(170, 38), Position = UDim2.fromOffset(198, 52), ZIndex = 31, Parent = popup, Callback = function()
+		respond(false)
+	end })
+
+	Remotes.TradeInvited.OnClientEvent:Connect(function(data)
+		popupToken += 1
+		local token = popupToken
+		popupText.Text = data.FromName .. " wants to trade pets!"
+		UIKit.PlaySound("Notify", 0.6, 1.2)
+		TweenService:Create(popup, TweenInfo.new(0.45, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Position = UDim2.new(0.5, 0, 0, 90) }):Play()
+		task.spawn(function()
+			for t = data.Timeout or 30, 0, -1 do
+				if token ~= popupToken then
+					return
+				end
+				popupTimer.Text = "⏱ " .. t
+				task.wait(1)
+			end
+			if token == popupToken then
+				respond(false)
+			end
+		end)
+	end)
+
+	Remotes.TradeUpdate.OnClientEvent:Connect(function(state)
+		local wasTrading = Trade.State ~= nil
+		Trade.State = state
+		if state and not wasTrading then
+			-- the popup is gone, the trade begins: pets first
+			popupToken += 1
+			popup.Position = UDim2.new(0.5, 0, 0, -140)
+			Remotes.PetAction:InvokeServer("Refresh")
+			C.UI:Open("Trade")
+		end
+		if C.UI.Current == "Trade" then
+			renderTrade()
+			updateAccept()
+		end
+	end)
+	-- pets changed (a trade finished, or a pet was sold)
+	Remotes.PetUpdate.OnClientEvent:Connect(function()
+		if Trade.State and C.UI.Current == "Trade" then
+			task.defer(renderTrade)
+		end
+	end)
+	Players.PlayerAdded:Connect(function()
+		if not Trade.State and C.UI.Current == "Trade" then
+			fillPlayers()
+		end
+	end)
+	Players.PlayerRemoving:Connect(function()
+		task.defer(function()
+			if not Trade.State and C.UI.Current == "Trade" then
+				fillPlayers()
+			end
+		end)
+	end)
+end
+
+function Trade:Start()
+	while true do
+		task.wait(0.25)
+		if Trade.State and C.UI.Current == "Trade" then
+			updateAccept()
+		end
+	end
+end
+
+return Trade
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="74">
           <Properties>
             <string name="Name">Travel</string>
             <string name="Source"><![CDATA[--[[
@@ -19114,7 +22097,155 @@ return Travel
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="61">
+        <Item class="ModuleScript" referent="75">
+          <Properties>
+            <string name="Name">Tutorial</string>
+            <string name="Source"><![CDATA[--[[
+	Tutorial (client) - a short guided start: buy upgrades, spin the wheel, claim
+	the daily reward. The banner tells where to click; the server checks the
+	steps before it pays the reward (see TutorialService).
+]]
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local Config = require(Shared.Config)
+local Util = require(Shared.Util)
+local UIKit = require(Shared.UIKit)
+local Remotes = require(Shared.Remotes)
+
+local player = Players.LocalPlayer
+local Theme = UIKit.Theme
+local TC = Config.Tutorial
+
+local Tutorial = {}
+local C
+
+local banner: Frame
+local title: TextLabel
+local body: TextLabel
+local stepDots: TextLabel
+local finished = false
+
+local function count(map: any): number
+	local n = 0
+	for _ in map do
+		n += 1
+	end
+	return n
+end
+
+local steps = {
+	{
+		Title = "1/3  Buy upgrades",
+		Text = function()
+			local bought = math.max(count(C.Build.State.Purchased) - 1, 0)
+			return string.format("Walk onto a glowing pad to buy an upgrade! (%d/%d)", math.min(bought, TC.BuyUpgrades), TC.BuyUpgrades)
+		end,
+		Done = function()
+			return count(C.Build.State.Purchased) - 1 >= TC.BuyUpgrades
+		end,
+	},
+	{
+		Title = "2/3  Spin the wheel",
+		Text = function()
+			return "Press ➕ MORE on the left, then 🎰 WHEEL, and spin for a free prize!"
+		end,
+		Done = function()
+			return (player:GetAttribute("WheelReadyAt") or 0) > Util.ServerNow()
+		end,
+	},
+	{
+		Title = "3/3  Daily reward",
+		Text = function()
+			return "Press 🎁 DAILY on the left and claim your daily reward!"
+		end,
+		Done = function()
+			return (player:GetAttribute("LastDaily") or 0) > 0
+		end,
+	},
+}
+
+local function hide()
+	banner.Visible = false
+end
+
+local function finish()
+	if finished then
+		return
+	end
+	finished = true
+	title.Text = "🎓 Well done!"
+	body.Text = "Tutorial complete - your reward is on its way."
+	stepDots.Text = "●●●"
+	Remotes.TutorialClaim:FireServer()
+	task.delay(4, hide)
+end
+
+function Tutorial:Init(controllers)
+	C = controllers
+	banner = UIKit.new("Frame", {
+		Name = "Tutorial",
+		Size = UDim2.fromOffset(420, 78),
+		Position = UDim2.new(0.5, 0, 0, 176),
+		AnchorPoint = Vector2.new(0.5, 0),
+		BackgroundColor3 = Theme.Panel,
+		Visible = false,
+		ZIndex = 12,
+		Parent = C.UI.Gui,
+	})
+	UIKit.Corner(banner, 14)
+	UIKit.Stroke(banner, Theme.Green, 3)
+	title = UIKit.Label({ Text = "", Size = UDim2.new(1, -110, 0, 24), Position = UDim2.fromOffset(12, 6), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = Theme.Green, ZIndex = 13, Parent = banner })
+	stepDots = UIKit.Label({ Text = "", Size = UDim2.fromOffset(60, 20), Position = UDim2.new(1, -150, 0, 8), TextColor3 = Theme.Accent, ZIndex = 13, Parent = banner })
+	body = UIKit.new("TextLabel", { Text = "", Size = UDim2.new(1, -24, 0, 40), Position = UDim2.fromOffset(12, 32), BackgroundTransparency = 1, TextWrapped = true, TextSize = 15, Font = Theme.BodyFont, TextColor3 = Theme.Text, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Top, ZIndex = 13, Parent = banner })
+	UIKit.Button({ Text = "SKIP", Color = Color3.fromRGB(90, 92, 120), Size = UDim2.fromOffset(70, 26), Position = UDim2.new(1, -82, 0, 6), ZIndex = 14, Parent = banner, Callback = function()
+		finished = true
+		hide()
+	end })
+end
+
+function Tutorial:Start()
+	if not TC.Enabled then
+		return
+	end
+	if not player:GetAttribute("DataLoaded") then
+		player:GetAttributeChangedSignal("DataLoaded"):Wait()
+	end
+	while not player:GetAttribute("LoadingDone") do
+		task.wait(0.5)
+	end
+	task.wait(2)
+	if player:GetAttribute("TutorialDone") == true then
+		return
+	end
+	banner.Visible = true
+	while not finished and banner.Visible do
+		local current
+		local doneCount = 0
+		for _, step in steps do
+			if step.Done() then
+				doneCount += 1
+			elseif not current then
+				current = step
+			end
+		end
+		if not current then
+			finish()
+			break
+		end
+		title.Text = current.Title
+		body.Text = current.Text()
+		stepDots.Text = string.rep("●", doneCount) .. string.rep("○", #steps - doneCount)
+		task.wait(0.4)
+	end
+end
+
+return Tutorial
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="76">
           <Properties>
             <string name="Name">UI</string>
             <string name="Source"><![CDATA[--[[ UI - owns the main ScreenGui and the "one panel at a time" manager ]]
@@ -19253,7 +22384,7 @@ return UI
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="62">
+        <Item class="ModuleScript" referent="77">
           <Properties>
             <string name="Name">VFX</string>
             <string name="Source"><![CDATA[--[[
@@ -19796,7 +22927,7 @@ return VFX
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="63">
+        <Item class="ModuleScript" referent="78">
           <Properties>
             <string name="Name">Weekly</string>
             <string name="Source"><![CDATA[--[[
@@ -19910,7 +23041,7 @@ return Weekly
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="64">
+        <Item class="ModuleScript" referent="79">
           <Properties>
             <string name="Name">Wheel</string>
             <string name="Source"><![CDATA[--[[
@@ -20093,13 +23224,13 @@ return Wheel
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="65">
+  <Item class="TextChatService" referent="80">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="66">
+  <Item class="Workspace" referent="81">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="Gravity">196.2</float>
