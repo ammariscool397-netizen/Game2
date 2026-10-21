@@ -7,7 +7,6 @@
 	Floor-local coordinates come from TycoonItems.
 ]]
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared.Config)
@@ -60,7 +59,8 @@ function TycoonBuilder.BuildPlot(index: number, cf: CFrame, parent: Instance)
 	local color = PLOT_COLORS[(index - 1) % #PLOT_COLORS + 1]
 	local model = BuildKit.Model("Plot" .. index, parent)
 	model:SetAttribute("PlotIndex", index)
-	model.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+	-- always loaded: the ground, gate and upgrade pads must never be missing while you stand on them
+	model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 
 	local base = BuildKit.Model("Base", model)
 	Part({ Name = "Ground", Size = Vector3.new(120, 1, 120), CFrame = at(cf, 0, 0.5, 0), Color = Color3.fromRGB(225, 225, 230), Material = Enum.Material.Concrete, Parent = base })
@@ -151,8 +151,6 @@ function TycoonBuilder.BuildButton(plot, item, slot: number?, price: number)
 		Parent = model,
 	})
 	model.PrimaryPart = ring
-	pad.Size = Vector3.new(0.6, 0.5, 0.5)
-	TweenService:Create(pad, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = Vector3.new(0.6, 5, 5) }):Play()
 	return { Model = model, Pad = pad, Pillar = pillar, Label = label, Gui = gui, Slot = slot, Floor = item.ButtonFloor }
 end
 

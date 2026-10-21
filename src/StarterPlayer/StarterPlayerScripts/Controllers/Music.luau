@@ -6,6 +6,7 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local SoundService = game:GetService("SoundService")
+local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
@@ -120,6 +121,23 @@ function Music:Init(controllers)
 		if type(v) == "number" then
 			self:SetVolume(v, true)
 		end
+	end)
+
+	-- coming back to the window (from another app / tab): if the engine paused the song, carry on
+	local function resume()
+		local ok, paused = pcall(function()
+			return sound.SoundId ~= "" and sound.IsLoaded and not sound.IsPlaying
+		end)
+		if ok and paused then
+			if sound.TimeLength > 0 and sound.TimePosition >= sound.TimeLength - 0.5 then
+				self:Next()
+			else
+				sound:Play()
+			end
+		end
+	end
+	pcall(function()
+		UserInputService.WindowFocused:Connect(resume)
 	end)
 
 	sound.Ended:Connect(function()
